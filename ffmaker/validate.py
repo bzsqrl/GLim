@@ -267,7 +267,11 @@ def _render(ir, glsl_list, width, height, times, frames_between):
                 _ui(gl, prog, "ffm_Frame", frame)
                 _ui(gl, prog, "ffm_PassIndex", pi)
                 _u(gl, prog, "ffm_Date", 4, (2026.0, 9.0, 20.0, 43200.0 + sim_time))
-                _u(gl, prog, "ffm_Mouse", 4, (0.0, 0.0, 0.0, 0.0))
+                mp = next((p for p in ir.params if p.kind == "mouse"), None)
+                mc = next((p for p in ir.params if p.kind == "mouseclick"), None)
+                mx, my = (mp.default[0] * w, mp.default[1] * h) if mp else (0.0, 0.0)
+                down = bool(mc and mc.default)
+                _u(gl, prog, "ffm_Mouse", 4, (mx, my, mx if down else -mx, my if down else -my))
                 for p in ir.params:
                     if p.name:
                         _set_param(gl, prog, p, w, h)

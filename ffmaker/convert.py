@@ -100,6 +100,10 @@ def convert(code, name="Shader", path=None, extract_params=True, promote_ints=Fa
             exclude=(), dialect=None):
     """Parse + transform shader source into a ShaderIR."""
     code = code.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    if dialect is None:
+        from . import shadertoy_project
+        if shadertoy_project.is_project(code):
+            return _convert_project(code, name, path, extract_params, promote_ints, exclude)
     dialect = dialect or detect_dialect(code)
     ir = ShaderIR(name=name, dialect=dialect)
     header = None
@@ -113,6 +117,19 @@ def convert(code, name="Shader", path=None, extract_params=True, promote_ints=Fa
         code = code[:hdr[1]] + "\n" * code[hdr[1]:hdr[2]].count("\n") + code[hdr[2]:]
         _isf_header_to_ir(header, ir, path)
 
+    prog = _build_program(code, ir, path, extract_params, exclude, promote_ints,
+                          directives=channel_directives(code) if dialect == "shadertoy" else None)
+    prog.force_opaque = dialect != "isf"
+    ir.programs.append(prog)
+    if not ir.passes:
+        ir.passes.append(Pass())
+    _finish(ir, header)
+    return ir
+
+
+def _build_program(code, ir, path, extract_params, exclude, promote_ints, directives=None,
+                   label="", line_offset=0, channels=None):
+    """Run the token pipeline on one program's source and return a Program."""
     # Each phase gets a fresh token list so it sees earlier rewrites.
     retok = lambda t: G.tokenize(G.untokenize(t))
     toks = G.tokenize(code)
@@ -124,28 +141,32 @@ def convert(code, name="Shader", path=None, extract_params=True, promote_ints=Fa
     _map_varyings(toks, ir)
     toks = retok(toks)
     _map_distinctive_names(toks, ir, aliases)
-    if dialect == "shadertoy":
-        _shadertoy_images(toks, ir, channel_directives(code), path)
+    if ir.dialect == "shadertoy" and directives is not None:
+        _shadertoy_images(toks, ir, directives, path)
 
-    if extract_params and dialect != "isf":
+    if extract_params and ir.dialect != "isf":
         _promote_constants(toks, ir, set(exclude), promote_ints)
         toks = retok(toks)
 
+    _zero_init(toks)
+    toks = retok(toks)
+
     dynamic = set(aliases) | {p.name for p in ir.params if p.name} | {i.name for i in ir.images}
+    dynamic |= {p.target for p in ir.passes if p.target}
     hoisted = _hoist_globals(toks, dynamic)
     toks = retok(toks)
     _strip_local_consts(toks, dynamic)
     toks = retok(toks)
     entry = _entry_point(toks, ir)
     _rename_frag_outputs(toks)
+    return Program(code=G.untokenize(toks), entry=entry, aliases=aliases, hoisted=hoisted,
+                   label=label, line_offset=line_offset, channels=channels)
 
-    prog = Program(code=G.untokenize(toks), entry=entry, aliases=aliases, hoisted=hoisted,
-                   force_opaque=dialect != "isf")
-    ir.programs.append(prog)
-    if not ir.passes:
-        ir.passes.append(Pass())
 
-    used = set(aliases.values())
+def _finish(ir, header):
+    used = set()
+    for prog in ir.programs:
+        used |= set(prog.aliases.values())
     if used & TIME_SYMBOLS or "time" in used:
         if not any(p.kind == "speed" for p in ir.params):
             ir.params.insert(0, Param("", "speed", "Speed", 1.0, 0.0, 4.0, origin="synthetic"))
@@ -159,7 +180,80 @@ def convert(code, name="Shader", path=None, extract_params=True, promote_ints=Fa
         ir.params.append(Param("", "fft", "Audio Spectrum", 0.0, origin="synthetic"))
     _decide_kind(ir, header)
     _dedupe_labels(ir)
+
+
+# ── Multi-pass Shadertoy projects ────────────────────────────────────────────
+
+def _convert_project(code, name, path, extract_params, promote_ints, exclude):
+    from . import shadertoy_project as SP
+    passes = SP.parse(code, path)
+    common = next((p for p in passes if p.name == "Common"), None)
+    image = next((p for p in passes if p.name == "Image"), None)
+    if image is None:
+        raise ConvertError("Shadertoy project has no Image pass.")
+    ir = ShaderIR(name=name, dialect="shadertoy")
+    info = getattr(image, "info", {}) or {}
+    credit = ""
+    if info.get("author"):
+        credit = f"{info['author']} - https://www.shadertoy.com/view/{info.get('id', '')}"
+    ir.meta = {"description": info.get("name") or name, "credit": credit}
+    buffers = [p for p in passes if p.name.startswith("Buffer")]
+    # Targets first so every program knows the buffer sampler names.
+    for p in buffers:
+        ir.passes.append(Pass(target="ffm_buf" + p.name[-1], persistent=True, float=True))
+
+    def sampler_for(spec, pass_name, ch):
+        kind = spec[0]
+        if kind == "buffer":
+            if not any(b.name == "Buffer " + spec[1] for b in buffers):
+                ir.warnings.append(f"{pass_name} iChannel{ch} reads Buffer {spec[1]}, which doesn't exist.")
+                return _add_image(ir, Image("ffm_none", "none"))
+            return "ffm_buf" + spec[1]
+        if kind == "input":
+            return _add_image(ir, Image("ffm_input", "host", 0))
+        if kind == "audio":
+            return _add_image(ir, Image("ffm_audio", "audio", rows=2, isf_type="audioFFT"))
+        if kind == "noise":
+            return _add_image(ir, Image("ffm_noise", "imported", repeat=True))
+        if kind == "file":
+            existing = next((i for i in ir.images if i.source == "imported" and i.path == spec[1]), None)
+            if existing:
+                return existing.name
+            if not os.path.isfile(spec[1]):
+                ir.warnings.append(f"{pass_name} iChannel{ch} image '{spec[1]}' not found; using noise.")
+            n = sum(1 for i in ir.images if i.name.startswith("ffm_tex"))
+            return _add_image(ir, Image(f"ffm_tex{n}", "imported", path=spec[1], repeat=True))
+        return _add_image(ir, Image("ffm_none", "none"))
+
+    prefix = (common.code + "\n") if common else ""
+    offset = prefix.count("\n")
+    for p in buffers + [image]:
+        src = prefix + p.code
+        toks = G.tokenize(src)
+        used = {t.text for t in toks if t.kind == "ident"}
+        mapping, chans = {}, [None] * 4
+        for ch in range(4):
+            nm = f"iChannel{ch}"
+            if nm in used:
+                spec = p.channels.get(ch) or (("input",) if p.name == "Image" and ch == 0 else ("none",))
+                mapping[nm] = chans[ch] = sampler_for(spec, p.name, ch)
+        G.rename_idents(toks, mapping)
+        prog = _build_program(G.untokenize(toks), ir, path, extract_params, exclude, promote_ints,
+                              label=p.name, line_offset=offset, channels=chans)
+        prog.force_opaque = p.name == "Image"
+        ir.programs.append(prog)
+        if p.name == "Image":
+            ir.passes.append(Pass(program=len(ir.programs) - 1))
+        else:
+            next(x for x in ir.passes if x.target == "ffm_buf" + p.name[-1]).program = len(ir.programs) - 1
+    _finish(ir, None)
     return ir
+
+
+def _add_image(ir, image):
+    if not any(i.name == image.name for i in ir.images):
+        ir.images.append(image)
+    return image.name
 
 
 # ── ISF header ───────────────────────────────────────────────────────────────
@@ -279,6 +373,10 @@ def _normalize(toks, ir):
 
     declared = G.declared_names(toks)
     renames = {}
+    # FFMaker reserves the ffm_ prefix for its host layer (e.g. re-imported exports).
+    for nm in declared:
+        if nm.startswith("ffm_"):
+            renames[nm] = "user_" + nm
     # A user variable called 'texture' collides with the texture() builtin we map to.
     if "texture" in declared:
         renames["texture"] = "texture_"
@@ -583,7 +681,8 @@ def _promote_constants(toks, ir, exclude, promote_ints):
         nm, kind, ty, vals, where = c
         if nm in exclude or nm in required or _looks_mathematical(nm, vals):
             continue
-        if ir.param(nm) or nm in SHADERTOY_NAMES or nm in ISF_NAMES:
+        prior = ir.param(nm)
+        if (prior and prior.origin not in ("const", "define")) or nm in SHADERTOY_NAMES or nm in ISF_NAMES:
             continue
         chosen.append(c)
         if len(chosen) >= MAX_PROMOTED:
@@ -603,6 +702,7 @@ def _promote_constants(toks, ir, exclude, promote_ints):
             p = Param(nm, "bool", humanize(nm), vals[0], glsl_type="bool", origin="const")
         else:
             p = Param(nm, "color", humanize(nm), (vals + [1.0])[:4], glsl_type=ty, origin="const")
+        prior = ir.param(nm)
         if where[0] == "define":
             p.origin = "define"
             t = toks[where[1]]
@@ -610,8 +710,9 @@ def _promote_constants(toks, ir, exclude, promote_ints):
             t.kind = "nl" if t.text else "ws"
         else:
             by_item.setdefault(id(where[1]), (where[1], set()))[1].add(nm)
-        ir.params.append(p)
-        ir.promoted.append(nm)
+        if prior is None:
+            ir.params.append(p)
+            ir.promoted.append(nm)
 
     for item, names in by_item.values():
         keep = [d for d in item.decls if d.name not in names]
@@ -633,6 +734,78 @@ def _looks_mathematical(name, vals):
         if any(abs(v - m) < 1e-3 for m in _MATH_VALUES):
             return True
     return False
+
+
+# ── Zero-initialisation (WebGL/ANGLE semantics) ─────────────────────────────
+
+_ZERO_TYPES = {t for t in G.TYPES if not t.startswith(("sampler", "isampler", "usampler", "void"))}
+
+
+def _zero_init(toks):
+    """Browsers (ANGLE) zero-initialise every variable, and plenty of Shadertoy
+    code relies on it (`float a; a += ...`). Native drivers leave them
+    undefined, so give uninitialised scalars/vectors/matrices an explicit 0."""
+    for it in G.analyze(toks):
+        if it.kind == "decl" and not set(it.qualifiers) & {"uniform", "in", "out", "varying",
+                                                             "attribute", "const", "buffer", "shared"}:
+            _zero_declarators(toks, it)
+        elif it.kind == "func":
+            for local in _all_local_decls(toks, it.body[0] + 1, it.body[1]):
+                if not set(local.qualifiers) & {"const"}:
+                    _zero_declarators(toks, local)
+
+
+def _zero_declarators(toks, item):
+    if item.type not in _ZERO_TYPES:
+        return
+    for d in item.decls:
+        if d.init_span is None and d.array_span is None:
+            # Only plain declarators: the token after the name must be ',' or ';'.
+            nxt = G.next_sig(toks, d.name_idx)
+            if nxt is not None and toks[nxt].text in (",", ";"):
+                toks[d.name_idx].text = f"{d.name} = {item.type}(0)"
+
+
+def _all_local_decls(toks, start, end):
+    """Every declaration statement inside a function body, including
+    `for (TYPE x; ...)` initialisers."""
+    res = []
+    i = start
+    stmt_start = start
+    while i < end:
+        t = toks[i]
+        if t.kind == "punct" and t.text in (";", "{", "}"):
+            stmt_start = i + 1
+        elif t.kind == "punct" and t.text == "(":
+            prev = G.prev_sig(toks, i)
+            if prev is not None and toks[prev].text == "for":
+                stmt_start = i + 1          # for-init clause behaves like a statement
+            else:
+                i = G.match_close(toks, i)
+        elif t.kind == "ident" and _is_stmt_start(toks, i, stmt_start) and \
+                (t.text in _ZERO_TYPES or t.text in ("highp", "mediump", "lowp", "precise")):
+            j = i
+            depth = 0
+            while j < end:
+                tj = toks[j]
+                if tj.kind == "punct":
+                    if tj.text in ("(", "[", "{"):
+                        depth += 1
+                    elif tj.text in (")", "]", "}"):
+                        depth -= 1
+                        if depth < 0:
+                            break
+                    elif tj.text == ";" and depth == 0:
+                        break
+                j += 1
+            item = G._classify(toks, i, j)
+            if item.kind == "decl":
+                res.append(item)
+            i = j
+            stmt_start = j + 1
+            continue
+        i += 1
+    return res
 
 
 # ── Global initializer hoisting & const relaxation ──────────────────────────
@@ -707,6 +880,10 @@ def _strip_local_consts(toks, dynamic):
 def _entry_point(toks, ir):
     items = G.analyze(toks)
     funcs = {it.name: it for it in items if it.kind == "func"}
+    if "main" in funcs and ir.dialect != "shadertoy":
+        # ISF/GLSL: main() is the entry; any mainImage() is just a helper it calls.
+        toks[funcs["main"].name_idx].text = "ffm_main"
+        return "main"
     if "mainImage" in funcs:
         entry = "mainImage"
         if "main" in funcs:
@@ -722,6 +899,10 @@ def _entry_point(toks, ir):
 
 
 def _rename_frag_outputs(toks):
+    for t in toks:
+        if t.kind == "preproc":
+            t.text = re.sub(r"\bgl_FragColor\b", "ffm_FragColor", t.text)
+            t.text = re.sub(r"\bgl_FragData\s*\[\s*0\s*\]", "ffm_FragColor", t.text)
     sig = G.significant(toks)
     for pos, k in enumerate(sig):
         t = toks[k]

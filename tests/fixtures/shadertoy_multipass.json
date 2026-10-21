@@ -1,0 +1,54 @@
+{
+ "Shader": {
+  "info": {
+   "id": "fixture",
+   "name": "Multipass JSON fixture",
+   "username": "ffmaker"
+  },
+  "renderpass": [
+   {
+    "type": "common",
+    "name": "Common",
+    "code": "const float TRAIL = 0.96;\nvec2 orbit(float t) { return 0.5 + 0.3 * vec2(cos(t), sin(t * 1.3)); }\n\n",
+    "inputs": [],
+    "outputs": []
+   },
+   {
+    "type": "buffer",
+    "name": "Buffer A",
+    "code": "// ffmaker: iChannel0 = Buffer A\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n    vec2 uv = fragCoord / iResolution.xy;\n    vec4 prev = texture(iChannel0, uv) * TRAIL;\n    float d = length((uv - orbit(iTime)) * vec2(iResolution.x / iResolution.y, 1.0));\n    vec3 dot = vec3(1.0, 0.5, 0.2) * smoothstep(0.05, 0.0, d);\n    fragColor = vec4(max(prev.rgb, dot), 1.0);\n}\n\n",
+    "inputs": [
+     {
+      "id": "4dXGR8",
+      "channel": 0,
+      "ctype": "buffer"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "4dXGR8",
+      "channel": 0
+     }
+    ]
+   },
+   {
+    "type": "image",
+    "name": "Image",
+    "code": "// ffmaker: iChannel0 = Buffer A\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n    vec2 uv = fragCoord / iResolution.xy;\n    fragColor = vec4(texture(iChannel0, uv).rgb, 1.0);\n}\n",
+    "inputs": [
+     {
+      "id": "4dXGR8",
+      "channel": 0,
+      "ctype": "buffer"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "4dXGR8",
+      "channel": 0
+     }
+    ]
+   }
+  ]
+ }
+}

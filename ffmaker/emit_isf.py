@@ -16,6 +16,10 @@ ISF_SYMBOLS = {
 }
 
 
+ISF_RESERVED = {"TIME", "TIMEDELTA", "RENDERSIZE", "PASSINDEX", "FRAMEINDEX", "DATE",
+                "isf_FragNormCoord", "vv_FragNormCoord", "inputImage"}
+
+
 def asset_name(ir, im):
     """File name for an embedded image written next to the .fs."""
     ext = os.path.splitext(im.path)[1].lower() if im.path and os.path.isfile(im.path) else ".png"
@@ -47,7 +51,6 @@ def emit(ir, source_code=None):
         if source_code is None:
             raise ValueError("ISF sources are passed through; supply source_code")
         return source_code
-    prog = ir.programs[0]
     inputs = []
     defines = []
     has_speed = any(p.kind == "speed" for p in ir.params)
@@ -120,20 +123,34 @@ def emit(ir, source_code=None):
     if imported:
         header["IMPORTED"] = imported
 
-    for name, sym in sorted(prog.aliases.items()):
+    aliases = {}
+    for pr in ir.programs:
+        aliases.update(pr.aliases)
+    for name, sym in sorted(aliases.items()):
         expr = ISF_SYMBOLS[sym]
         if sym == "time" and not has_speed:
             expr = "TIME"
         defines.append(f"#define {name} {expr}")
-    defines.append("#define ffm_FragColor gl_FragColor")
 
-    toks = G.tokenize(prog.code)
-    G.rename_idents(toks, image_renames)
-    image_names = {image_renames.get(i.name, i.name) for i in ir.images}
+    targets = [ps.target for ps in ir.passes if ps.target]
+    if targets:
+        header["PASSES"] = [{"TARGET": ps.target, "PERSISTENT": bool(ps.persistent), "FLOAT": bool(ps.float)}
+                            if ps.target else {} for ps in ir.passes]
+
+    # One ISF shader runs every pass, so each pass's own functions/globals get a
+    # unique suffix; shared (Common) code appears once.
+    body, entries = _merge_programs(ir.programs)
+    image_names = {image_renames.get(i.name, i.name) for i in ir.images} | set(targets)
     repeat_names = {image_renames.get(i.name, i.name) for i in ir.images
                     if i.source == "imported" and i.repeat}
+    toks = G.tokenize(body)
+    # User code must not redefine names the ISF host provides.
+    clash = {n: "user_" + n for n in G.declared_names(toks) if n in ISF_RESERVED or n.startswith("IMG_")}
+    G.rename_everywhere(toks, clash)
+    G.rename_idents(toks, {**image_renames, "ffm_FragColor": "gl_FragColor"})
     code = _portable_textures(G.untokenize(toks), image_names, repeat_names)
-    used = set(prog.aliases.values())
+
+    used = set(aliases.values())
     globals_ = []
     setup = []
     if "mouse_px" in used:
@@ -144,12 +161,27 @@ def emit(ir, source_code=None):
         setup.append("ffm_SurfacePos = (isf_FragNormCoord - 0.5) * vec2(RENDERSIZE.x / RENDERSIZE.y, 1.0);")
     if "channelres" in used:
         globals_.append("vec3 ffm_ChannelRes[4];")
-        for i in range(4):
-            setup.append(f"ffm_ChannelRes[{i}] = vec3(" + ("IMG_SIZE(inputImage)" if host_imgs else "RENDERSIZE") + ", 1.0);")
     if "channeltime" in used:
         globals_.append("float ffm_ChannelTime[4];")
         for i in range(4):
             setup.append(f"ffm_ChannelTime[{i}] = TIME;")
+
+    def channel_res(prog):
+        lines = []
+        for i in range(4):
+            ch = prog.channels[i] if prog.channels else ("inputImage" if host_imgs else None)
+            ch = image_renames.get(ch, ch)
+            lines.append(f"ffm_ChannelRes[{i}] = vec3(" + (f"IMG_SIZE({ch})" if ch else "RENDERSIZE") + ", 1.0);")
+        return lines
+
+    hoisted = []
+    for k, pr in enumerate(ir.programs):
+        for h in pr.hoisted:
+            ht = G.tokenize(h)
+            G.rename_idents(ht, {**entries[k]["renames"], **image_renames})
+            line = G.untokenize(ht)
+            if line not in hoisted:
+                hoisted.append(line)
 
     out = ["/*" + json.dumps(header, indent=4) + "*/", ""]
     out += ["// ── FFMaker compatibility layer ──"] + defines + globals_ + [""]
@@ -157,25 +189,59 @@ def emit(ir, source_code=None):
     out.append("")
     out.append("// ── FFMaker entry ──")
     out.append("void ffm_init() {")
-    for h in prog.hoisted:
-        ht = G.tokenize(h)
-        G.rename_idents(ht, image_renames)
-        out.append("    " + G.untokenize(ht))
+    out += [f"    {h}" for h in hoisted]
     out.append("}")
     out.append("void main() {")
-    out += [f"    {s}" for s in setup]
+    out += [f"    {x}" for x in setup]
     out.append("    ffm_init();")
-    if prog.entry == "mainImage":
-        out.append("    vec4 ffm_c = vec4(0.0, 0.0, 0.0, 1.0);")
-        out.append("    mainImage(ffm_c, gl_FragCoord.xy);")
-        out.append("    gl_FragColor = ffm_c;")
-    else:
-        out.append("    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);")
-        out.append("    ffm_main();")
-    if prog.force_opaque:
-        out.append("    gl_FragColor.a = 1.0;")
+    multi = len(ir.passes) > 1
+    for i, ps in enumerate(ir.passes):
+        prog = ir.programs[ps.program]
+        ind = "        " if multi else "    "
+        if multi:
+            out.append(f"    {'if' if i == 0 else 'else if'} (PASSINDEX == {i}) {{")
+        if "channelres" in used:
+            out += [ind + x for x in channel_res(prog)]
+        entry = entries[ps.program]["entry"]
+        if prog.entry == "mainImage":
+            out.append(f"{ind}vec4 ffm_c = vec4(0.0, 0.0, 0.0, 1.0);")
+            out.append(f"{ind}{entry}(ffm_c, gl_FragCoord.xy);")
+            out.append(f"{ind}gl_FragColor = ffm_c;")
+        else:
+            out.append(f"{ind}gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);")
+            out.append(f"{ind}{entry}();")
+        if prog.force_opaque:
+            out.append(f"{ind}gl_FragColor.a = 1.0;")
+        if multi:
+            out.append("    }")
     out.append("}")
     return "\n".join(out) + "\n"
+
+
+def _merge_programs(programs):
+    """Combine programs into one source. Returns (code, [{entry, renames}])."""
+    if len(programs) == 1:
+        pr = programs[0]
+        return pr.code, [{"entry": "mainImage" if pr.entry == "mainImage" else "ffm_main", "renames": {}}]
+    offset = programs[0].line_offset
+    common = "\n".join(programs[0].code.split("\n")[:offset])
+    parts = [common]
+    entries = []
+    for k, pr in enumerate(programs):
+        part = "\n".join(pr.code.split("\n")[offset:])
+        toks = G.tokenize(part)
+        renames = {}
+        for it in G.analyze(toks):
+            if it.kind in ("func", "proto"):
+                renames[it.name] = f"{it.name}_p{k}"
+            elif it.kind == "decl":
+                for d in it.decls:
+                    renames[d.name] = f"{d.name}_p{k}"
+        G.rename_idents(toks, renames)
+        parts.append(f"// ── {pr.label or 'pass ' + str(k)} ──\n" + G.untokenize(toks))
+        entry = "mainImage" if pr.entry == "mainImage" else "ffm_main"
+        entries.append({"entry": renames.get(entry, entry), "renames": renames})
+    return "\n".join(parts), entries
 
 
 def _portable_textures(code, image_names, repeat_names=()):

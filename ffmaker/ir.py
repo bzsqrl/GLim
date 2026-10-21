@@ -50,6 +50,9 @@ class Program:
     aliases: dict = field(default_factory=dict)   # name -> host symbol key
     hoisted: list = field(default_factory=list)   # assignment statements for ffm_init()
     force_opaque: bool = False
+    label: str = ""           # pass name for multi-program shaders ("Buffer A")
+    line_offset: int = 0      # lines of shared code (Common) prepended before the pass
+    channels: list = None     # Shadertoy: sampler name feeding iChannel0..3
 
 
 @dataclass

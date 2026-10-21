@@ -103,11 +103,24 @@ def _check_isf(code, stem, path, out_dir):
     ir = C.convert(code, name=stem, path=path)
     if ir.dialect == "isf":
         return {"status": "n/a"}
-    text = emit_isf.emit(ir)
-    with open(os.path.join(out_dir, stem + ".isf.fs"), "w", encoding="utf-8") as f:
-        f.write(text)
+    ir.name = stem + ".isf"
+    fs_path = emit_isf.write(ir, out_dir)        # .fs plus texture assets
+    text = open(fs_path, encoding="utf-8").read()
     ok, errs = isf_host.compile_isf(text)
-    return {"status": "OK" if ok else "COMPILE", "errors": errs[:3]}
+    if not ok:
+        return {"status": "COMPILE", "errors": errs[:3]}
+    # Round trip: re-import the exported ISF and compare renders with the original.
+    try:
+        a = pipeline.convert_ffgl(code, name=stem, path=path)
+        b = pipeline.convert_ffgl(text, name=stem, path=os.path.join(out_dir, stem + ".isf.fs"))
+        if not b.ok:
+            return {"status": "REIMPORT", "errors": b.errors[:3]}
+        ra = V.render(a.ir, a.ffgl_glsl, times=(1.0,), frames_between=5)["frames"][-1]["mean"]
+        rb = V.render(b.ir, b.ffgl_glsl, times=(1.0,), frames_between=5)["frames"][-1]["mean"]
+        diff = max(abs(x - y) for x, y in zip(ra, rb))
+        return {"status": "OK" if diff < 3 else f"DIFF{diff:.0f}"}
+    except Exception as e:
+        return {"status": "ROUNDTRIP-ERR", "errors": [str(e)[:200]]}
 
 
 if __name__ == "__main__":

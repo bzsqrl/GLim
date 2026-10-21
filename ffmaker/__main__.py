@@ -11,7 +11,7 @@ import sys
 from . import convert as C
 from . import emit_isf, pipeline, paths
 
-EXTS = {".fs", ".frag", ".glsl", ".txt", ".shader"}
+EXTS = {".fs", ".frag", ".glsl", ".txt", ".shader", ".json"}
 
 
 def collect(inputs):

@@ -399,3 +399,14 @@ def parse_literal_vector(text):
     if len(vals) != size:
         return None
     return vals
+
+
+def rename_everywhere(toks, mapping):
+    """rename_idents, plus whole-word renames inside preprocessor lines."""
+    rename_idents(toks, mapping)
+    if not mapping:
+        return
+    rx = re.compile(r"\b(" + "|".join(re.escape(k) for k in mapping) + r")\b")
+    for t in toks:
+        if t.kind == "preproc":
+            t.text = rx.sub(lambda m: mapping[m.group(1)], t.text)

@@ -66,8 +66,8 @@ def program_glsl(ir, prog):
     out.append("    ffm_FragNorm = gl_FragCoord.xy / ffm_Resolution;\n")
     out.append("    ffm_SurfacePos = (ffm_FragNorm - 0.5) * vec2(ffm_Resolution.x / ffm_Resolution.y, 1.0);\n")
     for i in range(4):
-        ch = f"iChannel{i}"
-        res = f"vec3(vec2(textureSize({ch}, 0)), 1.0)" if ch in samplers else "vec3(ffm_Resolution, 1.0)"
+        ch = prog.channels[i] if prog.channels else f"iChannel{i}"
+        res = f"vec3(vec2(textureSize({ch}, 0)), 1.0)" if ch and ch in samplers else "vec3(ffm_Resolution, 1.0)"
         out.append(f"    ffm_ChannelRes[{i}] = {res}; ffm_ChannelTime[{i}] = ffm_Time;\n")
     out.append("    ffm_init();\n")
     if prog.entry == "mainImage":
