@@ -89,7 +89,15 @@ def main(argv=None):
             continue
         if args.to in ("isf", "both"):
             if ir.dialect == "isf":
-                print(f"  (ISF source: no ISF export needed)")
+                from . import settings as S
+                if S.load(path):
+                    os.makedirs(out_dir, exist_ok=True)
+                    dst = os.path.join(out_dir, stem + ".fs")
+                    with open(dst, "w", encoding="utf-8") as f:
+                        f.write(emit_isf.apply_settings_to_isf(code, ir))
+                    print(f"✓ {stem} → {dst} (ISF header updated from saved settings)")
+                else:
+                    print(f"  (ISF source: no ISF export needed)")
             else:
                 ir.name = stem
                 isf_path = emit_isf.write(ir, out_dir)

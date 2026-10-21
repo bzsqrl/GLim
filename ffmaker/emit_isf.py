@@ -282,3 +282,39 @@ def _top_level_commas(toks, open_i, close_i):
             elif tx == "," and depth == 0:
                 out.append(k)
     return out
+
+
+def apply_settings_to_isf(source, ir):
+    """For ISF sources: rewrite the JSON header with the user's label/range/
+    default edits; hidden inputs are removed and compiled in as constants.
+    The shader body is left untouched."""
+    from . import convert as C
+    from .emit_ffgl import glsl_literal
+    hdr = C.find_isf_header(source)
+    if not hdr:
+        return source
+    header = json.loads(C.sanitize_json(hdr[0]))
+    by_name = {p.name: p for p in ir.params if p.name}
+    consts = []
+    new_inputs = []
+    for inp in header.get("INPUTS", []):
+        p = by_name.get(inp.get("NAME"))
+        if p is None:
+            new_inputs.append(inp)
+            continue
+        if p.hidden:
+            consts.append(f"const {p.glsl_type} {p.name} = {glsl_literal(p)};")
+            continue
+        if p.label and p.label != inp.get("LABEL"):
+            inp["LABEL"] = p.label
+        if p.kind in ("float",):
+            inp["DEFAULT"], inp["MIN"], inp["MAX"] = p.default, p.min, p.max
+        elif p.kind in ("bool", "long", "color", "point2D") and p.default is not None:
+            inp["DEFAULT"] = list(p.default) if isinstance(p.default, (list, tuple)) else p.default
+        new_inputs.append(inp)
+    header["INPUTS"] = new_inputs
+    body = source[hdr[2]:]
+    out = "/*" + json.dumps(header, indent=4) + "*/\n"
+    if consts:
+        out += "\n// ── constants set in FFMaker ──\n" + "\n".join(consts) + "\n"
+    return out + body

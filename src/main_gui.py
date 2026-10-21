@@ -11,6 +11,8 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ffmaker import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: E402
 from ffmaker import convert as ffconvert                               # noqa: E402
+from ffmaker import settings as ffsettings                             # noqa: E402
+from editor_panel import EditorPanel                                   # noqa: E402
 
 
 # --- Drag-and-drop support (optional, graceful fallback) ---
@@ -78,13 +80,15 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             ctk.set_appearance_mode("Dark")
 
         self.title("FFMaker – Shader to FFGL Converter")
-        self.geometry("1050x680")
+        self.geometry("1440x900")
         self.minsize(860, 540)
 
         self._queue: list[QueueItem] = []
         self._building = False
         self._cancel_event = threading.Event()
         self._source_stem = "FFMakerPlugin"   # for single-file tab
+        self._source_path = None
+        self.settings = {}                    # single-file tab: the shader's .ffmaker.json
         self.extract_params_var = ctk.BooleanVar(value=True)
 
         # Force dark background regardless of TkinterDnD vs CTk base class
@@ -143,7 +147,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         ctk.CTkLabel(frame_log, text="Build Log", font=("Arial", 11, "bold"),
                      anchor="w").grid(row=0, column=0, padx=10, pady=(6, 0), sticky="w")
         self.textbox_log = ctk.CTkTextbox(frame_log, font=("Consolas", 11),
-                                          text_color="#10b981", height=160)
+                                          text_color="#10b981", height=110)
         self.textbox_log.grid(row=1, column=0, padx=10, pady=(2, 8), sticky="ew")
         self.log("System ready.")
 
@@ -268,31 +272,24 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.panes.add(self.textbox_code, stretch="always")
 
         # Right Pane: Parameters
-        self.frame_params = ctk.CTkFrame(self.panes)
-        self.panes.add(self.frame_params, stretch="never", minsize=180)
+        self.editor = EditorPanel(self.panes, on_recompile=lambda: self.analyze_code(keep_time=True),
+                                  log=self.log)
+        self.panes.add(self.editor, stretch="always", minsize=760)
+        self.textbox_code.bind("<Control-Return>", lambda e: (self.analyze_code(), "break")[1])
 
-        ctk.CTkLabel(self.frame_params, text="Detected Parameters",
-                     font=("Arial", 13, "bold")).pack(anchor="w", padx=10, pady=5)
-        self.scroll_params = ctk.CTkScrollableFrame(self.frame_params)
-        self.scroll_params.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-
-        self.label_no_params = ctk.CTkLabel(
-            self.scroll_params,
-            text="Click 'Analyze Code' to detect globals...", text_color="gray")
-        self.label_no_params.pack(pady=10)
-
-        # Set initial 80/20 split after rendering
         self.after(200, self._set_initial_sash)
 
     def _set_initial_sash(self):
-        """Set the initial horizontal split (exactly 80/20) for the Single File tab."""
+        """Initial split for the Single File tab: code on the left, editor panel on the right.
+        Retries until the tab has been shown and laid out."""
         try:
-            self.update() # Force layout calculation
             w = self.panes.winfo_width()
             if w > 200:
-                self.panes.sash_place(0, int(w * 0.80), 0)
+                self.panes.sash_place(0, max(300, w - 860), 0)
+                return
         except Exception:
             pass
+        self.after(300, self._set_initial_sash)
 
     def _on_code_focus(self, event):
         if self.textbox_code.get("1.0", "end-1c").strip() == "// Paste your shader code here...":
@@ -555,7 +552,8 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             try:
                 code = open(item.path, encoding="utf-8", errors="replace").read()
                 suffix = "-p" if self.extract_params_var.get() else ""
-                name = build_ffgl.unique_plugin_name(item.name + suffix, visible_names)
+                wanted = ffsettings.load(item.path).get("plugin_name") or item.name + suffix
+                name = build_ffgl.unique_plugin_name(wanted, visible_names)
                 status, text = self._convert_and_build(code, name, item.path, output_dir)
                 if status == "cancelled":
                     item.status = "pending"
@@ -587,11 +585,12 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     # Single-file tab methods (unchanged from original)
     # -----------------------------------------------------------------------
-    def _convert_and_build(self, code, name, path, output_dir):
-        """Shared by queue and single-file builds. Returns (status, label)."""
+    def _convert_and_build(self, code, name, path, output_dir, settings=None):
+        """Shared by queue and single-file builds. Returns (status, label).
+        settings=None uses the shader's saved .ffmaker.json."""
         log = self._gui_log
         try:
-            res = pipeline.convert_ffgl(code, name=name, path=path,
+            res = pipeline.convert_ffgl(code, name=name, path=path, settings=settings,
                                         extract_params=self.extract_params_var.get())
         except ffconvert.ConvertError as e:
             log(f"  ERROR: {e}")
@@ -618,68 +617,54 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         log(f"[{name}] ✓ {res.ir.kind}, {len(res.ir.params)} params → {dst}")
         return "done", os.path.basename(dst)
 
-    def analyze_code(self):
-        self.log("Analyzing shader code...")
+    def analyze_code(self, keep_time=False):
         code = self.textbox_code.get("1.0", "end-1c")
-
+        if not keep_time:
+            self.log("Analyzing shader code...")
         if not self.entry_plugin_name.get().strip():
             self.entry_plugin_name.delete(0, "end")
             self.entry_plugin_name.insert(0, "FFMakerPlugin")
 
         try:
             res = pipeline.convert_ffgl(code, name=self.entry_plugin_name.get().strip(),
-                                        path=getattr(self, "_source_path", None),
+                                        path=self._source_path, settings=self.settings,
                                         extract_params=self.extract_params_var.get())
         except ffconvert.ConvertError as e:
             self.log(f"ERROR: {e}")
             return
         ir = res.ir
-        self.log(f"Detected: {ir.dialect} {ir.kind}")
-        for w in ir.warnings:
-            self.log(f"WARNING: {w}")
+        if not keep_time:
+            self.log(f"Detected: {ir.dialect} {ir.kind}"
+                     + (f", {len(ir.programs)} passes" if len(ir.programs) > 1 else ""))
+            for w in ir.warnings:
+                self.log(f"WARNING: {w}")
         if res.demoted:
             self.log(f"Kept as constants (would not compile as sliders): {', '.join(res.demoted)}")
         if not res.ok:
             self.log("Shader does not compile:")
             for ln, msg in res.errors[:8]:
                 self.log(f"  line {ln}: {msg}")
-        elif res.validated:
-            self.log("✓ Shader compiles on this GPU.")
-
-        # Rebuild the params panel
-        self.label_no_params.pack_forget()
-        for widget in self.scroll_params.winfo_children():
-            if widget != self.label_no_params:
-                widget.destroy()
-
-        promoted = [p for p in ir.params if p.origin in ("const", "define")]
-        self.log(f"Found {len(ir.params)} controllable parameter(s).")
-        if promoted:
-            self.log(f"  [{len(promoted)} auto-detected from constants]")
-
-        for p in ir.params:
-            row = ctk.CTkFrame(self.scroll_params, fg_color="transparent")
-            row.pack(fill="x", padx=5, pady=1)
-            ctk.CTkLabel(row, text=p.display(), anchor="w").pack(side="left")
-            kind = p.kind
-            if p.kind in ("float", "int", "speed") and p.min is not None:
-                kind += f" {p.min:g}–{p.max:g}"
-            ctk.CTkLabel(row, text=kind, text_color="#60a5fa", anchor="w").pack(side="left", padx=(6, 0))
-            if p.origin in ("const", "define"):
-                ctk.CTkLabel(row, text="[const]", text_color="#9ca3af",
-                             font=("Consolas", 11)).pack(side="left", padx=(6, 0))
+        elif res.validated and not keep_time:
+            promoted = [p for p in ir.params if p.origin in ("const", "define")]
+            self.log(f"✓ Compiles on this GPU. {len(ir.params)} parameter(s)"
+                     + (f", {len(promoted)} from constants." if promoted else "."))
+        self.editor.load(res, self.settings, self._source_path, keep_time=keep_time)
 
     def _build_single(self):
         self.log("Starting build…")
         self.btn_build_single.configure(state="disabled")
         code = self.textbox_code.get("1.0", "end-1c")
         name = self.entry_plugin_name.get().strip() or "FFMakerPlugin"
-        path = getattr(self, "_source_path", None)
+        path = self._source_path
+        self._remember_plugin_name(name)
+        if path:
+            ffsettings.save(path, self.settings)     # queue builds of this file use the same settings
+        settings = dict(self.settings)
 
         def run():
             try:
                 self._cancel_event.clear()
-                self._convert_and_build(code, name, path, ffpaths.default_output_dir())
+                self._convert_and_build(code, name, path, ffpaths.default_output_dir(), settings)
             except Exception as exc:
                 self._gui_log(f"EXCEPTION: {exc}")
             finally:
@@ -693,6 +678,12 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if path:
             self._load_file_path(path)
 
+    def _remember_plugin_name(self, name):
+        if self._source_path and name != Path(self._source_path).stem:
+            self.settings["plugin_name"] = name
+        else:
+            self.settings.pop("plugin_name", None)
+
     def _load_file_path(self, path: str):
         """Helper to load a file into the Single File editor and analyze it."""
         try:
@@ -700,12 +691,14 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.textbox_code.delete("1.0", "end")
             self.textbox_code.insert("1.0", code)
             
-            # Update output name entry
+            self.settings = ffsettings.load(path)
             self.entry_plugin_name.delete(0, "end")
-            self.entry_plugin_name.insert(0, Path(path).stem)
+            self.entry_plugin_name.insert(0, self.settings.get("plugin_name") or Path(path).stem)
 
             self._source_stem = Path(path).stem
             self._source_path = path
+            if self.settings:
+                self.log(f"Loaded saved settings: {ffsettings.path_for(path)}")
             self.log(f"Loaded: {Path(path).name} (will export as {self.entry_plugin_name.get()}.dll)")
             self.analyze_code()
         except Exception as e:
@@ -715,19 +708,19 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     # ISF Export
     # -----------------------------------------------------------------------
-    def _isf_export(self, code, name, path, out_dir):
+    def _isf_export(self, code, name, path, out_dir, settings=None):
         """Write <name>.fs (plus texture files) into out_dir. Returns (fs_path, note)."""
-        res = pipeline.convert_ffgl(code, name=name, path=path,
+        res = pipeline.convert_ffgl(code, name=name, path=path, settings=settings,
                                     extract_params=self.extract_params_var.get())
         if res.ir.dialect == "isf":
             dst = os.path.join(out_dir, name + ".fs")
             with open(dst, "w", encoding="utf-8") as f:
-                f.write(code)
+                f.write(emit_isf.apply_settings_to_isf(code, res.ir))
             vs = os.path.splitext(path)[0] + ".vs" if path else ""
             if vs and os.path.isfile(vs):
                 import shutil
                 shutil.copy2(vs, os.path.join(out_dir, name + ".vs"))
-            return dst, "already ISF, copied unchanged"
+            return dst, "ISF source: header updated with your settings"
         if not res.ok:
             raise RuntimeError("shader does not compile: " +
                                "; ".join(f"line {l}: {m}" for l, m in res.errors[:3]))
@@ -750,8 +743,8 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if not save_path:
             return
         try:
-            dst, note = self._isf_export(code, Path(save_path).stem,
-                                         getattr(self, "_source_path", None), os.path.dirname(save_path))
+            dst, note = self._isf_export(code, Path(save_path).stem, self._source_path,
+                                         os.path.dirname(save_path), settings=self.settings)
             self.log(f"✓ Exported ISF to {dst} ({note})")
         except Exception as exc:
             self.log(f"ERROR: Export failed: {exc}")
