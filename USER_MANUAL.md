@@ -27,6 +27,20 @@ The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFMaker` and
 2. Click **Build Queue** to make FFGL plugins, or **Export ISF** to make `.fs` files.
 3. Plugins are written to `FFMaker\output\`. Copy them to Resolume's FFGL plugin folder (set in *Preferences → Video → FFGL plugins*), then restart Resolume.
 
+**Single File tab (editor):** open or paste a shader and click **Analyze Code** (or press Ctrl+Enter). You get:
+- **Live preview.** Rendered on your GPU the same way the plugin renders it.
+  - Play/pause with ⏸; restart time and feedback buffers with ⟲.
+  - For effects, preview over the test pattern, or choose **Load image…** to use your own picture.
+- **Channels.** For Shadertoy shaders, pick what each `iChannel` reads: the clip (`input`), `noise`, `audio`, `none`, or an image file.
+- **Parameters.** For each control you can:
+  - **Untick** it to hide it. Hidden controls are compiled in as constants at their current value.
+  - **Rename** it. That's the name Resolume and MadMapper show.
+  - Set the **min/max** range.
+  - Set the **starting value** with the slider, switch, dropdown or color picker.
+- **Save settings.** Writes `<shader>.ffmaker.json` next to the shader. **Compile FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
+
+**Packaged app:** `dist\FFMaker.exe` (build it with `venv\Scripts\python compile.py`) runs without Python installed. Building plugins still needs CMake and Visual Studio's C++ tools.
+
 **Command line:**
 
 ```

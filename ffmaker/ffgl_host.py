@@ -64,6 +64,13 @@ class Plugin:
     def __init__(self, path):
         self.ctx = V.context()
         loader = ctypes.WinDLL if sys.platform == "win32" else ctypes.CDLL
+        if path.endswith(".bundle"):            # macOS: the binary lives inside the bundle
+            import glob
+            import os
+            bins = glob.glob(os.path.join(path, "Contents", "MacOS", "*"))
+            if not bins:
+                raise RuntimeError(f"No binary inside {path}")
+            path = bins[0]
         self.lib = loader(path)
         self.main = self.lib.plugMain
         self.main.restype = ctypes.c_uint64

@@ -98,6 +98,17 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.configure(bg="#1a1a2e")
 
         self._build_layout()
+        # Create the GPU validation context now, on the main thread (required on
+        # macOS; also makes the first Analyze faster).
+        self.after(50, self._init_gpu)
+
+    def _init_gpu(self):
+        try:
+            from ffmaker import validate as V
+            with V.gpu() as ctx:
+                self.log(f"GPU: {ctx.renderer}")
+        except Exception as e:
+            self.log(f"GPU validation unavailable ({e}). Shaders will be built without compile checks.")
 
     # CustomTkinter's DPI tracker calls these on CTk windows; TkinterDnD.Tk lacks them.
     def block_update_dimensions_event(self):

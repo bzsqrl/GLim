@@ -42,11 +42,33 @@ Not yet checked inside Resolume or MadMapper.
   - `gl_FragColor` inside `#define` lines.
 - Test batch v2 is in `output/test_batch_v2`.
 
+**Phase 3 (GUI) and the Windows part of Phase 4 are done** (user confirmed batch v2):
+- **Live GPU preview** (`ffmaker/validate.Previewer`, shared with the offline renderer).
+- **Parameter editor:** expose/hide, label, range, default.
+- **Shadertoy channel pickers.**
+- **Per-shader settings** in `<shader>.ffmaker.json`, used by queue, CLI and ISF export. ISF sources get their headers rewritten from these settings.
+- **Packaged `.exe` verified:**
+  - builds plugins headlessly (`FFMaker.exe --selftest <shader> <dir>`);
+  - GLEW is bundled;
+  - the SDK is copied to a stable cache path so the workspace isn't reconfigured every launch.
+- **Mac groundwork** (untested):
+  - the GPU context is created on the main thread;
+  - the test host loads `.bundle` binaries;
+  - CMake has an Apple bundle branch.
+
 **Next:**
-1. GUI: live preview, a parameter editor (expose/rename/range), and per-channel source pickers.
-2. Packaged `.exe`: test the updated PyInstaller spec.
-3. macOS build and testing.
-4. Smaller items: Shadertoy cubemap passes; per-channel filter/wrap settings from Shadertoy JSON.
+1. **macOS** (needs the Mac laptop):
+   - set up the environment;
+   - build the universal `.bundle`;
+   - run the corpus;
+   - test in Resolume and MadMapper for Mac;
+   - make a PyInstaller `.app`;
+   - retire `FFMaker-Mac/`.
+2. **Smaller items:**
+   - Shadertoy cubemap passes;
+   - per-channel filter/wrap settings from Shadertoy JSON;
+   - BPM/bar-phase uniforms for tempo-synced shaders;
+   - letting the preview load a real audio file.
 
 ## 1. Baseline: what works today
 
