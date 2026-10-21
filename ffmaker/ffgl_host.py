@@ -23,6 +23,8 @@ FF_PROCESS_OPENGL = 17
 FF_INSTANTIATE_GL = 18
 FF_DEINSTANTIATE_GL = 19
 FF_INITIALISE_V2 = 34
+FF_SET_PARAMETER_ELEMENT_VALUE = 37
+FF_TYPE_BUFFER = 12
 FF_FAIL = 1
 
 
@@ -45,6 +47,11 @@ class ProcessGL(ctypes.Structure):
 
 class SetParam(ctypes.Structure):
     _fields_ = [("ParameterNumber", ctypes.c_uint32), ("NewParameterValue", ctypes.c_uint64)]
+
+
+class SetElement(ctypes.Structure):
+    _fields_ = [("ParameterNumber", ctypes.c_uint32), ("ElementNumber", ctypes.c_uint32),
+                ("NewParameterValue", ctypes.c_uint64)]
 
 
 class PluginInfo(ctypes.Structure):
@@ -95,6 +102,10 @@ class Plugin:
         sp = SetParam(index, struct.unpack("<I", struct.pack("<f", value))[0])
         self.call(FF_SET_PARAMETER, ctypes.addressof(sp), self.instance)
 
+    def set_element(self, index, element, value):
+        se = SetElement(index, element, struct.unpack("<I", struct.pack("<f", value))[0])
+        self.call(FF_SET_PARAMETER_ELEMENT_VALUE, ctypes.addressof(se), self.instance)
+
     def get_param(self, index):
         v = self.call(FF_GET_PARAMETER, index, self.instance) & 0xFFFFFFFF
         return struct.unpack("<f", struct.pack("<I", v))[0]
@@ -131,6 +142,13 @@ def _smoke_test(path, num_inputs, w, h, frames, frame_dt):
     texs = [TextureStruct(256, 256, 256, 256, int(ctx.test_input[i % 2])) for i in range(num_inputs)]
     ptrs = (ctypes.POINTER(TextureStruct) * max(1, num_inputs))(*[ctypes.pointer(t) for t in texs])
     pgl = ProcessGL(num_inputs, ptrs, int(fbo))
+
+    # Feed a synthetic spectrum into FFT buffer params, as Resolume would.
+    import math
+    for p in params:
+        if p["type"] == FF_TYPE_BUFFER:
+            for i in range(512):
+                plug.set_element(p["index"], i, math.exp(-i / 80.0) * (0.7 + 0.3 * math.sin(i * 0.37)))
 
     stats = []
     for f in range(frames):

@@ -64,7 +64,9 @@ def emit(ir, source_code=None):
                 image_renames[im.name] = "inputImage"
     imported = {}
     for im in ir.images:
-        if im.source == "imported":
+        if im.source == "audio":
+            inputs.append({"NAME": im.name, "TYPE": im.isf_type or "audioFFT", "LABEL": "Audio"})
+        elif im.source == "imported":
             imported[im.name] = {"PATH": asset_name(ir, im)}
         elif im.source != "host":
             inputs.append({"NAME": im.name, "TYPE": "image", "LABEL": im.name})
@@ -77,6 +79,8 @@ def emit(ir, source_code=None):
         elif p.kind == "mouse":
             inputs.append({"NAME": "ffmMouse", "LABEL": "Mouse", "TYPE": "point2D",
                            "DEFAULT": list(p.default), "MIN": [0.0, 0.0], "MAX": [1.0, 1.0]})
+        elif p.kind == "fft":
+            pass                      # ISF hosts supply audio through the audio input itself
         elif p.kind == "mouseclick":
             inputs.append({"NAME": "ffmMouseClick", "LABEL": "Mouse Click", "TYPE": "bool",
                            "DEFAULT": bool(p.default)})

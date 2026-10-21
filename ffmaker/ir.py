@@ -24,11 +24,13 @@ class Param:
 @dataclass
 class Image:
     name: str                 # sampler uniform name used by the shader code
-    source: str = "host"      # host | imported | none
+    source: str = "host"      # host | imported | audio | none
     index: int = 0            # host input index
     path: str = ""            # imported image path
     repeat: bool = True       # wrap mode for imported images
     noise_size: int = 256     # size of generated noise when the file is missing
+    rows: int = 1             # audio: 1 = spectrum (ISF), 2 = spectrum + wave (Shadertoy)
+    isf_type: str = ""        # original ISF input type (audio / audioFFT) for re-export
 
 
 @dataclass

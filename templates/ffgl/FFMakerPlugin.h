@@ -18,7 +18,8 @@ enum FFMKind
 	FFM_K_POINT,     // def = {x, y}; min/max per axis
 	FFM_K_SPEED,     // CPU-only: scales the clock
 	FFM_K_MOUSE,     // CPU-only: feeds ffm_Mouse
-	FFM_K_MOUSECLICK // CPU-only: feeds ffm_Mouse.zw sign
+	FFM_K_MOUSECLICK,// CPU-only: feeds ffm_Mouse.zw sign
+	FFM_K_FFT        // FFGL buffer param filled with the host's audio spectrum
 };
 
 enum FFMSource
@@ -26,8 +27,11 @@ enum FFMSource
 	FFM_SRC_HOST,
 	FFM_SRC_TARGET,
 	FFM_SRC_NONE,
-	FFM_SRC_IMAGE// embedded image (index into FFM_IMAGES)
+	FFM_SRC_IMAGE,// embedded image (index into FFM_IMAGES)
+	FFM_SRC_AUDIO // audio texture; index = rows (1 = FFT, 2 = FFT + wave, Shadertoy layout)
 };
+
+static const int FFM_FFT_SIZE = 512;
 
 struct FFMParamDef
 {
@@ -120,6 +124,9 @@ private:
 	std::vector< Target > targets;
 	GLuint blackTex = 0;
 	std::vector< GLuint > imageTex;
+	GLuint audioTex[ 3 ] = { 0, 0, 0 };// by row count
+	int fftParam         = -1;          // FFGL index of the FFT buffer param
+	void UpdateAudio();
 
 	double clockTime = 0.0;
 	float lastDelta  = 0.0f;

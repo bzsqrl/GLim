@@ -1,0 +1,8 @@
+// Fixture: Shadertoy sound channel -> FFGL audio spectrum.
+// ffmaker: iChannel0 = audio
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    float fft = texture(iChannel0, vec2(uv.x, 0.25)).x;
+    float bar = step(uv.y, fft);
+    fragColor = vec4(vec3(bar) * vec3(uv.x, 0.6, 1.0 - uv.x), 1.0);
+}

@@ -116,6 +116,15 @@ FFMakerPlugin::FFMakerPlugin()
 			add( label + " Brightness", FF_TYPE_BRIGHTNESS, p.def[ 2 ], 2 );
 			add( label + " Alpha", FF_TYPE_ALPHA, p.def[ 3 ], 3 );
 			break;
+		case FFM_K_FFT:
+		{
+			unsigned int idx = (unsigned int)hostParams.size();
+			SetBufferParamInfo( idx, label.c_str(), FFM_FFT_SIZE, FF_USAGE_FFT );
+			hostParams.push_back( { d, 0 } );
+			values.push_back( 0.0f );
+			fftParam = (int)idx;
+			break;
+		}
 		case FFM_K_POINT:
 		case FFM_K_MOUSE:
 			SetParamRange( add( label + " X", FF_TYPE_STANDARD, p.def[ 0 ], 0 ), p.min[ 0 ], p.max[ 0 ] );
@@ -211,6 +220,12 @@ FFResult FFMakerPlugin::DeInitGL()
 	for( GLuint t : imageTex )
 		glDeleteTextures( 1, &t );
 	imageTex.clear();
+	for( GLuint& t : audioTex )
+	{
+		if( t )
+			glDeleteTextures( 1, &t );
+		t = 0;
+	}
 	blackTex = 0;
 	return FF_SUCCESS;
 }
@@ -253,6 +268,45 @@ void FFMakerPlugin::FreeTarget( Target& t )
 		t.fbo[ i ] = t.tex[ i ] = 0;
 	}
 	t.w = t.h = 0;
+}
+
+void FFMakerPlugin::UpdateAudio()
+{
+	if( fftParam < 0 )
+		return;
+	std::vector< float > fft( FFM_FFT_SIZE, 0.0f );
+	if( ParamInfo* info = FindParamInfo( (unsigned int)fftParam ) )
+		for( size_t i = 0; i < fft.size() && i < info->elements.size(); ++i )
+			fft[ i ] = info->elements[ i ].value;
+	for( int rows = 1; rows <= 2; ++rows )
+	{
+		bool needed = false;
+		for( int s = 0; s < FFM_NUM_SAMPLERS; ++s )
+			needed |= FFM_SAMPLERS[ s ].source == FFM_SRC_AUDIO && FFM_SAMPLERS[ s ].index == rows;
+		if( !needed )
+			continue;
+		std::vector< float > data( fft );
+		if( rows == 2 )// Shadertoy: row 0 spectrum, row 1 waveform (approximated by the spectrum)
+			data.insert( data.end(), fft.begin(), fft.end() );
+		if( !audioTex[ rows ] )
+		{
+			glGenTextures( 1, &audioTex[ rows ] );
+			glBindTexture( GL_TEXTURE_2D, audioTex[ rows ] );
+			glTexImage2D( GL_TEXTURE_2D, 0, GL_R32F, FFM_FFT_SIZE, rows, 0, GL_RED, GL_FLOAT, data.data() );
+			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+			GLint swizzle[ 4 ] = { GL_RED, GL_RED, GL_RED, GL_ONE };
+			glTexParameteriv( GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzle );
+		}
+		else
+		{
+			glBindTexture( GL_TEXTURE_2D, audioTex[ rows ] );
+			glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, FFM_FFT_SIZE, rows, GL_RED, GL_FLOAT, data.data() );
+		}
+		glBindTexture( GL_TEXTURE_2D, 0 );
+	}
 }
 
 float FFMakerPlugin::Value( int def, int sub ) const
@@ -354,6 +408,7 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 #endif
 	float daySeconds = (float)( lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec );
 
+	UpdateAudio();
 	const int VW = (int)currentViewport.width, VH = (int)currentViewport.height;
 	GLboolean scissor = glIsEnabled( GL_SCISSOR_TEST );
 	glDisable( GL_SCISSOR_TEST );
@@ -402,6 +457,8 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 			GLuint tex = blackTex;
 			if( sd.source == FFM_SRC_HOST && (unsigned)sd.index < pGL->numInputTextures && pGL->inputTextures[ sd.index ] )
 				tex = pGL->inputTextures[ sd.index ]->Handle;
+			else if( sd.source == FFM_SRC_AUDIO && audioTex[ sd.index ] )
+				tex = audioTex[ sd.index ];
 			else if( sd.source == FFM_SRC_IMAGE && sd.index < (int)imageTex.size() )
 				tex = imageTex[ sd.index ];
 			else if( sd.source == FFM_SRC_TARGET && targets[ sd.index ].tex[ 0 ] )

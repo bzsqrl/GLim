@@ -222,6 +222,21 @@ def _render(ir, glsl_list, width, height, times, frames_between):
         gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
         img_tex[im.name] = tex
 
+    for im in ir.images:
+        if im.source == "audio":
+            # Synthetic spectrum: strong bass falling off, like real music.
+            spec = [math.exp(-i / 80.0) * (0.7 + 0.3 * math.sin(i * 0.37)) for i in range(512)]
+            data = struct.pack(f"{512 * im.rows}f", *(spec * im.rows))
+            tex = gl.glGenTextures(1)
+            gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
+            gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_R32F, 512, im.rows, 0, gl.GL_RED, gl.GL_FLOAT, data)
+            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
+            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
+            gl.glTexParameteriv(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_SWIZZLE_RGBA,
+                                [gl.GL_RED, gl.GL_RED, gl.GL_RED, gl.GL_ONE])
+            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+            img_tex[im.name] = tex
+
     values = {p.name: p for p in ir.params if p.name}
     results = []
     frame = 0
@@ -261,7 +276,7 @@ def _render(ir, glsl_list, width, height, times, frames_between):
                     tex = ctx.black
                     if im.source == "host":
                         tex = ctx.test_input[min(im.index, 1)]
-                    elif im.source == "imported":
+                    elif im.source in ("imported", "audio"):
                         tex = img_tex[im.name]
                     unit = _bind(gl, prog, im.name, tex, unit)
                 for name, t in targets.items():

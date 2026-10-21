@@ -155,6 +155,8 @@ def convert(code, name="Shader", path=None, extract_params=True, promote_ints=Fa
                                glsl_type="vec2", origin="synthetic"))
         ir.params.append(Param("", "mouseclick", "Mouse Click", False, glsl_type="bool",
                                origin="synthetic"))
+    if any(i.source == "audio" for i in ir.images):
+        ir.params.append(Param("", "fft", "Audio Spectrum", 0.0, origin="synthetic"))
     _decide_kind(ir, header)
     _dedupe_labels(ir)
     return ir
@@ -221,8 +223,10 @@ def _isf_header_to_ir(h, ir, path):
             ir.images.append(Image(name, "host", host_index))
             host_index += 1
         elif t in ("audio", "audiofft"):
-            ir.images.append(Image(name, "none"))
-            ir.warnings.append(f"Audio input '{name}' is not supported yet; it will read black.")
+            ir.images.append(Image(name, "audio", rows=1, isf_type=inp.get("TYPE")))
+            if t == "audio":
+                ir.warnings.append(f"'{name}' asks for an audio waveform; FFGL hosts only provide the "
+                                   f"spectrum (FFT), so it receives that instead.")
         else:
             ir.warnings.append(f"Input '{name}' has unsupported type '{t}' and was skipped.")
 
@@ -417,6 +421,8 @@ def _shadertoy_images(toks, ir, directives=None, path=None):
         val = directives.get(ch, "input").strip().strip("\"'")
         if val.lower() in ("input", "clip", "host"):
             ir.images.append(Image(ch, "host", 0))
+        elif val.lower() in ("audio", "sound", "fft", "music"):
+            ir.images.append(Image(ch, "audio", rows=2, isf_type="audioFFT"))
         elif val.lower() == "noise":
             ir.images.append(Image(ch, "imported", repeat=True))
         else:

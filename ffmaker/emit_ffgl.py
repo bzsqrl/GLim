@@ -192,7 +192,7 @@ def shader_data_header(ir, programs_glsl, plugin_name):
         kind = {"float": "FFM_K_FLOAT", "int": "FFM_K_INT", "bool": "FFM_K_BOOL",
                 "event": "FFM_K_EVENT", "long": "FFM_K_OPTION", "color": "FFM_K_COLOR",
                 "point2D": "FFM_K_POINT", "speed": "FFM_K_SPEED", "mouse": "FFM_K_MOUSE",
-                "mouseclick": "FFM_K_MOUSECLICK"}[p.kind]
+                "mouseclick": "FFM_K_MOUSECLICK", "fft": "FFM_K_FFT"}[p.kind]
         if p.kind in ("float", "int", "speed"):
             d[0] = float(p.default)
             mn[0], mx[0] = float(p.min), float(p.max)
@@ -259,6 +259,9 @@ def shader_data_header(ir, programs_glsl, plugin_name):
 
     samplers = []
     for im in ir.images:
+        if im.source == "audio":
+            samplers.append(f"    {{ {_cstr(im.name)}, FFM_SRC_AUDIO, {im.rows} }},")
+            continue
         if im.source == "imported":
             samplers.append(f"    {{ {_cstr(im.name)}, FFM_SRC_IMAGE, {imported.index(im)} }},")
             continue
