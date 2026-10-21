@@ -250,7 +250,8 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._queue_menu.add_command(label="Open in Single File", command=self._open_selected)
         self._queue_menu.add_command(label="Remove", command=self._remove_selected)
         self.tree.bind("<Button-3>", self._on_queue_right_click)
-        self.tree.bind("<Button-2>", self._on_queue_right_click)      # macOS right-click
+        if sys.platform == "darwin":    # older Tk on macOS reports right-click as button 2 (elsewhere it's the middle button)
+            self.tree.bind("<Button-2>", self._on_queue_right_click)
 
         # Drop-zone label (shown when empty)
         self.lbl_drop = ctk.CTkLabel(
@@ -541,11 +542,13 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._building = True
         self._cancel_event.clear()
         self.btn_build_queue.configure(text="Cancel Build", fg_color="#ef4444", hover_color="#dc2626")
-        t = threading.Thread(target=self._build_queue_thread, args=(pending,), daemon=True)
+        t = threading.Thread(target=self._build_queue_thread,
+                             args=(pending, self.extract_params_var.get()), daemon=True)
         t.start()
 
-    def _build_queue_thread(self, items: list[QueueItem]):
+    def _build_queue_thread(self, items: list[QueueItem], extract_params: bool):
         output_dir = ffpaths.default_output_dir()
+        suffix = "-p" if extract_params else ""
 
         ok = err = 0
         was_cancelled = False
@@ -555,6 +558,8 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             if self._cancel_event.is_set():
                 was_cancelled = True
                 break
+            if item.iid not in self._items_by_iid:     # removed from the queue after the build started
+                continue
 
             item.status = "building"
             self._set_item_status(item, "building", "Building…")
@@ -562,10 +567,10 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
             try:
                 code = open(item.path, encoding="utf-8", errors="replace").read()
-                suffix = "-p" if self.extract_params_var.get() else ""
                 wanted = ffsettings.load(item.path).get("plugin_name") or item.name + suffix
                 name = build_ffgl.unique_plugin_name(wanted, visible_names)
-                status, text = self._convert_and_build(code, name, item.path, output_dir)
+                status, text = self._convert_and_build(code, name, item.path, output_dir,
+                                                       extract_params=extract_params)
                 if status == "cancelled":
                     item.status = "pending"
                     self._set_item_status(item, "pending", "Pending")
@@ -595,13 +600,14 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     # Single-file tab methods (unchanged from original)
     # -----------------------------------------------------------------------
-    def _convert_and_build(self, code, name, path, output_dir, settings=None):
+    def _convert_and_build(self, code, name, path, output_dir, settings=None, extract_params=False):
         """Shared by queue and single-file builds. Returns (status, label).
-        settings=None uses the shader's saved .ffmaker.json."""
+        settings=None uses the shader's saved .ffmaker.json. Runs on worker
+        threads, so callers read extract_params from the checkbox beforehand."""
         log = self._gui_log
         try:
             res = pipeline.convert_ffgl(code, name=name, path=path, settings=settings,
-                                        extract_params=self.extract_params_var.get())
+                                        extract_params=extract_params)
         except ffconvert.ConvertError as e:
             log(f"  ERROR: {e}")
             return "error", "Not a shader"
@@ -670,11 +676,12 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if path:
             ffsettings.save(path, self.settings)     # queue builds of this file use the same settings
         settings = dict(self.settings)
+        extract = self.extract_params_var.get()
 
         def run():
             try:
                 self._cancel_event.clear()
-                self._convert_and_build(code, name, path, ffpaths.default_output_dir(), settings)
+                self._convert_and_build(code, name, path, ffpaths.default_output_dir(), settings, extract)
             except Exception as exc:
                 self._gui_log(f"EXCEPTION: {exc}")
             finally:
@@ -718,10 +725,13 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     # ISF Export
     # -----------------------------------------------------------------------
-    def _isf_export(self, code, name, path, out_dir, settings=None):
-        """Write <name>.fs (plus texture files) into out_dir. Returns (fs_path, note)."""
+    def _isf_export(self, code, name, path, out_dir, settings=None, extract_params=None):
+        """Write <name>.fs (plus texture files) into out_dir. Returns (fs_path, note).
+        Worker threads pass extract_params; None reads the checkbox."""
+        if extract_params is None:
+            extract_params = self.extract_params_var.get()
         res = pipeline.convert_ffgl(code, name=name, path=path, settings=settings,
-                                    extract_params=self.extract_params_var.get())
+                                    extract_params=extract_params)
         if res.ir.dialect == "isf":
             dst = os.path.join(out_dir, name + ".fs")
             with open(dst, "w", encoding="utf-8") as f:
@@ -771,7 +781,8 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             return
 
         self.log(f"Exporting {len(items)} items to ISF...")
-        suffix = "-p" if self.extract_params_var.get() else ""
+        extract = self.extract_params_var.get()
+        suffix = "-p" if extract else ""
         self.btn_export_isf_queue.configure(state="disabled")
 
         def run():          # off the UI thread, so long exports don't freeze the window
@@ -779,7 +790,8 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             for item in items:
                 try:
                     code = open(item.path, encoding="utf-8", errors="replace").read()
-                    _, note = self._isf_export(code, item.name + suffix, item.path, out_dir)
+                    _, note = self._isf_export(code, item.name + suffix, item.path, out_dir,
+                                               extract_params=extract)
                     self._gui_log(f"  [{item.fname}] ✓ {note}")
                     ok += 1
                 except Exception as exc:
