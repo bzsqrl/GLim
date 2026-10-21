@@ -73,10 +73,26 @@ def _glew_root(log):
     return os.path.join(base, "glew-2.2.0")
 
 
+def _tool_path():
+    """PATH for build tools. Apps opened from Finder get a minimal PATH
+    without Homebrew, where CMake usually lives."""
+    dirs = os.environ.get("PATH", "").split(os.pathsep)
+    if sys.platform == "darwin":
+        dirs += [d for d in ("/opt/homebrew/bin", "/usr/local/bin",
+                             "/Applications/CMake.app/Contents/bin") if d not in dirs]
+    return os.pathsep.join(d for d in dirs if d)
+
+
 def _run(cmd, cwd, log, cancel_event=None):
     flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-    proc = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, encoding="utf-8", errors="replace", creationflags=flags)
+    path = _tool_path()
+    exe = shutil.which(cmd[0], path=path)
+    if exe is None:
+        hint = " (install it with: brew install cmake)" if sys.platform == "darwin" else ""
+        raise BuildError(f"{cmd[0]} not found{hint}")
+    proc = subprocess.Popen([exe] + cmd[1:], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace", creationflags=flags,
+                            env={**os.environ, "PATH": path})
     lines = []
     for line in proc.stdout:
         lines.append(line)

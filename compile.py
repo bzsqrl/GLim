@@ -4,7 +4,7 @@ import os
 
 def build():
     print("Starting FFMaker build process...")
-    
+
     # Check if pyinstaller is installed
     try:
         import PyInstaller
@@ -12,14 +12,17 @@ def build():
         print("PyInstaller not found. Installing...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
 
-    # Run pyinstaller using the .spec file
+    # Run pyinstaller using the .spec file (it handles Windows and macOS)
     print("Running PyInstaller...")
-    cmd = ["pyinstaller", "--clean", "--noconfirm", "FFMaker.spec"]
-    
+    cmd = [sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm", "FFMaker.spec"]
+
     try:
-        subprocess.check_call(cmd)
+        subprocess.check_call(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))
         print("\nBuild successful!")
-        print("You can find the compiled application in the 'dist/FFMaker' folder.")
+        if sys.platform == "darwin":
+            print("You can find FFMaker.app in the 'dist' folder.")
+        else:
+            print("You can find FFMaker.exe in the 'dist' folder.")
     except subprocess.CalledProcessError as e:
         print(f"\nBuild failed with error: {e}")
 

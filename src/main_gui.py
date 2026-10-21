@@ -290,6 +290,8 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                                   log=self.log)
         self.panes.add(self.editor, stretch="always", minsize=760)
         self.textbox_code.bind("<Control-Return>", lambda e: (self.analyze_code(), "break")[1])
+        if sys.platform == "darwin":
+            self.textbox_code.bind("<Command-Return>", lambda e: (self.analyze_code(), "break")[1])
 
         self.after(200, self._set_initial_sash)
 

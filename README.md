@@ -16,7 +16,6 @@ Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for
 | `src/` | GUI (`main_gui.py`, `editor_panel.py`) |
 | `tests/` | Regression runner (`run_corpus.py`) and feature fixtures |
 | `sample-shaders/` | Test corpus |
-| `FFMaker-Mac/` | Old, separate Mac port; to be retired once the main code runs on macOS |
 
 ## Windows setup
 
@@ -32,7 +31,7 @@ Building plugins needs CMake and Visual Studio's C++ tools. GLEW is downloaded o
 
 ```
 xcode-select --install                 # Apple compilers
-brew install python@3.12 cmake         # Homebrew: https://brew.sh
+brew install python@3.12 python-tk@3.12 cmake   # Homebrew: https://brew.sh
 git clone <this repo> FFMaker && cd FFMaker
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
@@ -40,4 +39,6 @@ venv/bin/python tests/run_corpus.py    # converts, compiles and renders every sa
 venv/bin/python src/main_gui.py
 ```
 
-Drag-and-drop in the GUI also needs `tkdnd`. Without it, the GUI falls back to the Add Files / Add Folder buttons.
+To build the packaged app: `venv/bin/python compile.py` (writes `dist/FFMaker.app`).
+
+Drag-and-drop in the GUI uses `tkdnd`, which the `tkinterdnd2` package includes for macOS and Windows. Without it, the GUI falls back to the Add Files / Add Folder buttons.

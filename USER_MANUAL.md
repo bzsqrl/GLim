@@ -1,7 +1,7 @@
 # FFMaker User Manual
 
 **FFMaker** converts GLSL shaders into:
-- **FFGL 2 plugins** for Resolume 7.21.3+ and other FFGL hosts (`.dll` on Windows; macOS `.bundle` support is planned)
+- **FFGL 2 plugins** for Resolume 7.21.3+ and other FFGL hosts (`.dll` on Windows, universal `.bundle` on macOS)
 - **ISF 2 files** (`.fs`) for MadMapper, VDMX, Millumin and other ISF hosts
 
 It accepts ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.
@@ -15,19 +15,27 @@ It accepts ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.
 - **Visual Studio 2022+ or the Build Tools**, with the "Desktop development with C++" workload
 - An OpenGL 4.1 GPU. FFMaker compiles and test-renders every shader on your GPU before building it.
 
-The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFMaker` and compiles the FFGL SDK. This takes about a minute. After that, each plugin builds in about 2 seconds.
+## Prerequisites (macOS)
+
+- **Python 3.12** (Homebrew `python@3.12` and `python-tk@3.12`) with the packages in `requirements.txt`: `venv/bin/pip install -r requirements.txt`
+- **CMake** (`brew install cmake`)
+- **Xcode Command Line Tools** (`xcode-select --install`). The full Xcode app isn't needed.
+
+Plugins are universal `.bundle`s that run on Apple Silicon and Intel Macs (macOS 10.15+).
+
+The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFMaker` (macOS: `~/Library/Caches/FFMaker`) and compiles the FFGL SDK. This takes about a minute. After that, each plugin builds in about 2 seconds.
 
 ---
 
 ## Quick start
 
-**GUI:** `venv\Scripts\python src\main_gui.py`
+**GUI:** `venv\Scripts\python src\main_gui.py` (macOS: `venv/bin/python src/main_gui.py`)
 
 1. Drop shader files or folders onto the **Queue**.
 2. Click **Build Queue** to make FFGL plugins, or **Export ISF** to make `.fs` files.
-3. Plugins are written to `FFMaker\output\`. Copy them to Resolume's FFGL plugin folder (set in *Preferences → Video → FFGL plugins*), then restart Resolume.
+3. Plugins are written to `FFMaker\output\`. Copy them to Resolume's FFGL plugin folder (set in *Preferences → Video → FFGL plugins*; on macOS, `~/Documents/Resolume Arena/Extra Effects` works by default), then restart Resolume.
 
-**Single File tab (editor):** open or paste a shader and click **Analyze Code** (or press Ctrl+Enter). You get:
+**Single File tab (editor):** open or paste a shader and click **Analyze Code** (or press Ctrl+Enter; ⌘+Enter on macOS). You get:
 - **Live preview.** Rendered on your GPU the same way the plugin renders it.
   - Play/pause with ⏸; restart time and feedback buffers with ⟲.
   - For effects, preview over the test pattern, or choose **Load image…** to use your own picture.
@@ -40,6 +48,8 @@ The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFMaker` and
 - **Save settings.** Writes `<shader>.ffmaker.json` next to the shader. **Compile FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
 
 **Packaged app:** `dist\FFMaker.exe` (build it with `venv\Scripts\python compile.py`) runs without Python installed. Building plugins still needs CMake and Visual Studio's C++ tools.
+
+On macOS, `venv/bin/python compile.py` builds `dist/FFMaker.app` (Apple Silicon). It writes plugins to `~/Documents/FFMaker/output`, and building them still needs CMake and the Command Line Tools. The app is signed ad hoc, not notarized: on another Mac, open it the first time with right-click → **Open**. Headless check: `FFMaker.app/Contents/MacOS/FFMaker --selftest <shader> <dir>`.
 
 **Command line:**
 

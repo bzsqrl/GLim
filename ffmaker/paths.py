@@ -39,4 +39,8 @@ def ffgl_sdk_dir():
 
 
 def default_output_dir():
+    # A packaged Mac app can't write inside FFMaker.app (that breaks its
+    # signature, and /Applications is read-only), so use Documents instead.
+    if getattr(sys, "frozen", False) and sys.platform == "darwin":
+        return os.path.join(os.path.expanduser("~/Documents"), "FFMaker", "output")
     return os.path.join(app_dir(), "output")

@@ -51,20 +51,16 @@ Not yet checked inside Resolume or MadMapper.
   - builds plugins headlessly (`FFMaker.exe --selftest <shader> <dir>`);
   - GLEW is bundled;
   - the SDK is copied to a stable cache path so the workspace isn't reconfigured every launch.
-- **Mac groundwork** (untested):
-  - the GPU context is created on the main thread;
-  - the test host loads `.bundle` binaries;
-  - CMake has an Apple bundle branch.
+**macOS port done** (M1 Max, macOS 14, Resolume 7.21.3, MadMapper 6.0.1):
+- Builds with only the Command Line Tools (Makefiles generator, not Xcode).
+- Plugins are universal (arm64 + x86_64) `.bundle`s, macOS 10.15+, each with its own bundle identifier, signed ad hoc. The binary is named after the bundle, because Resolume opens `Contents/MacOS/<bundle name>`.
+- Corpus: all 79 convert, compile and render on the Apple GPU. Plugins load in Resolume for Mac.
+- ISF exports no longer use `gl_FragCoord` (MadMapper on macOS puts its origin at the top). The corpus `--isf` run now fails an export with `FLIP` if its output depends on `gl_FragCoord`'s origin.
+- `FFMaker.spec` builds `dist/FFMaker.app` on macOS. It writes output to `~/Documents/FFMaker/output` and finds Homebrew's CMake when opened from Finder. Verified with `--selftest`.
+- Not done: a universal or Intel build of the app itself (Homebrew Python is arm64 only), and Developer ID signing/notarization for distribution.
 
 **Next:**
-1. **macOS** (needs the Mac laptop):
-   - set up the environment;
-   - build the universal `.bundle`;
-   - run the corpus;
-   - test in Resolume and MadMapper for Mac;
-   - make a PyInstaller `.app`;
-   - retire `FFMaker-Mac/`.
-2. **Smaller items:**
+1. **Smaller items:**
    - Shadertoy cubemap passes;
    - per-channel filter/wrap settings from Shadertoy JSON;
    - BPM/bar-phase uniforms for tempo-synced shaders;
@@ -119,7 +115,7 @@ Smaller issues:
 - **Text replacement instead of host emulation.** The code rewrites shader text with dozens of regexes. Every new shader style needs a new regex, and fixes collide with each other (that's where the `// <FFMAKER_ISF_SHIMS>` round-trip markers came from).
 - **No validation before building.** The tool runs a full CMake/MSVC build and reports "success" without ever compiling the GLSL. Shader errors only show up as a blank clip in Resolume.
 - **Slow builds.** Every plugin rebuilds the whole FFGL SDK through CMake, and failed builds leave their folders behind (`boilerplates/` holds about 13,000 leftover `build_temp_*` files). In the packaged `.exe`, builds are written into PyInstaller's temporary extraction folder.
-- **The Mac port is a forked copy** of `src/` (`FFMaker-Mac/src_mac`), so the two versions will drift apart.
+- ~~**The Mac port is a forked copy** of `src/` (`FFMaker-Mac/src_mac`), so the two versions will drift apart.~~ Fixed: one codebase runs on both.
 - Multi-pass is rejected with the message "FFGL does not support it". That's wrong: plugins can render into their own FBOs (`ffglex::FFGLFBO`).
 
 ## 3. Target architecture
