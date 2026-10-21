@@ -10,6 +10,9 @@ and a JSON report to tests/out/. Status codes:
   BLACK    rendered all black / fully transparent
   COMPILE  GPU compile error
   PARSE    converter refused the file
+With --isf, each export is also checked: COMPILE, FLIP (renders differently
+when gl_FragCoord runs top-down, as in MadMapper on macOS), REIMPORT, DIFFn
+(round-trip render differs by n), else OK.
 """
 import argparse
 import glob
@@ -110,6 +113,10 @@ def _check_isf(code, stem, path, out_dir):
     ok, errs = isf_host.compile_isf(text)
     if not ok:
         return {"status": "COMPILE", "errors": errs[:3]}
+    # Hosts disagree on gl_FragCoord's origin (MadMapper on macOS: top-left),
+    # so the export must render the same either way.
+    if isf_host.origin_independent(text) is False:
+        return {"status": "FLIP", "errors": ["output depends on gl_FragCoord's origin"]}
     # Round trip: re-import the exported ISF and compare renders with the original.
     try:
         a = pipeline.convert_ffgl(code, name=stem, path=path)
