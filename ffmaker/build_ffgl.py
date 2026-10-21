@@ -55,7 +55,8 @@ def _write_if_changed(path, text):
 def _glew_root(log):
     if sys.platform != "win32":
         return None
-    for base in (os.path.join(paths.app_dir(), "deps"), os.path.join(paths.cache_dir(), "deps")):
+    for base in (os.path.join(paths.app_dir(), "deps"), os.path.join(paths.bundle_dir(), "deps"),
+                 os.path.join(paths.cache_dir(), "deps")):
         d = os.path.join(base, "glew-2.2.0")
         if os.path.isdir(d):
             return d
@@ -92,6 +93,25 @@ def _run(cmd, cwd, log, cancel_event=None):
     return out
 
 
+def _stable_sdk_dir():
+    """The FFGL SDK at a path that stays the same between runs. A packaged app
+    unpacks to a new temp folder each launch, which would force CMake to
+    reconfigure and rebuild the SDK every session, so copy it to the cache once."""
+    src = paths.ffgl_sdk_dir()
+    if not getattr(sys, "frozen", False):
+        return src
+    dst = os.path.join(paths.cache_dir(), "ffgl_sdk")
+    stamp = os.path.join(dst, ".ffmaker_stamp")
+    marker = str(os.path.getsize(os.path.join(src, "CMakeLists.txt")))
+    if not (os.path.isfile(stamp) and open(stamp).read() == marker):
+        if os.path.exists(dst):
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst)
+        with open(stamp, "w") as f:
+            f.write(marker)
+    return dst
+
+
 def workspace_dir():
     return os.path.join(paths.cache_dir(), "ffgl_workspace")
 
@@ -104,7 +124,7 @@ def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None
         ws = workspace_dir()
         os.makedirs(ws, exist_ok=True)
         tpl = paths.templates_dir()
-        sdk = paths.ffgl_sdk_dir().replace("\\", "/")
+        sdk = _stable_sdk_dir().replace("\\", "/")
         for fn in sorted(os.listdir(os.path.join(tpl, "ffgl"))):
             if fn == "CMakeLists.txt":
                 continue

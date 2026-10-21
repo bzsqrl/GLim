@@ -80,7 +80,10 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             ctk.set_appearance_mode("Dark")
 
         self.title("FFMaker – Shader to FFGL Converter")
-        self.geometry("1440x900")
+        # Fit the screen (minus taskbar), up to 1440x900.
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        w, h = min(1440, sw - 60), min(900, sh - 110)
+        self.geometry(f"{w}x{h}+{max(0, (sw - w) // 2)}+{max(0, (sh - h) // 2 - 20)}")
         self.minsize(860, 540)
 
         self._queue: list[QueueItem] = []
@@ -772,6 +775,27 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
         self.log(f"✓ ISF Export complete: {ok}/{len(items)} successful.")
 
+def _selftest(shader, out_dir):
+    """Headless check of a (packaged) build: convert, GPU-validate and build one
+    shader. Writes selftest.log into out_dir. Usage: FFMaker.exe --selftest <shader> <out_dir>"""
+    import traceback
+    os.makedirs(out_dir, exist_ok=True)
+    lines = []
+    try:
+        code = open(shader, encoding="utf-8", errors="replace").read()
+        res = pipeline.convert_ffgl(code, name=Path(shader).stem, path=shader)
+        lines.append(f"ok={res.ok} validated={res.validated} kind={res.ir.kind} params={len(res.ir.params)} {res.log}")
+        dst = build_ffgl.build(res.ir, res.ffgl_glsl, Path(shader).stem, out_dir=out_dir, log=lines.append)
+        lines.append(f"built {dst}")
+    except Exception:
+        lines.append(traceback.format_exc())
+    with open(os.path.join(out_dir, "selftest.log"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 if __name__ == "__main__":
+    if len(sys.argv) >= 4 and sys.argv[1] == "--selftest":
+        _selftest(sys.argv[2], sys.argv[3])
+        sys.exit(0)
     app = FFMakerApp()
     app.mainloop()

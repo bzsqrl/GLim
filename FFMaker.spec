@@ -10,10 +10,12 @@ ffgl_sdk = [(os.path.join(root, f), os.path.relpath(root, '.'))
 
 a = Analysis(
     ['src\\main_gui.py'],
-    pathex=['.'],
+    pathex=['.', 'src'],
     binaries=collect_dynamic_libs('glfw'),
     datas=collect_data_files('customtkinter') + collect_data_files('tkinterdnd2') + [
         ('templates', 'templates'),
+        ('deps/glew-2.2.0/include', 'deps/glew-2.2.0/include'),
+        ('deps/glew-2.2.0/lib/Release/x64', 'deps/glew-2.2.0/lib/Release/x64'),
     ] + ffgl_sdk,
     hiddenimports=['ffmaker', 'glfw', 'OpenGL.GL', 'OpenGL.platform.win32'],
     hookspath=[],
