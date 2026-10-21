@@ -30,19 +30,23 @@ Not yet checked inside Resolume or MadMapper.
 - ISF transitions as FFGL mixers
 - Cached-SDK builds (about 2 s per plugin)
 
+**Done since the first test batch** (user confirmed v1 works in Resolume and MadMapper):
+- **Embedded textures:** ISF `IMPORTED`, Shadertoy channel directives, and a noise fallback for missing files.
+- **Audio:** an FFGL FFT buffer parameter drives ISF `audio`/`audioFFT` inputs and Shadertoy sound channels.
+- **Multi-buffer Shadertoy:** Common plus Buffers A–D from sectioned text or Shadertoy JSON. These export to ISF `PASSES`.
+- **ISF `.vs` vertex shaders.**
+- **ISF round-trip regression test:** each export is re-imported and its render compared with the original. It found and fixed:
+  - uninitialised variables (FFMaker now zero-initialises them, as browsers do);
+  - the ISF entry point when a file defines both `main()` and `mainImage()`;
+  - user macros shadowing ISF built-ins;
+  - `gl_FragColor` inside `#define` lines.
+- Test batch v2 is in `output/test_batch_v2`.
+
 **Next:**
-1. Fix whatever the Resolume/MadMapper testing turns up.
-2. Embed ISF `IMPORTED` images and Shadertoy textures.
-3. Audio FFT inputs.
-4. Shadertoy multi-buffer projects.
-5. ISF `.vs` vertex shaders.
-6. GUI preview and parameter editor.
-7. macOS build and testing (the CMake template already has an Apple branch, untested).
-8. Updated PyInstaller packaging (spec updated but not yet tested).
-
-Targets: **FFGL 2 plugins for Resolume 7.21.3+** (Windows first, Mac later) and **ISF 2 files for MadMapper and other hosts**.
-
----
+1. GUI: live preview, a parameter editor (expose/rename/range), and per-channel source pickers.
+2. Packaged `.exe`: test the updated PyInstaller spec.
+3. macOS build and testing.
+4. Smaller items: Shadertoy cubemap passes; per-channel filter/wrap settings from Shadertoy JSON.
 
 ## 1. Baseline: what works today
 

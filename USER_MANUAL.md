@@ -47,16 +47,49 @@ venv\Scripts\python -m ffmaker <files or folders> --to ffgl|isf|both|check [--ou
 | **GLSL Sandbox / plain GLSL** | `main()` | Source (or Effect if it declares a `sampler2D` uniform) |
 
 Supported features:
-- **ISF:** all input types except audio. Multi-pass and persistent buffers (`PASSES`, `PERSISTENT`, `FLOAT`, `WIDTH`/`HEIGHT` expressions) are supported. So are all `IMG_*` macros, `DATE`, `FRAMEINDEX` and `TIMEDELTA`.
-- **Shadertoy:** `iTime`, `iResolution`, `iMouse`, `iDate`, `iFrame`, `iTimeDelta`, `iChannel0-3` (fed from the clip input), and `iChannelResolution`.
+- **ISF:** all input types. Multi-pass and persistent buffers (`PASSES`, `PERSISTENT`, `FLOAT`, `WIDTH`/`HEIGHT` expressions) are supported, as are all `IMG_*` macros, `DATE`, `FRAMEINDEX` and `TIMEDELTA`.
+  - `IMPORTED` images are embedded in the plugin.
+  - `audio`/`audioFFT` inputs receive the host's audio spectrum.
+  - Companion `.vs` vertex shaders (same file name, next to the `.fs`) are supported.
+- **Shadertoy:** `iTime`, `iResolution`, `iMouse`, `iDate`, `iFrame`, `iTimeDelta`, `iChannel0-3` and `iChannelResolution`.
 - **GLSL Sandbox:** `time`, `resolution`, `mouse` and `surfacePosition`. Unknown `uniform`s become sliders.
 - **Older GLSL:** `texture2D`, `gl_FragColor` and similar legacy names are translated automatically.
+- **Uninitialised variables** are set to zero, as browsers do. Shadertoy code often relies on this.
 
-**Not yet supported** (see `IMPROVEMENT_PLAN.md`):
-- ISF `IMPORTED` images: they read black for now.
-- Audio inputs.
-- Shadertoy multi-buffer projects (Buffer A–D).
-- ISF custom vertex shaders.
+### Shadertoy channels
+By default every `iChannel` reads the clip, which makes the plugin an effect. Choose a different source with a comment line anywhere in the shader:
+
+```glsl
+// ffmaker: iChannel1 = textures/rock.jpg   (image file, relative to the shader; embedded in the plugin)
+// ffmaker: iChannel2 = noise                (generated RGBA noise texture)
+// ffmaker: iChannel3 = audio                (live audio spectrum from the host)
+// ffmaker: iChannel0 = input                (the clip; the default)
+```
+
+If an image file is missing, a noise texture is used and FFMaker warns you.
+
+### Multi-buffer Shadertoy shaders (Buffer A–D)
+Either:
+- **Shadertoy JSON:** drop the `.json` export of the shader. Passes, channel wiring and texture slots come from the file. Texture images are used if a file with the same name sits next to the JSON; otherwise noise is used.
+- **Sectioned text:** paste each tab into one `.txt` under header lines, with channel directives inside each section:
+
+```glsl
+// ==== Common ====
+...
+// ==== Buffer A ====
+// ffmaker: iChannel0 = Buffer A     (feedback: reads its own previous frame)
+void mainImage(...) { ... }
+// ==== Image ====
+// ffmaker: iChannel0 = Buffer A
+void mainImage(...) { ... }
+```
+
+Buffers become float feedback buffers in the FFGL plugin and `PASSES` in ISF exports. Errors are reported as `[Buffer A] line N`.
+
+### Not yet supported
+- Shadertoy cubemap and sound-output passes.
+- Keyboard input (reads black).
+- Real waveform data. FFGL hosts only provide the spectrum, so waveform inputs get the spectrum instead.
 
 ---
 

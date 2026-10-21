@@ -35,3 +35,24 @@ Known gaps (expected, not bugs):
 ## MadMapper (ISF exports)
 
 Load the `.fs` files from the same folder. Check that they compile, render and animate, and that inputs (Speed, sliders, colors) behave. Shadertoy effects expect an input image (`inputImage`).
+
+
+---
+
+# Test batch v2: new features
+
+Location: `output/test_batch_v2/`. It has 7 FFGL plugins, the matching ISF files, and the `img/` folder that `imported_texture.fs` needs.
+
+| Plugin | What to check |
+| :-- | :-- |
+| `imported_texture` | A dark-blue image with a **red band at the top**. This checks that embedded images are the right way up. |
+| `isf_vertex_blur` | Effect. Blurs the clip; the **Width** slider changes the blur amount. Uses a `.vs` vertex shader. |
+| `shadertoy_channels` | Effect. Left half shows the clip, right half shows a repeating red/blue image, plus a little noise shimmer. |
+| `shadertoy_multipass` | An orange dot leaving a **fading trail**. Buffer feedback works if the trail persists; the **Trail** slider sets its length. |
+| `shadertoy_mult~2` | Same shader, built from the Shadertoy **JSON** form. Should look identical. |
+| `shadertoy_audio` | Spectrum bars that react to music. |
+| `isf_audiofft` | Spectrum bars that react to music; the **Gain** slider scales them. |
+
+**Audio in Resolume:** the plugins have an **Audio Spectrum** parameter. Resolume feeds it from the composition or layer audio, or whatever audio source you assign in the parameter's audio settings. With no audio playing, the bars stay flat. That's expected.
+
+**MadMapper:** load the `.fs` files from the same folder. Keep the `.png`, `.vs` and `img/` files next to them. `shadertoy_multipass.fs` exercises ISF multi-pass feedback; the two audio files need MadMapper's audio input.
