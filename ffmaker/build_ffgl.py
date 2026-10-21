@@ -134,7 +134,8 @@ def workspace_dir():
 
 def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None):
     """Build the plugin; returns the output path."""
-    out_dir = out_dir or paths.default_output_dir()
+    # Absolute, because later steps run tools from other working directories.
+    out_dir = os.path.abspath(out_dir or paths.default_output_dir())
     os.makedirs(out_dir, exist_ok=True)
     with _lock:
         ws = workspace_dir()

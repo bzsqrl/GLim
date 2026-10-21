@@ -13,6 +13,8 @@ from ffmaker import settings as S
 
 PREVIEW_W, PREVIEW_H = 384, 216
 CHANNEL_CHOICES = ["input", "noise", "audio", "none", "file…"]
+FILTER_CHOICES = ["filter", "nearest", "linear", "mipmap"]   # first entry = Shadertoy default
+WRAP_CHOICES = ["wrap", "clamp", "repeat"]
 
 
 class EditorPanel(ctk.CTkFrame):
@@ -198,22 +200,65 @@ class EditorPanel(ctk.CTkFrame):
         if not chans or any(p.label for p in ir.programs):    # multi-buffer projects: wiring is in the file
             return
         ctk.CTkLabel(self.channel_frame, text="Channels", font=("Arial", 13, "bold")).pack(anchor="w")
-        from ffmaker.convert import channel_directives
-        current = dict(self.settings.get("channels", {}))
         for im in sorted(chans, key=lambda i: i.name):
             row = ctk.CTkFrame(self.channel_frame, fg_color="transparent")
             row.pack(fill="x", pady=1)
             ctk.CTkLabel(row, text=im.name, width=80, anchor="w").pack(side="left")
-            val = current.get(im.name)
-            if val is None:
-                val = {"host": "input", "audio": "audio", "none": "none"}.get(im.source)
-                if im.source == "imported":
-                    val = os.path.basename(im.path) if im.path else "noise"
+            val, opts = self._channel_value(im)
             shown = val if val in CHANNEL_CHOICES else os.path.basename(val)
-            menu = ctk.CTkOptionMenu(row, values=CHANNEL_CHOICES, width=150,
+            menu = ctk.CTkOptionMenu(row, values=CHANNEL_CHOICES, width=130,
                                      command=lambda c, n=im.name: self._channel_choice(n, c))
             menu.set(shown)
             menu.pack(side="left", padx=4)
+            if im.source == "audio":
+                continue
+            # Per-channel sampler settings, as on Shadertoy.
+            for key, choices in (("filter", FILTER_CHOICES), ("wrap", WRAP_CHOICES)):
+                m = ctk.CTkOptionMenu(row, values=choices, width=80,
+                                      command=lambda c, n=im.name, k=key: self._sampler_choice(n, k, c))
+                m.set(opts.get(key, choices[0]))
+                m.pack(side="left", padx=2)
+
+    def _channel_value(self, im):
+        """(source, sampler options) for a channel: the saved setting, else what
+        the shader's own directives produced."""
+        from ffmaker.convert import split_channel_options
+        saved = self.settings.get("channels", {}).get(im.name)
+        if saved is not None:
+            return split_channel_options(saved)
+        val = {"host": "input", "audio": "audio", "none": "none"}.get(im.source, "noise")
+        opts = {}
+        if im.source == "imported":
+            if im.path:
+                val = im.path
+                if self.shader_path:
+                    try:
+                        val = os.path.relpath(im.path, os.path.dirname(self.shader_path))
+                    except ValueError:
+                        pass
+            if not im.repeat:
+                opts["wrap"] = "clamp"
+            if not im.flip:
+                opts["vflip"] = False
+        elif im.wrap:
+            opts["wrap"] = im.wrap
+        if im.filter:
+            opts["filter"] = im.filter
+        return val, opts
+
+    def _store_channel(self, name, val, opts):
+        parts = [val] + [f"{k}={str(v).lower()}" for k, v in opts.items()]
+        self.settings.setdefault("channels", {})[name] = " ".join(parts)
+        self.on_recompile()
+
+    def _sampler_choice(self, name, key, choice):
+        im = next(i for i in self.res.ir.images if i.name == name)
+        val, opts = self._channel_value(im)
+        if choice in (FILTER_CHOICES[0], WRAP_CHOICES[0]):
+            opts.pop(key, None)
+        else:
+            opts[key] = choice
+        self._store_channel(name, val, opts)
 
     def _channel_choice(self, name, choice):
         if choice == "file…":
@@ -228,8 +273,9 @@ class EditorPanel(ctk.CTkFrame):
                 except ValueError:
                     pass
             choice = path
-        self.settings.setdefault("channels", {})[name] = choice
-        self.on_recompile()
+        im = next((i for i in self.res.ir.images if i.name == name), None)
+        opts = self._channel_value(im)[1] if im else {}
+        self._store_channel(name, choice, opts)
 
     # ── Parameters ───────────────────────────────────────────────────────────
     def _build_params(self):

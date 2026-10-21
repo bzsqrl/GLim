@@ -13,6 +13,7 @@ FFGL_SYMBOLS = {
     "surfacesize": "vec2(ffm_Resolution.x / ffm_Resolution.y, 1.0)",
     "samplerate": "44100.0", "framerate": "60.0",
     "channelres": "ffm_ChannelRes", "channeltime": "ffm_ChannelTime",
+    "bpm": "ffm_BPM", "beat": "ffm_Beat", "barphase": "ffm_BarPhase",
 }
 
 HOST_BLOCK = """#version 410 core
@@ -24,6 +25,9 @@ uniform int   ffm_Frame;
 uniform vec4  ffm_Date;
 uniform vec4  ffm_Mouse;
 uniform int   ffm_PassIndex;
+uniform float ffm_BPM;       // host tempo (FFGL SetBeatInfo), 120 when the host sends none
+uniform float ffm_Beat;      // beats elapsed, in step with the host's bars
+uniform float ffm_BarPhase;  // 0..1 through the current bar
 out vec4 ffm_FragColor;
 vec2  ffm_FragNorm;
 vec2  ffm_SurfacePos;
@@ -106,6 +110,20 @@ def glsl_literal(p):
             vals = [vals[0], vals[1]]
         return f"{p.glsl_type}(" + ", ".join(f(x) for x in vals) + ")"
     return f(v)
+
+
+_FILTERS = {"nearest": 0, "linear": 1, "mipmap": 2}
+
+
+def _sampler_state(im):
+    """'filter, wrap' for a host/target sampler: -1, -1 keeps the texture's own
+    (linear, clamp). Host textures have no mipmaps, so mipmap means linear there."""
+    if im.source not in ("host", "target") or not (im.filter or im.wrap):
+        return "-1, -1"
+    f = _FILTERS[im.filter or "linear"]
+    if im.source == "host" and f == 2:
+        f = 1
+    return f"{f}, {int(im.wrap == 'repeat')}"
 
 
 def sampler_names(ir):
@@ -259,9 +277,11 @@ def shader_data_header(ir, programs_glsl, plugin_name):
     for p in ir.passes:
         if p.target and p.target not in [t.target for t in targets]:
             targets.append(p)
+    # Buffers read with a mipmap filter get mipmaps rebuilt after they render.
+    mip = {i.target for i in ir.images if i.source == "target" and i.filter == "mipmap"}
     lines.append("static const FFMTargetDef FFM_TARGETS[] = {")
-    lines += [f"    {{ {_cstr(t.target)}, {int(t.persistent)}, {int(t.float)} }}," for t in targets] \
-        or ['    { "", 0, 0 },']
+    lines += [f"    {{ {_cstr(t.target)}, {int(t.persistent)}, {int(t.float)}, {int(t.target in mip)} }},"
+              for t in targets] or ['    { "", 0, 0, 0 },']
     lines.append("};")
     lines.append(f"#define FFM_NUM_TARGETS {len(targets)}")
     tindex = {t.target: i for i, t in enumerate(targets)}
@@ -271,33 +291,38 @@ def shader_data_header(ir, programs_glsl, plugin_name):
     img_defs = []
     for k, im in enumerate(imported):
         data = IMG.encoded_bytes(im)
+        state = f"{im.noise_size}, {int(im.repeat)}, {_FILTERS[im.filter or 'mipmap']}, {int(im.flip)}"
         if data:
             lines.append(f"static const unsigned char FFM_IMG_{k}[] = {{")
             for off in range(0, len(data), 48):
                 lines.append(",".join(str(b) for b in data[off:off + 48]) + ",")
             lines.append("};")
-            img_defs.append(f"    {{ {_cstr(im.name)}, FFM_IMG_{k}, {len(data)}u, {im.noise_size}, {int(im.repeat)} }},")
+            img_defs.append(f"    {{ {_cstr(im.name)}, FFM_IMG_{k}, {len(data)}u, {state} }},")
         else:
-            img_defs.append(f"    {{ {_cstr(im.name)}, nullptr, 0u, {im.noise_size}, {int(im.repeat)} }},")
+            img_defs.append(f"    {{ {_cstr(im.name)}, nullptr, 0u, {state} }},")
     lines.append("static const FFMImageDef FFM_IMAGES[] = {")
-    lines += img_defs or ['    { "", nullptr, 0u, 0, 0 },']
+    lines += img_defs or ['    { "", nullptr, 0u, 0, 0, 2, 1 },']
     lines.append("};")
     lines.append(f"static const int FFM_NUM_IMAGES = {len(img_defs)};")
 
     samplers = []
     for im in ir.images:
         if im.source == "audio":
-            samplers.append(f"    {{ {_cstr(im.name)}, FFM_SRC_AUDIO, {im.rows} }},")
+            samplers.append(f"    {{ {_cstr(im.name)}, FFM_SRC_AUDIO, {im.rows}, -1, -1 }},")
             continue
         if im.source == "imported":
-            samplers.append(f"    {{ {_cstr(im.name)}, FFM_SRC_IMAGE, {imported.index(im)} }},")
+            samplers.append(f"    {{ {_cstr(im.name)}, FFM_SRC_IMAGE, {imported.index(im)}, -1, -1 }},")
+            continue
+        if im.source == "target":
+            samplers.append(f"    {{ {_cstr(im.name)}, FFM_SRC_TARGET, {tindex[im.target]}, {_sampler_state(im)} }},")
             continue
         src = {"host": "FFM_SRC_HOST", "none": "FFM_SRC_NONE"}[im.source]
-        samplers.append(f"    {{ {_cstr(im.name)}, {src}, {im.index if im.source == 'host' else 0} }},")
+        samplers.append(f"    {{ {_cstr(im.name)}, {src}, {im.index if im.source == 'host' else 0}, "
+                        f"{_sampler_state(im)} }},")
     for t in targets:
-        samplers.append(f"    {{ {_cstr(t.target)}, FFM_SRC_TARGET, {tindex[t.target]} }},")
+        samplers.append(f"    {{ {_cstr(t.target)}, FFM_SRC_TARGET, {tindex[t.target]}, -1, -1 }},")
     lines.append("static const FFMSamplerDef FFM_SAMPLERS[] = {")
-    lines += samplers or ['    { "", FFM_SRC_NONE, 0 },']
+    lines += samplers or ['    { "", FFM_SRC_NONE, 0, -1, -1 },']
     lines.append("};")
     lines.append(f"static const int FFM_NUM_SAMPLERS = {len(samplers)};")
 

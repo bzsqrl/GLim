@@ -55,6 +55,8 @@ def rgba(image, index):
     data = encoded_bytes(image)
     if data:
         from PIL import Image as PILImage
-        im = PILImage.open(io.BytesIO(data)).convert("RGBA").transpose(PILImage.FLIP_TOP_BOTTOM)
+        im = PILImage.open(io.BytesIO(data)).convert("RGBA")
+        if image.flip:                 # upright in GL's bottom-up layout (Shadertoy vflip)
+            im = im.transpose(PILImage.FLIP_TOP_BOTTOM)
         return im.size[0], im.size[1], im.tobytes()
     return noise_rgba(index, image.noise_size)

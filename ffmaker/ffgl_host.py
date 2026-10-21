@@ -24,6 +24,7 @@ FF_INSTANTIATE_GL = 18
 FF_DEINSTANTIATE_GL = 19
 FF_INITIALISE_V2 = 34
 FF_SET_PARAMETER_ELEMENT_VALUE = 37
+FF_SET_BEATINFO = 38
 FF_TYPE_BUFFER = 12
 FF_FAIL = 1
 
@@ -52,6 +53,10 @@ class SetParam(ctypes.Structure):
 class SetElement(ctypes.Structure):
     _fields_ = [("ParameterNumber", ctypes.c_uint32), ("ElementNumber", ctypes.c_uint32),
                 ("NewParameterValue", ctypes.c_uint64)]
+
+
+class BeatInfo(ctypes.Structure):
+    _fields_ = [("bpm", ctypes.c_float), ("barPhase", ctypes.c_float)]
 
 
 class PluginInfo(ctypes.Structure):
@@ -113,6 +118,10 @@ class Plugin:
         se = SetElement(index, element, struct.unpack("<I", struct.pack("<f", value))[0])
         self.call(FF_SET_PARAMETER_ELEMENT_VALUE, ctypes.addressof(se), self.instance)
 
+    def set_beat(self, bpm, bar_phase):
+        bi = BeatInfo(bpm, bar_phase)
+        self.call(FF_SET_BEATINFO, ctypes.addressof(bi), self.instance)
+
     def get_param(self, index):
         v = self.call(FF_GET_PARAMETER, index, self.instance) & 0xFFFFFFFF
         return struct.unpack("<f", struct.pack("<I", v))[0]
@@ -128,13 +137,14 @@ class Plugin:
         self.call(FF_DEINITIALISE)
 
 
-def smoke_test(path, num_inputs=0, w=320, h=180, frames=30, frame_dt=1 / 60):
-    """Load, run and read back a plugin. Returns dict with info, params, stats."""
+def smoke_test(path, num_inputs=0, w=320, h=180, frames=30, frame_dt=1 / 60, beat=None):
+    """Load, run and read back a plugin. Returns dict with info, params, stats.
+    beat=(bpm, bar_phase) is sent before every frame, as Resolume does."""
     with V.gpu():
-        return _smoke_test(path, num_inputs, w, h, frames, frame_dt)
+        return _smoke_test(path, num_inputs, w, h, frames, frame_dt, beat)
 
 
-def _smoke_test(path, num_inputs, w, h, frames, frame_dt):
+def _smoke_test(path, num_inputs, w, h, frames, frame_dt, beat=None):
     ctx = V.context()
     gl = ctx.gl
     plug = Plugin(path)
@@ -163,6 +173,8 @@ def _smoke_test(path, num_inputs, w, h, frames, frame_dt):
         gl.glViewport(0, 0, w, h)
         gl.glClearColor(0, 0, 0, 0)
         gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+        if beat:
+            plug.set_beat(*beat)
         r = plug.call(FF_PROCESS_OPENGL, ctypes.addressof(pgl), plug.instance) & 0xFFFFFFFF
         if r == FF_FAIL:
             raise RuntimeError("FF_PROCESS_OPENGL failed")

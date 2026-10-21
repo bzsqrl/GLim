@@ -1,0 +1,18 @@
+// Per-channel sampler settings (Shadertoy filter / wrap / vflip), set with directives.
+// Thirds, left to right:
+//   1. a sharp 4x4 checker, red square top-left        (nearest)
+//   2. the same image soft and tiled 2x2               (linear, repeat)
+//   3. sharp again but upside down: red square bottom-left (nearest, vflip=false)
+// ffmaker: iChannel0 = img/grid4.png filter=nearest wrap=clamp
+// ffmaker: iChannel1 = img/grid4.png filter=linear wrap=repeat
+// ffmaker: iChannel2 = img/grid4.png filter=nearest vflip=false
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    float x = uv.x * 3.0;
+    if (x < 1.0)
+        fragColor = texture(iChannel0, vec2(x, uv.y));
+    else if (x < 2.0)
+        fragColor = texture(iChannel1, vec2(x - 1.0, uv.y) * 2.0);
+    else
+        fragColor = texture(iChannel2, vec2(x - 2.0, uv.y));
+}

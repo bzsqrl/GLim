@@ -59,11 +59,13 @@ Not yet checked inside Resolume or MadMapper.
 - `FFMaker.spec` builds `dist/FFMaker.app` on macOS. It writes output to `~/Documents/FFMaker/output` and finds Homebrew's CMake when opened from Finder. Verified with `--selftest`.
 - Not done: a universal or Intel build of the app itself (Homebrew Python is arm64 only), and Developer ID signing/notarization for distribution.
 
+**Done since the Mac port:**
+- **Per-channel sampler settings** (`filter`, `wrap`, `vflip`) from Shadertoy JSON, channel directives and the editor's channel menus. FFGL plugins and the preview use GL sampler objects (a buffer can be read with different settings in different passes; mipmapped buffers rebuild their mipmaps after each render). ISF exports emulate `nearest` and `repeat` in the shader.
+- **Tempo:** `iBPM`, `iBeat`, `iBarPhase` from FFGL `SetBeatInfo` (120 BPM fallback); ISF exports get a BPM slider. The test host can send beat info (`smoke_test(..., beat=(bpm, phase))`).
+
 **Next:**
 1. **Smaller items:**
    - Shadertoy cubemap passes;
-   - per-channel filter/wrap settings from Shadertoy JSON;
-   - BPM/bar-phase uniforms for tempo-synced shaders;
    - letting the preview load a real audio file.
 
 ## 1. Baseline: what works today

@@ -230,7 +230,10 @@ class Previewer:
             tex = ctx._texture(w_, h_, px)
             gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
             gl.glGenerateMipmap(gl.GL_TEXTURE_2D)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR_MIPMAP_LINEAR)
+            f = im.filter or "mipmap"
+            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, _MIN_FILTER[f](gl))
+            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER,
+                               gl.GL_NEAREST if f == "nearest" else gl.GL_LINEAR)
             wrap = gl.GL_REPEAT if im.repeat else gl.GL_CLAMP_TO_EDGE
             gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, wrap)
             gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, wrap)
@@ -239,6 +242,21 @@ class Previewer:
         for im in ir.images:
             if im.source == "audio":
                 self.img_tex[im.name] = self._audio_texture(im.rows)
+        # Per-channel sampler overrides for the clip and buffers, as in the plugin.
+        self.samplers = {}
+        for im in ir.images:
+            if im.source in ("host", "target") and (im.filter or im.wrap):
+                f = im.filter or "linear"
+                if im.source == "host" and f == "mipmap":
+                    f = "linear"
+                so = gl.glGenSamplers(1)
+                gl.glSamplerParameteri(so, gl.GL_TEXTURE_MIN_FILTER, _MIN_FILTER[f](gl))
+                gl.glSamplerParameteri(so, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST if f == "nearest" else gl.GL_LINEAR)
+                w = gl.GL_REPEAT if im.wrap == "repeat" else gl.GL_CLAMP_TO_EDGE
+                gl.glSamplerParameteri(so, gl.GL_TEXTURE_WRAP_S, w)
+                gl.glSamplerParameteri(so, gl.GL_TEXTURE_WRAP_T, w)
+                self.samplers[im.name] = so
+        self.mip_targets = {i.target for i in ir.images if i.source == "target" and i.filter == "mipmap"}
 
     def _audio_texture(self, rows):
         gl = self.gl
@@ -306,6 +324,10 @@ class Previewer:
             _u(gl, prog, "ffm_TimeDelta", 1, (dt,))
             _ui(gl, prog, "ffm_Frame", self.frame)
             _ui(gl, prog, "ffm_PassIndex", pi)
+            beat = sim_time * 120.0 / 60.0     # the plugin's tempo when the host sends none
+            _u(gl, prog, "ffm_BPM", 1, (120.0,))
+            _u(gl, prog, "ffm_Beat", 1, (beat,))
+            _u(gl, prog, "ffm_BarPhase", 1, (beat / 4.0 - math.floor(beat / 4.0),))
             _u(gl, prog, "ffm_Date", 4, (2026.0, 9.0, 20.0, 43200.0 + sim_time))
             mx, my = (0.0, 0.0)
             if mouse:
@@ -322,13 +344,26 @@ class Previewer:
                     tex = self.input_tex[min(im.index, len(self.input_tex) - 1)]
                 elif im.source in ("imported", "audio"):
                     tex = self.img_tex[im.name]
+                elif im.source == "target":
+                    t = self.targets[im.target]
+                    tex = t["tex"][t["front"]] if t["tex"][0] else ctx.black
+                before = unit
                 unit = _bind(gl, prog, im.name, tex, unit)
+                if unit > before and im.name in self.samplers and tex != ctx.black:
+                    gl.glBindSampler(before, self.samplers[im.name])
             for name, t in self.targets.items():
                 tex = t["tex"][t["front"]] if t["tex"][0] else ctx.black
                 unit = _bind(gl, prog, name, tex, unit)
             gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+            for u in range(unit):
+                gl.glBindSampler(u, 0)
             if ps.target:
-                self.targets[ps.target]["front"] ^= 1
+                t = self.targets[ps.target]
+                t["front"] ^= 1
+                if ps.target in self.mip_targets:
+                    gl.glBindTexture(gl.GL_TEXTURE_2D, t["tex"][t["front"]])
+                    gl.glGenerateMipmap(gl.GL_TEXTURE_2D)
+                    gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
         if ir.passes[-1].target:
             t = self.targets[ir.passes[-1].target]
             gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, t["fbo"][t["front"]])
@@ -371,6 +406,9 @@ class Previewer:
         if self._own_input:
             gl.glDeleteTextures(self._own_input)
             self._own_input = []
+        if getattr(self, "samplers", None):
+            gl.glDeleteSamplers(len(self.samplers), list(self.samplers.values()))
+            self.samplers = {}
 
 
 class _Live:
@@ -394,6 +432,10 @@ def _pass_size(ps, W, H, values):
         except Exception:
             return default
     return ev(ps.width, W), ev(ps.height, H)
+
+
+_MIN_FILTER = {"nearest": lambda gl: gl.GL_NEAREST, "linear": lambda gl: gl.GL_LINEAR,
+               "mipmap": lambda gl: gl.GL_LINEAR_MIPMAP_LINEAR}
 
 
 def _u(gl, prog, name, n, vals):

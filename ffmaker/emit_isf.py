@@ -13,7 +13,10 @@ ISF_SYMBOLS = {
     "passindex": "PASSINDEX", "fragnorm": "isf_FragNormCoord", "surfacepos": "ffm_SurfacePos",
     "surfacesize": "vec2(RENDERSIZE.x / RENDERSIZE.y, 1.0)", "samplerate": "44100.0",
     "framerate": "60.0", "channelres": "ffm_ChannelRes", "channeltime": "ffm_ChannelTime",
+    # ISF hosts send no tempo, so a BPM slider drives it from TIME.
+    "bpm": "ffmBPM", "beat": "(TIME * ffmBPM / 60.0)", "barphase": "fract(TIME * ffmBPM / 240.0)",
 }
+BEAT_SYMBOLS = {"bpm", "beat", "barphase"}
 
 
 ISF_RESERVED = {"TIME", "TIMEDELTA", "RENDERSIZE", "PASSINDEX", "FRAMEINDEX", "DATE",
@@ -36,7 +39,11 @@ def write(ir, out_dir, source_code=None):
     if ir.dialect != "isf":
         for k, im in enumerate([i for i in ir.images if i.source == "imported"]):
             dst = os.path.join(out_dir, asset_name(ir, im))
-            if IMG.available(im):
+            if IMG.available(im) and not im.flip:
+                # Shadertoy vflip=false: ISF hosts load images upright, so store it flipped.
+                from PIL import Image as PILImage
+                PILImage.open(im.path).transpose(PILImage.FLIP_TOP_BOTTOM).save(dst)
+            elif IMG.available(im):
                 shutil.copy2(im.path, dst)
             else:
                 from PIL import Image as PILImage
@@ -65,13 +72,17 @@ def emit(ir, source_code=None):
         for im in host_imgs:
             if im.name != "inputImage":
                 image_renames[im.name] = "inputImage"
+    # Extra names for a buffer read with its own sampler settings read the buffer itself.
+    for im in ir.images:
+        if im.source == "target":
+            image_renames[im.name] = im.target
     imported = {}
     for im in ir.images:
         if im.source == "audio":
             inputs.append({"NAME": im.name, "TYPE": im.isf_type or "audioFFT", "LABEL": "Audio"})
         elif im.source == "imported":
             imported[im.name] = {"PATH": asset_name(ir, im)}
-        elif im.source != "host":
+        elif im.source not in ("host", "target"):
             inputs.append({"NAME": im.name, "TYPE": "image", "LABEL": im.name})
 
     from .emit_ffgl import glsl_literal
@@ -131,6 +142,9 @@ def emit(ir, source_code=None):
     aliases = {}
     for pr in ir.programs:
         aliases.update(pr.aliases)
+    if BEAT_SYMBOLS & set(aliases.values()):
+        inputs.append({"NAME": "ffmBPM", "LABEL": "BPM", "TYPE": "float",
+                       "DEFAULT": 120.0, "MIN": 40.0, "MAX": 240.0})
     for name, sym in sorted(aliases.items()):
         expr = ISF_SYMBOLS[sym]
         if sym == "time" and not has_speed:
@@ -145,9 +159,12 @@ def emit(ir, source_code=None):
     # One ISF shader runs every pass, so each pass's own functions/globals get a
     # unique suffix; shared (Common) code appears once.
     body, entries = _merge_programs(ir.programs)
-    image_names = {image_renames.get(i.name, i.name) for i in ir.images} | set(targets)
-    repeat_names = {image_renames.get(i.name, i.name) for i in ir.images
-                    if i.source == "imported" and i.repeat}
+    image_names = {i.name for i in ir.images} | set(targets)
+    # ISF hosts sample every image linear + clamped, so other Shadertoy sampler
+    # settings are emulated in the shader (by name, before renaming).
+    repeat_names = {i.name for i in ir.images
+                    if (i.source == "imported" and i.repeat) or (i.source in ("host", "target") and i.wrap == "repeat")}
+    nearest_names = {i.name for i in ir.images if i.filter == "nearest" and i.source != "audio"}
     toks = G.tokenize(body)
     # User code must not redefine names the ISF host provides.
     clash = {n: "user_" + n for n in G.declared_names(toks) if n in ISF_RESERVED or n.startswith("IMG_")}
@@ -157,13 +174,19 @@ def emit(ir, source_code=None):
     # sets with ISF's bottom-left origin.
     frag_coord = any(p.entry == "mainImage" for p in ir.programs) or \
         any(t.kind == "ident" and t.text == "gl_FragCoord" for t in toks)
-    G.rename_idents(toks, {**image_renames, "ffm_FragColor": "gl_FragColor",
-                           "gl_FragCoord": "ffm_FragCoord"})
-    code = _portable_textures(G.untokenize(toks), image_names, repeat_names)
+    G.rename_idents(toks, {"ffm_FragColor": "gl_FragColor", "gl_FragCoord": "ffm_FragCoord"})
+    code = _portable_textures(G.untokenize(toks), image_names, repeat_names, nearest_names)
+    toks = G.tokenize(code)
+    G.rename_idents(toks, image_renames)
+    code = G.untokenize(toks)
 
     used = set(aliases.values())
     globals_ = []
     setup = []
+    for n in sorted(nearest_names):
+        img = image_renames.get(n, n)
+        globals_.append(f"vec2 ffm_nearest_{n}(vec2 uv) {{ vec2 s = IMG_SIZE({img}); "
+                        f"return (floor(uv * s) + 0.5) / s; }}")
     if frag_coord:
         globals_.append("vec4 ffm_FragCoord;")
         setup.append("ffm_FragCoord = vec4(isf_FragNormCoord * RENDERSIZE, gl_FragCoord.zw);")
@@ -258,9 +281,10 @@ def _merge_programs(programs):
     return "\n".join(parts), entries
 
 
-def _portable_textures(code, image_names, repeat_names=()):
+def _portable_textures(code, image_names, repeat_names=(), nearest_names=()):
     """texture(img, uv) -> IMG_NORM_PIXEL(img, uv) for ISF image inputs so the
-    file works in hosts that compile ISF with old GLSL versions."""
+    file works in hosts that compile ISF with old GLSL versions. Repeat wrap
+    and nearest filtering are emulated by rewriting uv."""
     toks = G.tokenize(code)
     sig = G.significant(toks)
     for pos, k in enumerate(sig[:-2]):
@@ -272,9 +296,13 @@ def _portable_textures(code, image_names, repeat_names=()):
                 commas = _top_level_commas(toks, sig[pos + 1], close)
                 if len(commas) == 1:          # no bias argument
                     t.text = "IMG_NORM_PIXEL"
-                    if arg.text in repeat_names:  # ISF hosts clamp; emulate GL_REPEAT
-                        toks[commas[0]].text = ", fract("
-                        toks[close].text = "))"
+                    pre, post = "", ""
+                    if arg.text in nearest_names:   # snap to texel centres
+                        pre, post = f"ffm_nearest_{arg.text}(", ")"
+                    if arg.text in repeat_names:    # ISF hosts clamp; emulate GL_REPEAT
+                        pre, post = pre + "fract(", post + ")"
+                    toks[commas[0]].text = ", " + pre
+                    toks[close].text = post + ")"
     return G.untokenize(toks)
 
 

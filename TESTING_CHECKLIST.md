@@ -56,3 +56,17 @@ Location: `output/test_batch_v2/`. It has 7 FFGL plugins, the matching ISF files
 **Audio in Resolume:** the plugins have an **Audio Spectrum** parameter. Resolume feeds it from the composition or layer audio, or whatever audio source you assign in the parameter's audio settings. With no audio playing, the bars stay flat. That's expected.
 
 **MadMapper:** load the `.fs` files from the same folder. Keep the `.png`, `.vs` and `img/` files next to them. `shadertoy_multipass.fs` exercises ISF multi-pass feedback; the two audio files need MadMapper's audio input.
+
+---
+
+# Test batch v3: sampler settings and tempo
+
+Location: `output/test_batch_v3/` (rebuild with `venv/bin/python -m ffmaker --to both --out output/test_batch_v3 tests/fixtures/shadertoy_sampler.txt tests/fixtures/shadertoy_buffer_sampler.txt tests/fixtures/shadertoy_tempo.txt`). It has 3 FFGL plugins and the matching ISF files.
+
+| Plugin | What to check |
+| :-- | :-- |
+| `shadertoy_sampler` | Three panels, left to right: a **sharp** 4×4 checker with a red square top-left; the same image **soft and tiled 2×2**; sharp again but **upside down** (red square bottom-left). |
+| `shadertoy_buffer` | Left half: **16 small orange discs**, smooth-edged. Right half: **one disc** in the bottom-left corner, black elsewhere. |
+| `shadertoy_tempo` | Left half brightens over each **bar**, then drops; right half **flashes on every beat**. Change Resolume's BPM and both follow. |
+
+**MadMapper:** load the `.fs` files from the same folder, keeping the `.png` files next to them. `shadertoy_sampler` should look the same as in Resolume (the tiled panel may show faint seams at tile edges). In `shadertoy_buffer` the small discs may look a little more jagged, since ISF has no mipmaps. `shadertoy_tempo` has a **BPM** slider; at 120 the right half flashes twice a second.

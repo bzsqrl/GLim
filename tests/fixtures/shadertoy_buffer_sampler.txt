@@ -1,0 +1,20 @@
+// A buffer read twice with different sampler settings.
+// Left half: Buffer A tiled 4x4 (wrap=repeat, filter=mipmap, so the small copies stay smooth).
+// Right half: the same buffer with default settings (clamp), so beyond the first copy
+// it smears into flat bands.
+// ==== Buffer A ====
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    float d = length(uv - 0.5);
+    fragColor = vec4(vec3(step(d, 0.3)) * vec3(1.0, 0.5, 0.1), 1.0);   // orange disc on black
+}
+// ==== Image ====
+// ffmaker: iChannel0 = Buffer A wrap=repeat filter=mipmap
+// ffmaker: iChannel1 = Buffer A
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    if (uv.x < 0.5)
+        fragColor = texture(iChannel0, vec2(uv.x * 2.0, uv.y) * 4.0);
+    else
+        fragColor = texture(iChannel1, vec2(uv.x * 2.0 - 1.0, uv.y) * 4.0);
+}

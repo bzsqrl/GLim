@@ -39,7 +39,7 @@ The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFMaker` (ma
 - **Live preview.** Rendered on your GPU the same way the plugin renders it.
   - Play/pause with ⏸; restart time and feedback buffers with ⟲.
   - For effects, preview over the test pattern, or choose **Load image…** to use your own picture.
-- **Channels.** For Shadertoy shaders, pick what each `iChannel` reads: the clip (`input`), `noise`, `audio`, `none`, or an image file.
+- **Channels.** For Shadertoy shaders, pick what each `iChannel` reads: the clip (`input`), `noise`, `audio`, `none`, or an image file. The **filter** and **wrap** menus next to it set how the channel is sampled (see *Sampler settings* below).
 - **Parameters.** For each control you can:
   - **Untick** it to hide it. Hidden controls are compiled in as constants at their current value.
   - **Rename** it. That's the name Resolume and MadMapper show.
@@ -77,6 +77,7 @@ Supported features:
   - Companion `.vs` vertex shaders (same file name, next to the `.fs`) are supported.
 - **Shadertoy:** `iTime`, `iResolution`, `iMouse`, `iDate`, `iFrame`, `iTimeDelta`, `iChannel0-3` and `iChannelResolution`.
 - **GLSL Sandbox:** `time`, `resolution`, `mouse` and `surfacePosition`. Unknown `uniform`s become sliders.
+- **Tempo (any dialect):** `iBPM`, `iBeat` and `iBarPhase`. See *Tempo* below.
 - **Older GLSL:** `texture2D`, `gl_FragColor` and similar legacy names are translated automatically.
 - **Uninitialised variables** are set to zero, as browsers do. Shadertoy code often relies on this.
 
@@ -91,6 +92,24 @@ By default every `iChannel` reads the clip, which makes the plugin an effect. Ch
 ```
 
 If an image file is missing, a noise texture is used and FFMaker warns you.
+
+#### Sampler settings
+Like Shadertoy's per-channel settings, add `filter`, `wrap` and `vflip` after the source:
+
+```glsl
+// ffmaker: iChannel1 = textures/pixels.png filter=nearest wrap=clamp
+// ffmaker: iChannel2 = textures/rock.jpg vflip=false
+```
+
+| Setting | Values | Default |
+| :-- | :-- | :-- |
+| `filter` | `nearest` (sharp pixels), `linear`, `mipmap` (smooth when shrunk) | images: `mipmap`; buffers and the clip: `linear` |
+| `wrap` | `clamp`, `repeat` (tiles) | images: `repeat`; buffers and the clip: `clamp` |
+| `vflip` | `true`, `false` (image upside down, as on Shadertoy) | `true` |
+
+Shadertoy JSON exports carry these settings already. In multi-buffer shaders each pass can read the same buffer with different settings. The clip can't be mipmapped, so `mipmap` acts like `linear` there.
+
+In ISF exports, `nearest` and `repeat` are emulated in the shader, because ISF hosts always sample images smoothly and clamped. Two small differences remain: `mipmap` acts like `linear`, and with `linear` + `repeat`, the half texel at each tile edge clamps instead of blending with the opposite edge (only visible on very low-resolution images).
 
 ### Multi-buffer Shadertoy shaders (Buffer A–D)
 Either:
@@ -140,6 +159,17 @@ With **Extract User Parameters** on, top-level `const float/bool/vec3` values an
 ### Built-in controls
 - **Speed** is added to every animated shader and scales time smoothly; changing it never makes the animation jump. If the shader already has its own "speed" control, FFMaker's is called **Time Scale** instead.
 - **Mouse X/Y** and **Mouse Click** are added when a shader uses the mouse.
+
+### Tempo
+Shaders in any dialect can use the host's tempo by reading these names (no declaration needed):
+
+| Name | Value |
+| :-- | :-- |
+| `iBPM` | Tempo in beats per minute |
+| `iBeat` | Beats elapsed, in step with the host's bars (`fract(iBeat)` pulses every beat) |
+| `iBarPhase` | 0 to 1 through the current bar |
+
+Resolume sends its tempo to FFGL plugins. Until a host sends any, and in the preview, the plugin runs at 120 BPM. ISF hosts have no tempo input, so ISF exports get a **BPM** slider (default 120) and count beats from `TIME`.
 
 ### Alpha
 Shadertoy and GLSL Sandbox ignore output alpha, so FFMaker makes those plugins opaque. ISF shaders keep their alpha.

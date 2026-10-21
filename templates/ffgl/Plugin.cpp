@@ -175,7 +175,7 @@ FFResult FFMakerPlugin::InitGL( const FFGLViewportStruct* vp )
 		std::vector< unsigned char > noise;
 		if( d.data )
 		{
-			stbi_set_flip_vertically_on_load( 1 );
+			stbi_set_flip_vertically_on_load( d.flip );
 			pixels = stbi_load_from_memory( d.data, (int)d.size, &w, &h, &n, 4 );
 		}
 		if( !pixels )
@@ -194,8 +194,9 @@ FFResult FFMakerPlugin::InitGL( const FFGLViewportStruct* vp )
 		glBindTexture( GL_TEXTURE_2D, tex );
 		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels ? pixels : noise.data() );
 		glGenerateMipmap( GL_TEXTURE_2D );
-		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
-		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+		static const GLint minFilter[ 3 ] = { GL_NEAREST, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR };
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter[ d.filter ] );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, d.filter == 0 ? GL_NEAREST : GL_LINEAR );
 		GLint wrap = d.repeat ? GL_REPEAT : GL_CLAMP_TO_EDGE;
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap );
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap );
@@ -204,6 +205,20 @@ FFResult FFMakerPlugin::InitGL( const FFGLViewportStruct* vp )
 			stbi_image_free( pixels );
 		imageTex.push_back( tex );
 	}
+
+	// Sampler objects let a channel read a buffer or the clip with its own
+	// filter/wrap without changing the texture itself.
+	glGenSamplers( 6, &samplerObj[ 0 ][ 0 ] );
+	for( int f = 0; f < 3; ++f )
+		for( int w = 0; w < 2; ++w )
+		{
+			GLuint so = samplerObj[ f ][ w ];
+			static const GLint minFilter[ 3 ] = { GL_NEAREST, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR };
+			glSamplerParameteri( so, GL_TEXTURE_MIN_FILTER, minFilter[ f ] );
+			glSamplerParameteri( so, GL_TEXTURE_MAG_FILTER, f == 0 ? GL_NEAREST : GL_LINEAR );
+			glSamplerParameteri( so, GL_TEXTURE_WRAP_S, w ? GL_REPEAT : GL_CLAMP_TO_EDGE );
+			glSamplerParameteri( so, GL_TEXTURE_WRAP_T, w ? GL_REPEAT : GL_CLAMP_TO_EDGE );
+		}
 	return CFFGLPlugin::InitGL( vp );
 }
 
@@ -226,6 +241,10 @@ FFResult FFMakerPlugin::DeInitGL()
 			glDeleteTextures( 1, &t );
 		t = 0;
 	}
+	if( samplerObj[ 0 ][ 0 ] )
+		glDeleteSamplers( 6, &samplerObj[ 0 ][ 0 ] );
+	for( auto& row : samplerObj )
+		row[ 0 ] = row[ 1 ] = 0;
 	blackTex = 0;
 	return FF_SUCCESS;
 }
@@ -399,6 +418,19 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	}
 	lastDelta = dt * speed;
 	clockTime += lastDelta;
+	realTime += dt;
+	float bpm = 120.0f, barPhase, beat;
+	if( hasBeatInfo )
+	{
+		bpm      = hostBpm;
+		barPhase = hostBarPhase;
+		beat     = ( (float)hostBars + barPhase ) * 4.0f;
+	}
+	else
+	{
+		beat     = (float)( realTime * bpm / 60.0 );
+		barPhase = beat / 4.0f - std::floor( beat / 4.0f );
+	}
 	std::time_t tt = std::time( nullptr );
 	std::tm lt;
 #ifdef _WIN32
@@ -441,6 +473,9 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 		glUniform1f( glGetUniformLocation( prog, "ffm_TimeDelta" ), lastDelta );
 		glUniform1i( glGetUniformLocation( prog, "ffm_Frame" ), frame );
 		glUniform1i( glGetUniformLocation( prog, "ffm_PassIndex" ), pi );
+		glUniform1f( glGetUniformLocation( prog, "ffm_BPM" ), bpm );
+		glUniform1f( glGetUniformLocation( prog, "ffm_Beat" ), beat );
+		glUniform1f( glGetUniformLocation( prog, "ffm_BarPhase" ), barPhase );
 		glUniform4f( glGetUniformLocation( prog, "ffm_Date" ), (float)( lt.tm_year + 1900 ), (float)lt.tm_mon,
 					 (float)lt.tm_mday, daySeconds );
 		float mx = mouseX * w, my = mouseY * h;
@@ -465,6 +500,7 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 				tex = targets[ sd.index ].tex[ targets[ sd.index ].front ];
 			glActiveTexture( GL_TEXTURE0 + unit );
 			glBindTexture( GL_TEXTURE_2D, tex );
+			glBindSampler( unit, sd.filter >= 0 && tex != blackTex ? samplerObj[ sd.filter ][ sd.wrap ] : 0 );
 			glUniform1i( loc, unit );
 			++unit;
 		}
@@ -475,9 +511,19 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 		{
 			glActiveTexture( GL_TEXTURE0 + u );
 			glBindTexture( GL_TEXTURE_2D, 0 );
+			glBindSampler( u, 0 );
 		}
 		if( pass.target >= 0 )
-			targets[ pass.target ].front = 1 - targets[ pass.target ].front;
+		{
+			Target& t = targets[ pass.target ];
+			t.front   = 1 - t.front;
+			if( FFM_TARGETS[ pass.target ].mipmap )
+			{
+				glBindTexture( GL_TEXTURE_2D, t.tex[ t.front ] );
+				glGenerateMipmap( GL_TEXTURE_2D );
+				glBindTexture( GL_TEXTURE_2D, 0 );
+			}
+		}
 	}
 
 	// If every pass rendered to a buffer, show the last one.
@@ -502,6 +548,17 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 			values[ i ] = 0.0f;
 	++frame;
 	return FF_SUCCESS;
+}
+
+void FFMakerPlugin::SetBeatInfo( float bpm, float barPhase )
+{
+	if( hasBeatInfo && barPhase < hostBarPhase - 0.5f )
+		++hostBars;// the bar wrapped
+	if( bpm > 0.0f )
+		hostBpm = bpm;
+	hostBarPhase = barPhase;
+	hasBeatInfo  = true;
+	CFFGLPlugin::SetBeatInfo( bpm, barPhase );
 }
 
 FFResult FFMakerPlugin::SetFloatParameter( unsigned int index, float value )

@@ -53,6 +53,8 @@ struct FFMSamplerDef
 	const char* name;
 	int source;
 	int index;
+	int filter;// -1 = the texture's own; else 0 nearest, 1 linear, 2 mipmap (per-channel Shadertoy sampler)
+	int wrap;  // -1 = the texture's own; else 0 clamp, 1 repeat
 };
 
 struct FFMImageDef
@@ -62,6 +64,8 @@ struct FFMImageDef
 	unsigned int size;
 	int noiseSize;           // used when data is nullptr
 	int repeat;              // GL_REPEAT (1) or GL_CLAMP_TO_EDGE (0)
+	int filter;              // 0 nearest, 1 linear, 2 mipmap
+	int flip;                // load upright (Shadertoy vflip)
 };
 
 struct FFMTargetDef
@@ -69,6 +73,7 @@ struct FFMTargetDef
 	const char* name;
 	int persistent;
 	int isFloat;
+	int mipmap;// some pass reads it with a mipmap filter: rebuild mipmaps after rendering
 };
 
 struct FFMPassDef
@@ -88,6 +93,8 @@ public:
 	FFResult InitGL( const FFGLViewportStruct* vp ) override;
 	FFResult ProcessOpenGL( ProcessOpenGLStruct* pGL ) override;
 	FFResult DeInitGL() override;
+
+	void SetBeatInfo( float bpm, float barPhase ) override;
 
 	FFResult SetFloatParameter( unsigned int index, float value ) override;
 	float GetFloatParameter( unsigned int index ) override;
@@ -125,8 +132,16 @@ private:
 	GLuint blackTex = 0;
 	std::vector< GLuint > imageTex;
 	GLuint audioTex[ 3 ] = { 0, 0, 0 };// by row count
+	GLuint samplerObj[ 3 ][ 2 ] = {};   // [filter][wrap], for FFMSamplerDef overrides
 	int fftParam         = -1;          // FFGL index of the FFT buffer param
 	void UpdateAudio();
+
+	// Tempo from the host; until it sends any, 120 BPM from the real clock.
+	bool hasBeatInfo   = false;
+	float hostBpm      = 120.0f;
+	float hostBarPhase = 0.0f;
+	int hostBars       = 0;
+	double realTime    = 0.0;
 
 	double clockTime = 0.0;
 	float lastDelta  = 0.0f;

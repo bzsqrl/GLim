@@ -6,6 +6,7 @@ Two input forms:
         // ==== Common ====
         // ==== Buffer A ====
         // ffmaker: iChannel0 = Buffer A      (directives apply to their section)
+        // ffmaker: iChannel1 = rock.jpg filter=nearest wrap=clamp vflip=false
         // ==== Image ====
 """
 import json
@@ -21,11 +22,12 @@ _BUFFER_IDS = {"4dXGR8": "A", "XsXGR8": "B", "4sXGR8": "C", "XdfGR8": "D",
 
 
 class ProjectPass:
-    def __init__(self, name, code, channels=None, line_offset=0):
+    def __init__(self, name, code, channels=None, line_offset=0, samplers=None):
         self.name = name              # "Common", "Buffer A".., "Image"
         self.code = code
         self.channels = channels or {}  # {0: ("buffer","A") | ("input",) | ("noise",) | ("file",path) | ("audio",) | ("none",)}
         self.line_offset = line_offset  # line in the source file where this section starts
+        self.samplers = samplers or {}  # {0: {"filter": "nearest", "wrap": "repeat", "vflip": False}}
 
 
 def _canon(name):
@@ -69,7 +71,7 @@ def _channel_value(val, path):
 
 
 def _parse_sections(code, path):
-    from .convert import channel_directives
+    from .convert import channel_directives, split_channel_options
     passes = []
     matches = list(_SECTION_RE.finditer(code))
     for i, m in enumerate(matches):
@@ -78,12 +80,17 @@ def _parse_sections(code, path):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(code)
         body = code[start:end]
         line = code.count("\n", 0, start)
-        chans = {int(k[-1]): _channel_value(v, path) for k, v in channel_directives(body).items()}
-        passes.append(ProjectPass(name, body, chans, line))
+        chans, samplers = {}, {}
+        for k, v in channel_directives(body).items():
+            value, opts = split_channel_options(v)
+            chans[int(k[-1])] = _channel_value(value, path)
+            samplers[int(k[-1])] = opts
+        passes.append(ProjectPass(name, body, chans, line, samplers))
     return passes
 
 
 def _parse_json(data, path):
+    from .convert import sampler_options
     if isinstance(data, list):
         data = data[0]
     shader = data.get("Shader", data)
@@ -99,10 +106,11 @@ def _parse_json(data, path):
             name = _canon(rp.get("name", "")) or "Buffer " + _buffer_letter(rp.get("outputs", [{}])[0])
         else:
             continue            # sound / cubemap passes are not supported
-        chans = {}
+        chans, samplers = {}, {}
         for inp in rp.get("inputs", []):
             ch = int(inp.get("channel", 0))
             ctype = inp.get("ctype", inp.get("type", ""))
+            samplers[ch] = sampler_options(inp.get("sampler") or {})
             if ctype == "buffer":
                 chans[ch] = ("buffer", _buffer_letter(inp))
             elif ctype in ("video", "webcam"):
@@ -115,7 +123,7 @@ def _parse_json(data, path):
                 chans[ch] = ("file", local) if local and os.path.isfile(local) else ("noise",)
             else:
                 chans[ch] = ("none",)
-        passes.append(ProjectPass(name, rp.get("code", ""), chans))
+        passes.append(ProjectPass(name, rp.get("code", ""), chans, samplers=samplers))
     passes.sort(key=lambda p: PASS_ORDER.index(p.name))
     passes_info = {"name": info.get("name", ""), "author": info.get("username", ""),
                    "description": info.get("description", ""), "id": info.get("id", "")}

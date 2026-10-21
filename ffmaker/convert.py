@@ -36,7 +36,11 @@ GLSL_UNIFORM_NAMES = {
     "iFrame": "frame", "frame": "frame", "iTimeDelta": "timedelta",
     "iDate": "date", "date": "date",
 }
+# Tempo from the host (FFGL SetBeatInfo), recognised in every dialect.
+BEAT_NAMES = {"iBPM": "bpm", "iBeat": "beat", "iBarPhase": "barphase"}
 SHADERTOY_CHANNELS = ["iChannel0", "iChannel1", "iChannel2", "iChannel3"]
+SAMPLER_FILTERS = ("nearest", "linear", "mipmap")
+SAMPLER_WRAPS = ("clamp", "repeat")
 TIME_SYMBOLS = {"time", "timedelta", "date"}
 MOUSE_SYMBOLS = {"mouse_px", "mouse_norm2", "mouse_px2"}
 
@@ -251,29 +255,34 @@ def _convert_project(code, name, path, extract_params, promote_ints, exclude):
     for p in buffers:
         ir.passes.append(Pass(target="ffm_buf" + p.name[-1], persistent=True, float=True))
 
-    def sampler_for(spec, pass_name, ch):
+    def sampler_for(spec, pass_name, ch, opts):
         kind = spec[0]
+        suffix = sampler_suffix(opts, kind)
         if kind == "buffer":
             if not any(b.name == "Buffer " + spec[1] for b in buffers):
                 ir.warnings.append(f"{pass_name} iChannel{ch} reads Buffer {spec[1]}, which doesn't exist.")
                 return _add_image(ir, Image("ffm_none", "none"))
-            return "ffm_buf" + spec[1]
+            if not suffix:
+                return "ffm_buf" + spec[1]
+            return _add_image(ir, _apply_sampler(Image(f"ffm_buf{spec[1]}{suffix}", "target",
+                                                       target="ffm_buf" + spec[1]), opts))
         if kind == "input":
-            return _add_image(ir, Image("ffm_input", "host", 0))
+            return _add_image(ir, _apply_sampler(Image("ffm_input" + suffix, "host", 0), opts))
         if kind == "audio":
             return _add_image(ir, Image("ffm_audio", "audio", rows=2, isf_type="audioFFT"))
         if kind == "noise":
-            return _add_image(ir, Image("ffm_noise", "imported", repeat=True))
+            return _add_image(ir, _apply_sampler(Image("ffm_noise" + suffix, "imported", repeat=True), opts))
         if kind == "file":
-            existing = next((i for i in ir.images if i.source == "imported" and i.path == spec[1]), None)
-            if existing:
-                return existing.name
-            if not os.path.isfile(spec[1]):
-                ir.warnings.append(f"{pass_name} iChannel{ch} image '{spec[1]}' not found; using noise.")
-            n = sum(1 for i in ir.images if i.name.startswith("ffm_tex"))
-            return _add_image(ir, Image(f"ffm_tex{n}", "imported", path=spec[1], repeat=True))
+            # One base name per file; each sampler setting adds its own suffix.
+            if spec[1] not in tex_names:
+                if not os.path.isfile(spec[1]):
+                    ir.warnings.append(f"{pass_name} iChannel{ch} image '{spec[1]}' not found; using noise.")
+                tex_names[spec[1]] = f"ffm_tex{len(tex_names)}"
+            return _add_image(ir, _apply_sampler(Image(tex_names[spec[1]] + suffix, "imported", path=spec[1],
+                                                       repeat=True), opts))
         return _add_image(ir, Image("ffm_none", "none"))
 
+    tex_names = {}
     prefix = (common.code + "\n") if common else ""
     offset = prefix.count("\n")
     for p in buffers + [image]:
@@ -285,7 +294,7 @@ def _convert_project(code, name, path, extract_params, promote_ints, exclude):
             nm = f"iChannel{ch}"
             if nm in used:
                 spec = p.channels.get(ch) or (("input",) if p.name == "Image" and ch == 0 else ("none",))
-                mapping[nm] = chans[ch] = sampler_for(spec, p.name, ch)
+                mapping[nm] = chans[ch] = sampler_for(spec, p.name, ch, p.samplers.get(ch, {}))
         G.rename_idents(toks, mapping)
         prog = _build_program(G.untokenize(toks), ir, path, extract_params, exclude, promote_ints,
                               label=p.name, line_offset=offset, channels=chans)
@@ -486,7 +495,8 @@ def _map_uniform_decls(toks, ir, aliases):
                 if not any(i.name == nm for i in ir.images):
                     ir.images.append(Image(nm, "host", len([i for i in ir.images if i.source == "host"])))
                 continue
-            sym = GLSL_UNIFORM_NAMES.get(nm) or SHADERTOY_NAMES.get(nm) or ISF_NAMES.get(nm)
+            sym = GLSL_UNIFORM_NAMES.get(nm) or SHADERTOY_NAMES.get(nm) or ISF_NAMES.get(nm) \
+                or BEAT_NAMES.get(nm)
             if sym == "resolution":
                 sym = "resolution3" if ty == "vec3" else "resolution2"
             if sym:
@@ -548,6 +558,7 @@ def _map_distinctive_names(toks, ir, aliases):
             used.update(re.findall(r"[A-Za-z_]\w*", t.text))
     table = dict(SHADERTOY_NAMES)
     table.update(ISF_NAMES)
+    table.update(BEAT_NAMES)
     table["surfacePosition"] = "surfacepos"
     for nm, sym in table.items():
         if nm in used and nm not in declared and nm not in aliases:
@@ -562,26 +573,83 @@ def channel_directives(code):
     return {m.group(1): m.group(2) for m in _CHANNEL_DIRECTIVE.finditer(code)}
 
 
+def split_channel_options(value):
+    """'rock.jpg filter=nearest wrap=repeat vflip=false' -> ('rock.jpg', options).
+    Options mirror Shadertoy's per-channel sampler settings."""
+    words = value.split()
+    opts = {}
+    while len(words) > 1 and "=" in words[-1]:
+        key, _, v = words.pop().partition("=")
+        opts.update(sampler_options({key.lower(): v}))
+    return " ".join(words).strip().strip("\"'"), opts
+
+
+def sampler_options(sampler):
+    """Shadertoy sampler dict ({"filter": "nearest", "wrap": "repeat", "vflip": "false"})
+    -> the subset FFMaker supports, normalised."""
+    out = {}
+    f = str(sampler.get("filter", "")).lower().strip("\"'")
+    w = str(sampler.get("wrap", "")).lower().strip("\"'")
+    v = str(sampler.get("vflip", "")).lower().strip("\"'")
+    if f in SAMPLER_FILTERS:
+        out["filter"] = f
+    if w in SAMPLER_WRAPS:
+        out["wrap"] = w
+    if v in ("true", "false"):
+        out["vflip"] = v == "true"
+    return out
+
+
+def _apply_sampler(im, opts):
+    """Set an Image's sampler fields from channel options; returns im."""
+    if im.source == "imported":
+        if "wrap" in opts:
+            im.repeat = opts["wrap"] == "repeat"
+        im.flip = opts.get("vflip", True)
+    elif "wrap" in opts:
+        im.wrap = opts["wrap"]
+    if im.source != "audio":
+        im.filter = opts.get("filter", "")
+    return im
+
+
+def sampler_suffix(opts, kind):
+    """Name suffix for a channel whose sampler differs from the source's
+    defaults (Shadertoy: textures mipmap/repeat/vflip, everything else
+    linear/clamp), so each setting gets its own sampler uniform."""
+    if kind == "file" or kind == "noise":
+        defaults = {"filter": "mipmap", "wrap": "repeat", "vflip": True}
+    else:
+        defaults = {"filter": "linear", "wrap": "clamp"}
+        opts = {k: v for k, v in opts.items() if k != "vflip"}
+    diff = {k: v for k, v in opts.items() if defaults.get(k) != v}
+    if not diff:
+        return ""
+    return "_" + "".join({"nearest": "n", "linear": "l", "mipmap": "m", "clamp": "c", "repeat": "r",
+                          True: "v", False: "f"}[diff[k]] for k in ("filter", "wrap", "vflip") if k in diff)
+
+
 def _shadertoy_images(toks, ir, directives=None, path=None):
     used = {t.text for t in toks if t.kind == "ident"}
     directives = directives or {}
     for ch in SHADERTOY_CHANNELS:
         if ch not in used or any(i.name == ch for i in ir.images):
             continue
-        val = directives.get(ch, "input").strip().strip("\"'")
+        val, opts = split_channel_options(directives.get(ch, "input").strip())
         if val.lower() in ("input", "clip", "host"):
-            ir.images.append(Image(ch, "host", 0))
+            im = Image(ch, "host", 0)
         elif val.lower() in ("audio", "sound", "fft", "music"):
-            ir.images.append(Image(ch, "audio", rows=2, isf_type="audioFFT"))
+            im = Image(ch, "audio", rows=2, isf_type="audioFFT")
         elif val.lower() == "noise":
-            ir.images.append(Image(ch, "imported", repeat=True))
+            im = Image(ch, "imported", repeat=True)
         else:
             p = val
             if path and not os.path.isabs(p):
                 p = os.path.join(os.path.dirname(path), p)
-            ir.images.append(Image(ch, "imported", path=p, repeat=True))
+            im = Image(ch, "imported", path=p, repeat=True)
             if not os.path.isfile(p):
                 ir.warnings.append(f"{ch} image '{val}' was not found; a noise texture is used instead.")
+        ir.images.append(_apply_sampler(im, opts))
     ir.images.sort(key=lambda i: i.name)
 
 
@@ -734,7 +802,8 @@ def _promote_constants(toks, ir, exclude, promote_ints):
         if nm in exclude or nm in required or _looks_mathematical(nm, vals):
             continue
         prior = ir.param(nm)
-        if (prior and prior.origin not in ("const", "define")) or nm in SHADERTOY_NAMES or nm in ISF_NAMES:
+        if (prior and prior.origin not in ("const", "define")) or nm in SHADERTOY_NAMES or nm in ISF_NAMES \
+                or nm in BEAT_NAMES:
             continue
         chosen.append(c)
         if len(chosen) >= MAX_PROMOTED:

@@ -1,0 +1,8 @@
+// Host tempo (FFGL SetBeatInfo): iBPM, iBeat (beats elapsed), iBarPhase (0..1 per bar).
+// Left half: brightness ramps up over each bar. Right half: flashes on every beat.
+// Without host tempo (preview, ISF hosts) it runs at 120 BPM / the BPM slider.
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    float v = uv.x < 0.5 ? iBarPhase : 1.0 - fract(iBeat);
+    fragColor = vec4(vec3(v) * vec3(0.2, 0.8, 1.0) * (iBPM / 120.0), 1.0);
+}
