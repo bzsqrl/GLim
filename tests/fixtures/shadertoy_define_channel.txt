@@ -1,0 +1,20 @@
+// Fixture: channels used only inside #define bodies must still be declared
+// and wired (Buffer A reads its own feedback and the audio through macros).
+// ==== Buffer A ====
+// ffmaker: iChannel0 = Buffer A
+// ffmaker: iChannel1 = audio
+#define PREV(uv) texture(iChannel0, uv)
+#define FFT(a) texture(iChannel1, vec2(a, 0.)).x
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    float d = length(uv - 0.5 - 0.3 * vec2(cos(iTime), sin(iTime)));
+    vec3 dot = vec3(0.2, 0.6, 1.0) * smoothstep(0.08, 0.0, d) * (0.5 + FFT(0.1));
+    fragColor = vec4(max(PREV(uv).rgb * 0.95, dot), 1.0);
+}
+
+// ==== Image ====
+// ffmaker: iChannel0 = Buffer A
+#define SRC(uv) texture(iChannel0, uv)
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    fragColor = vec4(SRC(fragCoord / iResolution.xy).rgb, 1.0);
+}

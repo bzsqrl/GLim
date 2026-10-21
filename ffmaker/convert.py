@@ -288,14 +288,14 @@ def _convert_project(code, name, path, extract_params, promote_ints, exclude):
     for p in buffers + [image]:
         src = prefix + p.code
         toks = G.tokenize(src)
-        used = {t.text for t in toks if t.kind == "ident"}
+        used = G.used_names(toks)
         mapping, chans = {}, [None] * 4
         for ch in range(4):
             nm = f"iChannel{ch}"
             if nm in used:
                 spec = p.channels.get(ch) or (("input",) if p.name == "Image" and ch == 0 else ("none",))
                 mapping[nm] = chans[ch] = sampler_for(spec, p.name, ch, p.samplers.get(ch, {}))
-        G.rename_idents(toks, mapping)
+        G.rename_everywhere(toks, mapping)
         prog = _build_program(G.untokenize(toks), ir, path, extract_params, exclude, promote_ints,
                               label=p.name, line_offset=offset, channels=chans)
         prog.force_opaque = p.name == "Image"
@@ -630,7 +630,7 @@ def sampler_suffix(opts, kind):
 
 
 def _shadertoy_images(toks, ir, directives=None, path=None):
-    used = {t.text for t in toks if t.kind == "ident"}
+    used = G.used_names(toks)
     directives = directives or {}
     for ch in SHADERTOY_CHANNELS:
         if ch not in used or any(i.name == ch for i in ir.images):
