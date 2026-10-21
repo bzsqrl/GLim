@@ -144,7 +144,9 @@ def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None
             if glew:
                 cmd += [f"-DGLEW_ROOT={glew}", "-A", "x64"]
             if sys.platform == "darwin":
-                cmd += ["-G", "Xcode"] if shutil.which("xcodebuild") else []
+                # Makefiles work with just the Command Line Tools; the Xcode
+                # generator would need the full Xcode app.
+                cmd += ["-G", "Unix Makefiles", "-DCMAKE_BUILD_TYPE=Release"]
             _run(cmd, ws, log, cancel_event)
         # MSBuild's header tracking misses ShaderData.h changes, so force the
         # plugin translation unit to recompile (the SDK stays cached).
@@ -171,4 +173,23 @@ def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None
             if os.path.exists(dst):
                 shutil.rmtree(dst)
             shutil.copytree(src, dst)
+            _set_bundle_identity(dst, plugin_name, log, cancel_event)
         return dst
+
+
+def _set_bundle_identity(bundle, plugin_name, log, cancel_event):
+    """Every build copies the same FFMakerPlugin.bundle, so give each copy its
+    own identifier and name (macOS caches bundles by identifier), then re-sign
+    ad hoc because editing Info.plist breaks the linker's signature.
+
+    Resolume ignores CFBundleExecutable and opens Contents/MacOS/<bundle name>,
+    so the binary is renamed to match the bundle."""
+    plist = os.path.join(bundle, "Contents", "Info.plist")
+    exe = os.path.splitext(os.path.basename(bundle))[0]
+    macos = os.path.join(bundle, "Contents", "MacOS")
+    os.rename(os.path.join(macos, "FFMakerPlugin"), os.path.join(macos, exe))
+    ident = "com.ffmaker.plugin." + safe_name(plugin_name) + "." + emit_ffgl.plugin_id(plugin_name)
+    for key, value in (("CFBundleIdentifier", ident), ("CFBundleName", plugin_name[:15]),
+                       ("CFBundleExecutable", exe), ("CFBundlePackageType", "BNDL")):
+        _run(["plutil", "-replace", key, "-string", value, plist], bundle, log, cancel_event)
+    _run(["codesign", "--force", "--sign", "-", bundle], bundle, log, cancel_event)

@@ -1,4 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
+
+# Universal binary for both Apple Silicon and Intel Macs. Set before project()
+# so the FFGL SDK static library is built for both architectures too.
+set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "")
+
 project(FFMakerPlugin CXX)
 
 # Filled in by ffmaker/build_ffgl.py
@@ -14,8 +20,7 @@ if(APPLE)
     add_library(FFMakerPlugin MODULE Plugin.cpp FFMakerPlugin.h ShaderData.h)
     set_target_properties(FFMakerPlugin PROPERTIES
         BUNDLE TRUE
-        BUNDLE_EXTENSION "bundle"
-        OSX_ARCHITECTURES "arm64;x86_64")
+        BUNDLE_EXTENSION "bundle")
     target_link_libraries(FFMakerPlugin PRIVATE ffgl::sdk "-framework OpenGL" "-framework Cocoa")
 else()
     add_library(FFMakerPlugin SHARED Plugin.cpp FFMakerPlugin.h ShaderData.h Plugin.def)

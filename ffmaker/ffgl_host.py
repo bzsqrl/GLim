@@ -65,12 +65,12 @@ class Plugin:
         self.ctx = V.context()
         loader = ctypes.WinDLL if sys.platform == "win32" else ctypes.CDLL
         if path.endswith(".bundle"):            # macOS: the binary lives inside the bundle
-            import glob
             import os
-            bins = glob.glob(os.path.join(path, "Contents", "MacOS", "*"))
-            if not bins:
-                raise RuntimeError(f"No binary inside {path}")
-            path = bins[0]
+            # Same rule as Resolume: the binary must be named after the bundle.
+            name = os.path.splitext(os.path.basename(path.rstrip("/")))[0]
+            path = os.path.join(path, "Contents", "MacOS", name)
+            if not os.path.isfile(path):
+                raise RuntimeError(f"No binary named {name} inside the bundle")
         self.lib = loader(path)
         self.main = self.lib.plugMain
         self.main.restype = ctypes.c_uint64
