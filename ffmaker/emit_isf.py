@@ -152,12 +152,21 @@ def emit(ir, source_code=None):
     # User code must not redefine names the ISF host provides.
     clash = {n: "user_" + n for n in G.declared_names(toks) if n in ISF_RESERVED or n.startswith("IMG_")}
     G.rename_everywhere(toks, clash)
-    G.rename_idents(toks, {**image_renames, "ffm_FragColor": "gl_FragColor"})
+    # Some hosts (MadMapper on macOS) put gl_FragCoord's origin at the top, so
+    # pixel coordinates are rebuilt from isf_FragNormCoord, which every host
+    # sets with ISF's bottom-left origin.
+    frag_coord = any(p.entry == "mainImage" for p in ir.programs) or \
+        any(t.kind == "ident" and t.text == "gl_FragCoord" for t in toks)
+    G.rename_idents(toks, {**image_renames, "ffm_FragColor": "gl_FragColor",
+                           "gl_FragCoord": "ffm_FragCoord"})
     code = _portable_textures(G.untokenize(toks), image_names, repeat_names)
 
     used = set(aliases.values())
     globals_ = []
     setup = []
+    if frag_coord:
+        globals_.append("vec4 ffm_FragCoord;")
+        setup.append("ffm_FragCoord = vec4(isf_FragNormCoord * RENDERSIZE, gl_FragCoord.zw);")
     if "mouse_px" in used:
         globals_.append("vec4 ffm_Mouse;")
         setup.append("ffm_Mouse = vec4(ffmMouse * RENDERSIZE, (ffmMouseClick ? 1.0 : -1.0) * ffmMouse * RENDERSIZE);")
@@ -210,7 +219,7 @@ def emit(ir, source_code=None):
         entry = entries[ps.program]["entry"]
         if prog.entry == "mainImage":
             out.append(f"{ind}vec4 ffm_c = vec4(0.0, 0.0, 0.0, 1.0);")
-            out.append(f"{ind}{entry}(ffm_c, gl_FragCoord.xy);")
+            out.append(f"{ind}{entry}(ffm_c, ffm_FragCoord.xy);")
             out.append(f"{ind}gl_FragColor = ffm_c;")
         else:
             out.append(f"{ind}gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);")
