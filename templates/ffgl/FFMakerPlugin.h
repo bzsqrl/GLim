@@ -1,6 +1,7 @@
 #pragma once
 #include <FFGLSDK.h>
 #include <chrono>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -104,7 +105,7 @@ private:
 	std::vector< float > values;
 	std::vector< int > firstHostParam;// per def: index of its first FFGL param
 
-	std::vector< ffglex::FFGLShader > shaders;
+	std::vector< std::unique_ptr< ffglex::FFGLShader > > shaders;
 	ffglex::FFGLScreenQuad quad;
 	std::vector< Target > targets;
 	GLuint blackTex = 0;

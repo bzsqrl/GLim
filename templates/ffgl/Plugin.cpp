@@ -39,7 +39,7 @@ static std::string JoinChunks( const char* const* chunks )
 	return s;
 }
 
-static void HSVtoRGB( float h, float s, float v, float& r, float& g, float& b )
+static void FFM_HSVtoRGB( float h, float s, float v, float& r, float& g, float& b )
 {
 	h       = h - std::floor( h );
 	float i = std::floor( h * 6.0f );
@@ -124,11 +124,12 @@ FFMakerPlugin::~FFMakerPlugin()
 
 FFResult FFMakerPlugin::InitGL( const FFGLViewportStruct* vp )
 {
-	shaders.resize( FFM_NUM_PROGRAMS );
+	shaders.clear();
 	for( int i = 0; i < FFM_NUM_PROGRAMS; ++i )
 	{
 		std::string frag = JoinChunks( FFM_PROGRAMS[ i ] );
-		if( !shaders[ i ].Compile( kVertexShader, frag.c_str() ) )
+		shaders.emplace_back( new FFGLShader() );
+		if( !shaders.back()->Compile( kVertexShader, frag.c_str() ) )
 		{
 			FFGLLog::LogToHost( "FFMaker: shader failed to compile" );
 			DeInitGL();
@@ -153,7 +154,7 @@ FFResult FFMakerPlugin::InitGL( const FFGLViewportStruct* vp )
 FFResult FFMakerPlugin::DeInitGL()
 {
 	for( auto& s : shaders )
-		s.FreeGLResources();
+		s->FreeGLResources();
 	shaders.clear();
 	quad.Release();
 	for( auto& t : targets )
@@ -250,7 +251,7 @@ void FFMakerPlugin::SendParams( GLuint program )
 		{
 			float hue = Value( d, 0 );
 			float r, g, b;
-			HSVtoRGB( hue >= 1.0f ? 0.0f : hue, Value( d, 1 ), Value( d, 2 ), r, g, b );
+			FFM_HSVtoRGB( hue >= 1.0f ? 0.0f : hue, Value( d, 1 ), Value( d, 2 ), r, g, b );
 			if( p.glslComponents == 3 )
 				glUniform3f( loc, r, g, b );
 			else
@@ -328,7 +329,7 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 		}
 		glViewport( 0, 0, w, h );
 
-		GLuint prog = shaders[ pass.program ].GetGLID();
+		GLuint prog = shaders[ pass.program ]->GetGLID();
 		glUseProgram( prog );
 		glUniform2f( glGetUniformLocation( prog, "ffm_Resolution" ), (float)w, (float)h );
 		glUniform1f( glGetUniformLocation( prog, "ffm_Time" ), (float)clockTime );

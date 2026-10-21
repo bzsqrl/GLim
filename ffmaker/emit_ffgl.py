@@ -97,6 +97,13 @@ def plugin_id(name):
     return alphabet[h[0] % 26] + "".join(alphabet[b % 36] for b in h[1:4])
 
 
+def _cfloat(x):
+    r = repr(float(x))
+    if "e" not in r and "." not in r:
+        r += ".0"
+    return r + "f"
+
+
 def _cstr(s):
     return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ") + '"'
 
@@ -196,7 +203,7 @@ def shader_data_header(ir, programs_glsl, plugin_name):
             lines.append(f"static const char* const FFM_OPT_LABELS_{idx}[] = {{ "
                          + ", ".join(_cstr(l) for l in p.labels) + " };")
             lines.append(f"static const float FFM_OPT_VALUES_{idx}[] = {{ "
-                         + ", ".join(f"{float(v)}f" for v in p.values) + " };")
+                         + ", ".join(_cfloat(v) for v in p.values) + " };")
             opt_l, opt_v = f"FFM_OPT_LABELS_{idx}", f"FFM_OPT_VALUES_{idx}"
             d[0] = float(p.values.index(p.default)) if p.default in p.values else 0.0
         elif p.kind == "color":
@@ -212,7 +219,7 @@ def shader_data_header(ir, programs_glsl, plugin_name):
                 d[0] = min(max(d[0] / 1920.0, 0.0), 1.0)
                 d[1] = min(max(d[1] / 1080.0, 0.0), 1.0)
             comps = 2
-        f = lambda xs: "{ " + ", ".join(f"{float(x):.6g}f" for x in xs) + " }"
+        f = lambda xs: "{ " + ", ".join(_cfloat(x) for x in xs) + " }"
         defs.append(f"    {{ {_cstr(p.name)}, {_cstr(p.display())}, {kind}, {f(d)}, {f(mn)}, {f(mx)}, "
                     f"{comps}, {pixel}, {opt_l}, {opt_v}, {nopt} }},")
     lines.append("static const FFMParamDef FFM_PARAMS[] = {")
