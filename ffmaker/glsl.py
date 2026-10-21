@@ -401,6 +401,15 @@ def parse_literal_vector(text):
     return vals
 
 
+def used_names(toks):
+    """Identifiers used anywhere, including inside #define bodies."""
+    used = {t.text for t in toks if t.kind == "ident"}
+    for t in toks:
+        if t.kind == "preproc":
+            used.update(re.findall(r"[A-Za-z_]\w*", t.text))
+    return used
+
+
 def rename_everywhere(toks, mapping):
     """rename_idents, plus whole-word renames inside preprocessor lines."""
     rename_idents(toks, mapping)
