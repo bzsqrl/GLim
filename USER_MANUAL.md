@@ -35,6 +35,11 @@ The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFMaker` (ma
 2. Click **Build Queue** to make FFGL plugins, or **Export ISF** to make `.fs` files.
 3. Plugins are written to `FFMaker\output\`. Copy them to Resolume's FFGL plugin folder (set in *Preferences → Video → FFGL plugins*; on macOS, `~/Documents/Resolume Arena/Extra Effects` works by default), then restart Resolume.
 
+In the queue, select rows with a click (Shift/Ctrl-click for several):
+- **Build Selected (n)** / **Export Selected (n)**: with rows selected, the two buttons act on just those rows. Selected rows are rebuilt even if they're already done. Click empty space in the list or press **Esc** to deselect; the buttons then work on the whole queue again (Build skips rows that are already done).
+- **Delete** removes the selected rows. Right-click for the same actions plus **Open in Single File**; double-clicking a row also opens it in the editor.
+- Drag the column header edges to resize columns.
+
 **Single File tab (editor):** open or paste a shader and click **Analyze Code** (or press Ctrl+Enter; ⌘+Enter on macOS). You get:
 - **Live preview.** Rendered on your GPU the same way the plugin renders it.
   - Play/pause with ⏸; restart time and feedback buffers with ⟲.
