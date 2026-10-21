@@ -11,3 +11,7 @@ boilerplates/ffgl/build/windows/x64/
 boilerplates/ffgl/build/windows/.vs/
 .ffmaker_cache/
 tests/out/
+
+# Upstream FFGL clone metadata (SDK files are vendored in boilerplates/ffgl)
+boilerplates/_ffgl_upstream.git/
+boilerplates/ffgl/build/
