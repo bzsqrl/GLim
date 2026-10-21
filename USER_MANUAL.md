@@ -1,129 +1,106 @@
 # FFMaker User Manual
 
-**FFMaker** is a powerful utility designed to convert GLSL shaders (ISF, Shadertoy, and GLSL Sandbox formats) into native **FFGL (FreeFrameGL) plugins** for use in VJ software like Resolume, VDMX, and MadMapper.
+**FFMaker** converts GLSL shaders into:
+- **FFGL 2 plugins** for Resolume 7.21.3+ and other FFGL hosts (`.dll` on Windows; macOS `.bundle` support is planned)
+- **ISF 2 files** (`.fs`) for MadMapper, VDMX, Millumin and other ISF hosts
+
+It accepts ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.
 
 ---
 
-## Table of Contents
-1. [Prerequisites](#prerequisites)
-2. [Quick Start](#quick-start)
-3. [Supported Formats](#supported-formats)
-4. [Interface Overview](#interface-overview)
-    - [Queue Tab (Batch Processing)](#queue-tab-batch-processing)
-    - [Single File Tab](#single-file-tab)
-5. [How Parameter Extraction Works](#how-parameter-extraction-works)
-    - [ISF Parameters](#isf-parameters)
-    - [Shadertoy Constants](#shadertoy-constants)
-6. [Shader Licensing and Ethics](#shader-licensing-and-ethics)
-7. [Troubleshooting](#troubleshooting)
+## Prerequisites (Windows)
 
+- **Python 3.10+** with the packages in `requirements.txt`: `venv\Scripts\pip install -r requirements.txt`
+- **CMake** on your PATH
+- **Visual Studio 2022+ or the Build Tools**, with the "Desktop development with C++" workload
+- An OpenGL 4.1 GPU. FFMaker compiles and test-renders every shader on your GPU before building it.
+
+The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFMaker` and compiles the FFGL SDK. This takes about a minute. After that, each plugin builds in about 2 seconds.
 
 ---
 
-## Prerequisites
+## Quick start
 
-To use FFMaker, your system must have:
-- **Windows OS** (Current version is optimized for Windows)
-- **Python 3.10+**
-- **CMake** (Installed and added to your System PATH)
-- **Visual Studio Build Tools** (MSVC compiler)
-- **Internet Connection** (On first run, FFMaker downloads the GLEW library automatically)
+**GUI:** `venv\Scripts\python src\main_gui.py`
 
----
+1. Drop shader files or folders onto the **Queue**.
+2. Click **Build Queue** to make FFGL plugins, or **Export ISF** to make `.fs` files.
+3. Plugins are written to `FFMaker\output\`. Copy them to Resolume's FFGL plugin folder (set in *Preferences → Video → FFGL plugins*), then restart Resolume.
 
-## Quick Start
+**Command line:**
 
-1. **Launch the Application**: Run `src/main_gui.py`.
-2. **Add Shaders**: Drag and drop your `.fs` (ISF) or `.txt` (Shadertoy) files into the window.
-3. **Analyze**: In the "Single File" tab, you can paste code directly and click **Analyze Code** to see detected parameters.
-4. **Build**: Click **Build Queue** or **Compile FFGL** to generate your plugins.
-5. **Install**: The resulting `.dll` files will be placed in the `FFMaker/output/` folder. Copy these to your VJ software's plugin directory.
+```
+venv\Scripts\python -m ffmaker <files or folders> --to ffgl|isf|both|check [--out DIR] [--no-params] [--test]
+```
+
+- `--to check` validates shaders without building anything.
+- `--test` loads each finished plugin in FFMaker's built-in test host and renders a few frames.
 
 ---
 
-## Supported Formats
+## Supported inputs
 
-FFMaker automatically detects the format of your shader code:
+| Format | Detected by | Becomes |
+| :-- | :-- | :-- |
+| **ISF** (`.fs`) | `/*{ JSON }*/` header | Source, Effect (1 image input), or Mixer (Transition category with 2 images) |
+| **Shadertoy** | `mainImage()` | Source; or Effect if it reads `iChannel0` |
+| **GLSL Sandbox / plain GLSL** | `main()` | Source (or Effect if it declares a `sampler2D` uniform) |
 
-| Format | File Ext | Detection Logic |
-| :--- | :--- | :--- |
-| **ISF** | `.fs` | Looks for the `/*{ JSON }*/` header. |
-| **Shadertoy** | `.txt`, `.glsl` | Looks for `void mainImage(...)` or `iTime`. |
-| **GLSL Sandbox** | `.glsl` | Looks for `uniform float time` and `uniform vec2 resolution`. |
+Supported features:
+- **ISF:** all input types except audio. Multi-pass and persistent buffers (`PASSES`, `PERSISTENT`, `FLOAT`, `WIDTH`/`HEIGHT` expressions) are supported. So are all `IMG_*` macros, `DATE`, `FRAMEINDEX` and `TIMEDELTA`.
+- **Shadertoy:** `iTime`, `iResolution`, `iMouse`, `iDate`, `iFrame`, `iTimeDelta`, `iChannel0-3` (fed from the clip input), and `iChannelResolution`.
+- **GLSL Sandbox:** `time`, `resolution`, `mouse` and `surfacePosition`. Unknown `uniform`s become sliders.
+- **Older GLSL:** `texture2D`, `gl_FragColor` and similar legacy names are translated automatically.
 
-> [!NOTE]
-> **Multi-pass ISF shaders** are currently not supported for direct conversion. FFMaker will warn you if a shader requires multiple passes.
-
----
-
-## Interface Overview
-
-### Queue Tab (Batch Processing)
-Designed for converting large libraries of shaders quickly.
-- **Drag & Drop**: Drop multiple files or entire folders into the list.
-- **Status Icons**:
-  - `—` Pending
-  - `⟳` Building (Compiling)
-  - `✓` Success (DLL generated)
-  - `✗` Error (Check the Build Log for details)
-- **Build Queue**: Compiles all pending items sequentially.
-
-### Single File Tab
-Best for debugging or customizing a specific shader.
-- **Code Editor**: Paste and edit your GLSL code.
-- **Analyze Code**: Scans the shader and lists all parameters that will be exposed as sliders in your VJ software.
-- **Output Name**: Specify a custom name for the resulting `.dll`.
+**Not yet supported** (see `IMPROVEMENT_PLAN.md`):
+- ISF `IMPORTED` images: they read black for now.
+- Audio inputs.
+- Shadertoy multi-buffer projects (Buffer A–D).
+- ISF custom vertex shaders.
 
 ---
 
-## How Parameter Extraction Works
+## Parameters
 
-FFMaker makes your shaders interactive by exposing variables as FFGL parameters.
+### ISF inputs
+These become native FFGL parameters:
 
-### ISF Parameters
-FFMaker parses the standard ISF `INPUTS` block. It supports:
-- `float` (with optional MIN/MAX/DEFAULT)
-- `bool` / `boolean`
-- `color` (mapped to RGBA)
-- `point2D` (split into X and Y sliders)
-- `long` (mapped to dropdown menus)
-- `event` (trigger buttons)
+| ISF input | FFGL parameter |
+| :-- | :-- |
+| `float` | Slider with the real MIN/MAX range |
+| `long` | Dropdown with the ISF labels |
+| `bool` | Toggle |
+| `event` | Trigger button |
+| `color` | Color picker |
+| `point2D` | X and Y sliders |
 
-### Shadertoy Constants
-Since Shadertoy doesn't have a formal input header, FFMaker intelligently "promotes" top-level `const` declarations into UI sliders.
-- **Example**: `const float size = 0.5;` becomes a slider named "size".
-- **Speed Injection**: FFMaker automatically adds a **Speed** parameter to all Shadertoy shaders, allowing you to slow down or speed up time-based effects.
-- **No Cap**: FFMaker extracts all detected constants and exposes them as sliders, giving you full control over the shader's internal parameters.
+### Shadertoy / GLSL constants
+With **Extract User Parameters** on, top-level `const float/bool/vec3` values and `#define NAME 1.5` lines become sliders, toggles or color pickers:
+- Math constants (PI, TAU, epsilons…) are skipped.
+- Constants that must stay constant (array sizes, `case` labels) are skipped.
+- If turning a constant into a slider would break compilation, FFMaker puts it back as a constant and tells you.
 
----
+### Built-in controls
+- **Speed** is added to every animated shader and scales time smoothly; changing it never makes the animation jump. If the shader already has its own "speed" control, FFMaker's is called **Time Scale** instead.
+- **Mouse X/Y** and **Mouse Click** are added when a shader uses the mouse.
 
-## Shader Licensing and Ethics
-
-Shaders found on public platforms are the creative property of their respective authors. When using FFMaker to convert shaders, it is your responsibility to adhere to the license terms provided by the creator.
-
-### Common Platform Policies
-- **Shadertoy**: By default, code on Shadertoy is licensed under **CC BY-NC-SA 3.0** (Attribution-NonCommercial-ShareAlike) unless specified otherwise by the author in the code comments. 
-- **ISF (Interactive Shader Format)**: Many ISF shaders are shared under open-source licenses (like MIT or BSD). Always check the `CREDIT` and `DESCRIPTION` fields in the ISF JSON header.
-- **GLSL Sandbox**: Most content is public domain or CC0, but authors often include credit lines that should be preserved.
-
-### Best Practices
-1. **Check for License Headers**: Always look at the top of the shader source for license text or a link to a license.
-2. **Give Credit**: If the shader has a `CREDIT` or `AUTHOR` field, preserve it. 
-3. **Non-Commercial Use**: Many shaders are restricted to non-commercial use. Do not use generated FFGL plugins in commercial performances without verifying permission.
-4. **Share Alike**: If you modify a shader and the license requires "Share Alike," ensure you share your modifications under the same terms.
+### Alpha
+Shadertoy and GLSL Sandbox ignore output alpha, so FFMaker makes those plugins opaque. ISF shaders keep their alpha.
 
 ---
-
 
 ## Troubleshooting
 
-- **"CMake not found"**: Ensure CMake is installed and you can run `cmake --version` in a command prompt.
-- **Blank Output in Resolume**:
-  - Check the **Build Log** in FFMaker for GLSL compilation errors.
-  - Ensure the shader doesn't use unsupported extensions or textures.
-  - Some complex Shadertoy shaders require manual tweaking if they rely on specific `iChannel` inputs.
-- **Build Fails**: If the build fails, the Build Log will show the exact error from the MSVC compiler. Common issues include syntax errors in the GLSL code or missing local dependencies.
+- **"Shader does not compile"**: the log lists the errors with line numbers from *your* file.
+- **Build failed**: check that CMake and Visual Studio's C++ tools are installed. The log shows the compiler's error lines.
+- **Plugin missing in Resolume**: make sure the `.dll` is in a folder Resolume scans, then restart Resolume. FFGL shows only the first 16 characters of a plugin name. FFMaker keeps those 16 characters unique within one batch.
 
 ---
 
-*Manual generated for FFMaker v1.0*
+## Shader licensing
+
+Shaders are the creative property of their authors.
+- Shadertoy code defaults to **CC BY-NC-SA 3.0** unless the code says otherwise.
+- ISF and GLSL Sandbox shaders vary.
+
+Keep credits, and respect non-commercial and share-alike terms.

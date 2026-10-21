@@ -27,6 +27,19 @@ def safe_name(name):
     return s or "Shader"
 
 
+def unique_plugin_name(name, taken):
+    """FFGL shows only 16 characters of a plugin name. Make the visible part
+    unique within `taken` (a set that is updated)."""
+    short = name[:16]
+    n = 2
+    while short.lower() in taken:
+        suffix = f"~{n}"
+        short = name[:16 - len(suffix)] + suffix
+        n += 1
+    taken.add(short.lower())
+    return name if short == name[:16] else short
+
+
 def _write_if_changed(path, text):
     try:
         with open(path, encoding="utf-8") as f:

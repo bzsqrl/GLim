@@ -25,6 +25,24 @@ def collect(inputs):
     return files
 
 
+def smoke_test_subprocess(plugin_path, num_inputs, timeout=60):
+    """Load the plugin in a separate process so crashes or file locks can't
+    affect the caller."""
+    import json
+    import subprocess
+    cmd = [sys.executable, "-m", "ffmaker.ffgl_host", plugin_path, str(num_inputs)]
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
+                           cwd=paths.bundle_dir())
+    except subprocess.TimeoutExpired:
+        return False, "timed out"
+    if p.returncode != 0:
+        err = (p.stderr.strip().splitlines() or ["crashed"])[-1]
+        return False, f"exit {p.returncode}: {err}"
+    r = json.loads(p.stdout.strip().splitlines()[-1])
+    return True, f"{r['params']} host params, mean colour {[round(x) for x in r['mean'][:3]]}"
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="ffmaker", description="Convert GLSL shaders to FFGL plugins and ISF files.")
     ap.add_argument("inputs", nargs="+")
@@ -39,9 +57,15 @@ def main(argv=None):
     out_dir = args.out or paths.default_output_dir()
     files = collect(args.inputs)
     ok_count = 0
+    used_names = set()
+    visible_names = set()
     for path in files:
         stem = os.path.splitext(os.path.basename(path))[0]
-        name = args.prefix + stem
+        if stem.lower() in used_names:      # e.g. foo.fs and foo.txt
+            stem += "_" + os.path.splitext(path)[1].lstrip(".")
+        used_names.add(stem.lower())
+        from .build_ffgl import unique_plugin_name
+        name = unique_plugin_name(args.prefix + stem, visible_names)
         try:
             code = open(path, encoding="utf-8", errors="replace").read()
             res = pipeline.convert_ffgl(code, name=name, path=path, extract_params=not args.no_params)
@@ -81,15 +105,9 @@ def main(argv=None):
                 continue
             print(f"✓ {stem} → {dst} ({note})")
             if args.test:
-                from . import ffgl_host
-                n = {"source": 0, "effect": 1, "mixer": 2}[ir.kind]
-                try:
-                    r = ffgl_host.smoke_test(dst, num_inputs=n, frames=10)
-                    b = r["frames"][-1]
-                    print(f"    test host: OK, {len(r['params'])} host params, mean colour "
-                          f"{[round(x) for x in b['mean'][:3]]}")
-                except Exception as e:
-                    print(f"    test host: FAILED: {e}")
+                ok, msg = smoke_test_subprocess(dst, {"source": 0, "effect": 1, "mixer": 2}[ir.kind])
+                print(f"    test host: {'OK' if ok else 'FAILED'}, {msg}")
+                if not ok:
                     continue
         ok_count += 1
     print(f"\n{ok_count}/{len(files)} converted.")

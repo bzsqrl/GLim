@@ -1,19 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
+# Build with:  venv\Scripts\python compile.py
+import os
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
+
+ffgl_sdk = [(os.path.join(root, f), os.path.relpath(root, '.'))
+            for root, dirs, files in os.walk(os.path.join('boilerplates', 'ffgl'))
+            if '.git' not in root and os.sep + 'build' not in root
+            for f in files]
 
 a = Analysis(
     ['src\\main_gui.py'],
-    pathex=[],
-    binaries=[],
-    datas=[
-        ('C:\\Users\\beatf\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\customtkinter', 'customtkinter/'), 
-        ('C:\\Users\\beatf\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\tkinterdnd2', 'tkinterdnd2/'),
-        ('boilerplates', 'boilerplates'),
-    ],
-    hiddenimports=[],
+    pathex=['.'],
+    binaries=collect_dynamic_libs('glfw'),
+    datas=collect_data_files('customtkinter') + collect_data_files('tkinterdnd2') + [
+        ('templates', 'templates'),
+    ] + ffgl_sdk,
+    hiddenimports=['ffmaker', 'glfw', 'OpenGL.GL', 'OpenGL.platform.win32'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['numpy'],
     noarchive=False,
     optimize=0,
 )
@@ -38,5 +44,4 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # icon='assets\\icon.ico', # Add icon if available
 )

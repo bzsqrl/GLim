@@ -2,6 +2,44 @@
 
 *Written 2026-10-20 from a code review plus a compile audit of the 79 files in `sample-shaders/`.*
 
+## Status (updated 2026-10-20)
+
+**Phase 0 and most of Phase 1 are done.** Results on the 79 samples:
+- **All 79** convert, compile on the GPU, and render. The old pipeline managed 18.
+- **All 79** build into DLLs that load and render in FFMaker's test host.
+- **All 40** non-ISF samples export ISF that compiles in an ISF host emulator.
+
+Not yet checked inside Resolume or MadMapper.
+
+**New code layout:**
+- `ffmaker/`: the core library
+  - `glsl.py`: tokenizer
+  - `convert.py`: front-ends and transformations
+  - `emit_ffgl.py`, `emit_isf.py`: output writers
+  - `validate.py`: GPU compile/render checks
+  - `isf_host.py`: ISF host emulator
+  - `build_ffgl.py`: builds plugins in a cached CMake workspace
+  - `ffgl_host.py`: test host
+  - `__main__.py`: command line
+- `templates/ffgl/`: the fixed C++ plugin runtime, driven by a generated `ShaderData.h`
+- `tests/run_corpus.py`: regression runner. Writes thumbnails and `report.json` to `tests/out/`.
+- `src/main_gui.py`: the existing GUI, now running on the new core
+
+**Already done ahead of schedule** (Phase 2 / Phase 4 items):
+- ISF multi-pass and persistent/float buffers
+- ISF transitions as FFGL mixers
+- Cached-SDK builds (about 2 s per plugin)
+
+**Next:**
+1. Fix whatever the Resolume/MadMapper testing turns up.
+2. Embed ISF `IMPORTED` images and Shadertoy textures.
+3. Audio FFT inputs.
+4. Shadertoy multi-buffer projects.
+5. ISF `.vs` vertex shaders.
+6. GUI preview and parameter editor.
+7. macOS build and testing (the CMake template already has an Apple branch, untested).
+8. Updated PyInstaller packaging (spec updated but not yet tested).
+
 Targets: **FFGL 2 plugins for Resolume 7.21.3+** (Windows first, Mac later) and **ISF 2 files for MadMapper and other hosts**.
 
 ---

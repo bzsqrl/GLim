@@ -541,6 +541,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
         ok = err = 0
         was_cancelled = False
+        visible_names = set()
 
         for item in items:
             if self._cancel_event.is_set():
@@ -554,7 +555,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             try:
                 code = open(item.path, encoding="utf-8", errors="replace").read()
                 suffix = "-p" if self.extract_params_var.get() else ""
-                name = item.name + suffix
+                name = build_ffgl.unique_plugin_name(item.name + suffix, visible_names)
                 status, text = self._convert_and_build(code, name, item.path, output_dir)
                 if status == "cancelled":
                     item.status = "pending"

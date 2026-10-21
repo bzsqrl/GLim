@@ -157,3 +157,11 @@ def _smoke_test(path, num_inputs, w, h, frames, frame_dt):
     gl.glDeleteTextures([out_tex])
     return {"info": info, "params": params, "displays": displays, "frames": stats,
             "rgba": last, "size": (w, h)}
+
+
+if __name__ == "__main__":
+    # python -m ffmaker.ffgl_host <plugin> <num_inputs>  -> JSON summary on stdout
+    import json
+    r = smoke_test(sys.argv[1], num_inputs=int(sys.argv[2]), frames=10)
+    print(json.dumps({"info": r["info"], "params": len(r["params"]),
+                      "mean": r["frames"][-1]["mean"], "distinct": r["frames"][-1]["distinct"]}))
