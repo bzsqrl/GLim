@@ -25,7 +25,8 @@ enum FFMSource
 {
 	FFM_SRC_HOST,
 	FFM_SRC_TARGET,
-	FFM_SRC_NONE
+	FFM_SRC_NONE,
+	FFM_SRC_IMAGE// embedded image (index into FFM_IMAGES)
 };
 
 struct FFMParamDef
@@ -48,6 +49,15 @@ struct FFMSamplerDef
 	const char* name;
 	int source;
 	int index;
+};
+
+struct FFMImageDef
+{
+	const char* name;
+	const unsigned char* data;// encoded PNG/JPG/BMP/TGA bytes, or nullptr for generated noise
+	unsigned int size;
+	int noiseSize;           // used when data is nullptr
+	int repeat;              // GL_REPEAT (1) or GL_CLAMP_TO_EDGE (0)
 };
 
 struct FFMTargetDef
@@ -109,6 +119,7 @@ private:
 	ffglex::FFGLScreenQuad quad;
 	std::vector< Target > targets;
 	GLuint blackTex = 0;
+	std::vector< GLuint > imageTex;
 
 	double clockTime = 0.0;
 	float lastDelta  = 0.0f;

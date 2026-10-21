@@ -8,6 +8,14 @@
 #include <cstring>
 #include <ctime>
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#define STBI_ONLY_JPEG
+#define STBI_ONLY_BMP
+#define STBI_ONLY_TGA
+#define STBI_NO_STDIO
+#include "stb_image.h"
+
 using namespace ffglex;
 
 static CFFGLPluginInfo PluginInfo(
@@ -148,6 +156,45 @@ FFResult FFMakerPlugin::InitGL( const FFGLViewportStruct* vp )
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
 	glBindTexture( GL_TEXTURE_2D, 0 );
+
+	// Embedded images (ISF IMPORTED / Shadertoy textures) or generated noise.
+	for( int i = 0; i < FFM_NUM_IMAGES; ++i )
+	{
+		const FFMImageDef& d = FFM_IMAGES[ i ];
+		int w = 0, h = 0, n = 0;
+		unsigned char* pixels = nullptr;
+		std::vector< unsigned char > noise;
+		if( d.data )
+		{
+			stbi_set_flip_vertically_on_load( 1 );
+			pixels = stbi_load_from_memory( d.data, (int)d.size, &w, &h, &n, 4 );
+		}
+		if( !pixels )
+		{
+			w = h = d.noiseSize > 0 ? d.noiseSize : 256;
+			noise.resize( (size_t)w * h * 4 );
+			unsigned int state = 0x12345678u + 7919u * (unsigned int)i;
+			for( auto& b : noise )
+			{
+				state = state * 1664525u + 1013904223u;
+				b     = (unsigned char)( state >> 24 );
+			}
+		}
+		GLuint tex = 0;
+		glGenTextures( 1, &tex );
+		glBindTexture( GL_TEXTURE_2D, tex );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels ? pixels : noise.data() );
+		glGenerateMipmap( GL_TEXTURE_2D );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+		GLint wrap = d.repeat ? GL_REPEAT : GL_CLAMP_TO_EDGE;
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap );
+		glBindTexture( GL_TEXTURE_2D, 0 );
+		if( pixels )
+			stbi_image_free( pixels );
+		imageTex.push_back( tex );
+	}
 	return CFFGLPlugin::InitGL( vp );
 }
 
@@ -161,6 +208,9 @@ FFResult FFMakerPlugin::DeInitGL()
 		FreeTarget( t );
 	if( blackTex )
 		glDeleteTextures( 1, &blackTex );
+	for( GLuint t : imageTex )
+		glDeleteTextures( 1, &t );
+	imageTex.clear();
 	blackTex = 0;
 	return FF_SUCCESS;
 }
@@ -352,6 +402,8 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 			GLuint tex = blackTex;
 			if( sd.source == FFM_SRC_HOST && (unsigned)sd.index < pGL->numInputTextures && pGL->inputTextures[ sd.index ] )
 				tex = pGL->inputTextures[ sd.index ]->Handle;
+			else if( sd.source == FFM_SRC_IMAGE && sd.index < (int)imageTex.size() )
+				tex = imageTex[ sd.index ];
 			else if( sd.source == FFM_SRC_TARGET && targets[ sd.index ].tex[ 0 ] )
 				tex = targets[ sd.index ].tex[ targets[ sd.index ].front ];
 			glActiveTexture( GL_TEXTURE0 + unit );

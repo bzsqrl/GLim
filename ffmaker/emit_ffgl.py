@@ -239,9 +239,30 @@ def shader_data_header(ir, programs_glsl, plugin_name):
     lines.append(f"#define FFM_NUM_TARGETS {len(targets)}")
     tindex = {t.target: i for i, t in enumerate(targets)}
 
+    from . import images as IMG
+    imported = [im for im in ir.images if im.source == "imported"]
+    img_defs = []
+    for k, im in enumerate(imported):
+        data = IMG.encoded_bytes(im)
+        if data:
+            lines.append(f"static const unsigned char FFM_IMG_{k}[] = {{")
+            for off in range(0, len(data), 48):
+                lines.append(",".join(str(b) for b in data[off:off + 48]) + ",")
+            lines.append("};")
+            img_defs.append(f"    {{ {_cstr(im.name)}, FFM_IMG_{k}, {len(data)}u, {im.noise_size}, {int(im.repeat)} }},")
+        else:
+            img_defs.append(f"    {{ {_cstr(im.name)}, nullptr, 0u, {im.noise_size}, {int(im.repeat)} }},")
+    lines.append("static const FFMImageDef FFM_IMAGES[] = {")
+    lines += img_defs or ['    { "", nullptr, 0u, 0, 0 },']
+    lines.append("};")
+    lines.append(f"static const int FFM_NUM_IMAGES = {len(img_defs)};")
+
     samplers = []
     for im in ir.images:
-        src = {"host": "FFM_SRC_HOST", "imported": "FFM_SRC_NONE", "none": "FFM_SRC_NONE"}[im.source]
+        if im.source == "imported":
+            samplers.append(f"    {{ {_cstr(im.name)}, FFM_SRC_IMAGE, {imported.index(im)} }},")
+            continue
+        src = {"host": "FFM_SRC_HOST", "none": "FFM_SRC_NONE"}[im.source]
         samplers.append(f"    {{ {_cstr(im.name)}, {src}, {im.index if im.source == 'host' else 0} }},")
     for t in targets:
         samplers.append(f"    {{ {_cstr(t.target)}, FFM_SRC_TARGET, {tindex[t.target]} }},")

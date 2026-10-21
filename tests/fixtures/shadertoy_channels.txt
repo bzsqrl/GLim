@@ -1,0 +1,11 @@
+// Fixture: Shadertoy channel directives.
+// ffmaker: iChannel0 = input
+// ffmaker: iChannel1 = img/topred.png
+// ffmaker: iChannel2 = noise
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    vec3 a = texture(iChannel0, uv).rgb;
+    vec3 b = texture(iChannel1, uv * 2.0).rgb;   // repeats
+    float n = texture(iChannel2, uv + iTime * 0.05).r;
+    fragColor = vec4(mix(a, b, step(0.5, uv.x)) * (0.7 + 0.3 * n), 1.0);
+}

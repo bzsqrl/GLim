@@ -208,6 +208,20 @@ def _render(ir, glsl_list, width, height, times, frames_between):
             gl.glClear(gl.GL_COLOR_BUFFER_BIT)
         t["size"] = (w, h)
 
+    from . import images as IMG
+    img_tex = {}
+    for k, im in enumerate([i for i in ir.images if i.source == "imported"]):
+        w_, h_, px = IMG.rgba(im, k)
+        tex = ctx._texture(w_, h_, px)
+        gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
+        gl.glGenerateMipmap(gl.GL_TEXTURE_2D)
+        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR_MIPMAP_LINEAR)
+        wrap = gl.GL_REPEAT if im.repeat else gl.GL_CLAMP_TO_EDGE
+        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, wrap)
+        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, wrap)
+        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+        img_tex[im.name] = tex
+
     values = {p.name: p for p in ir.params if p.name}
     results = []
     frame = 0
@@ -247,6 +261,8 @@ def _render(ir, glsl_list, width, height, times, frames_between):
                     tex = ctx.black
                     if im.source == "host":
                         tex = ctx.test_input[min(im.index, 1)]
+                    elif im.source == "imported":
+                        tex = img_tex[im.name]
                     unit = _bind(gl, prog, im.name, tex, unit)
                 for name, t in targets.items():
                     tex = t["tex"][t["front"]] if t["tex"][0] else ctx.black
@@ -275,6 +291,8 @@ def _render(ir, glsl_list, width, height, times, frames_between):
         gl.glDeleteProgram(p)
     gl.glDeleteFramebuffers(1, [out_fbo])
     gl.glDeleteTextures([out_tex])
+    if img_tex:
+        gl.glDeleteTextures(list(img_tex.values()))
     for t in targets.values():
         if t["tex"][0]:
             gl.glDeleteTextures(t["tex"])

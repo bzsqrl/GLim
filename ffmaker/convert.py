@@ -125,7 +125,7 @@ def convert(code, name="Shader", path=None, extract_params=True, promote_ints=Fa
     toks = retok(toks)
     _map_distinctive_names(toks, ir, aliases)
     if dialect == "shadertoy":
-        _shadertoy_images(toks, ir)
+        _shadertoy_images(toks, ir, channel_directives(code), path)
 
     if extract_params and dialect != "isf":
         _promote_constants(toks, ir, set(exclude), promote_ints)
@@ -236,7 +236,10 @@ def _isf_header_to_ir(h, ir, path):
         p = imp.get("PATH", "")
         if path and p:
             p = os.path.join(os.path.dirname(path), p)
-        ir.images.append(Image(nm, "imported", path=p))
+        ir.images.append(Image(nm, "imported", path=p, repeat=False))
+        if not (p and os.path.isfile(p)):
+            ir.warnings.append(f"Imported image '{nm}' ({imp.get('PATH', '')}) was not found; "
+                               f"a noise texture is used instead.")
 
     for i, p in enumerate(h.get("PASSES", []) or []):
         ir.passes.append(Pass(
@@ -397,11 +400,32 @@ def _map_distinctive_names(toks, ir, aliases):
             aliases[nm] = sym
 
 
-def _shadertoy_images(toks, ir):
+_CHANNEL_DIRECTIVE = re.compile(r"//\s*@?ffmaker\s*:?\s*(iChannel[0-3])\s*=\s*(.+?)\s*$", re.I | re.M)
+
+
+def channel_directives(code):
+    """`// ffmaker: iChannel1 = rock.jpg` lines -> {channel: value}."""
+    return {m.group(1): m.group(2) for m in _CHANNEL_DIRECTIVE.finditer(code)}
+
+
+def _shadertoy_images(toks, ir, directives=None, path=None):
     used = {t.text for t in toks if t.kind == "ident"}
+    directives = directives or {}
     for ch in SHADERTOY_CHANNELS:
-        if ch in used and not any(i.name == ch for i in ir.images):
+        if ch not in used or any(i.name == ch for i in ir.images):
+            continue
+        val = directives.get(ch, "input").strip().strip("\"'")
+        if val.lower() in ("input", "clip", "host"):
             ir.images.append(Image(ch, "host", 0))
+        elif val.lower() == "noise":
+            ir.images.append(Image(ch, "imported", repeat=True))
+        else:
+            p = val
+            if path and not os.path.isabs(p):
+                p = os.path.join(os.path.dirname(path), p)
+            ir.images.append(Image(ch, "imported", path=p, repeat=True))
+            if not os.path.isfile(p):
+                ir.warnings.append(f"{ch} image '{val}' was not found; a noise texture is used instead.")
     ir.images.sort(key=lambda i: i.name)
 
 

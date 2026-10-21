@@ -1,6 +1,8 @@
 """ShaderIR -> ISF 2 (.fs) for MadMapper, VDMX, Millumin and other ISF hosts."""
 import json
+import os
 import re
+import shutil
 
 from . import glsl as G
 
@@ -12,6 +14,31 @@ ISF_SYMBOLS = {
     "surfacesize": "vec2(RENDERSIZE.x / RENDERSIZE.y, 1.0)", "samplerate": "44100.0",
     "framerate": "60.0", "channelres": "ffm_ChannelRes", "channeltime": "ffm_ChannelTime",
 }
+
+
+def asset_name(ir, im):
+    """File name for an embedded image written next to the .fs."""
+    ext = os.path.splitext(im.path)[1].lower() if im.path and os.path.isfile(im.path) else ".png"
+    return f"{ir.name}_{im.name}{ext}"
+
+
+def write(ir, out_dir, source_code=None):
+    """Write <name>.fs plus any texture files it imports. Returns the .fs path."""
+    from . import images as IMG
+    os.makedirs(out_dir, exist_ok=True)
+    fs_path = os.path.join(out_dir, ir.name + ".fs")
+    with open(fs_path, "w", encoding="utf-8") as f:
+        f.write(emit(ir, source_code))
+    if ir.dialect != "isf":
+        for k, im in enumerate([i for i in ir.images if i.source == "imported"]):
+            dst = os.path.join(out_dir, asset_name(ir, im))
+            if IMG.available(im):
+                shutil.copy2(im.path, dst)
+            else:
+                from PIL import Image as PILImage
+                w, h, px = IMG.noise_rgba(k, im.noise_size)
+                PILImage.frombytes("RGBA", (w, h), px).save(dst)
+    return fs_path
 
 
 def emit(ir, source_code=None):
@@ -35,8 +62,11 @@ def emit(ir, source_code=None):
         for im in host_imgs:
             if im.name != "inputImage":
                 image_renames[im.name] = "inputImage"
+    imported = {}
     for im in ir.images:
-        if im.source != "host":
+        if im.source == "imported":
+            imported[im.name] = {"PATH": asset_name(ir, im)}
+        elif im.source != "host":
             inputs.append({"NAME": im.name, "TYPE": "image", "LABEL": im.name})
 
     for p in ir.params:
@@ -83,6 +113,8 @@ def emit(ir, source_code=None):
         "CATEGORIES": cats,
         "INPUTS": inputs,
     }
+    if imported:
+        header["IMPORTED"] = imported
 
     for name, sym in sorted(prog.aliases.items()):
         expr = ISF_SYMBOLS[sym]
@@ -94,7 +126,9 @@ def emit(ir, source_code=None):
     toks = G.tokenize(prog.code)
     G.rename_idents(toks, image_renames)
     image_names = {image_renames.get(i.name, i.name) for i in ir.images}
-    code = _portable_textures(G.untokenize(toks), image_names)
+    repeat_names = {image_renames.get(i.name, i.name) for i in ir.images
+                    if i.source == "imported" and i.repeat}
+    code = _portable_textures(G.untokenize(toks), image_names, repeat_names)
     used = set(prog.aliases.values())
     globals_ = []
     setup = []
@@ -140,7 +174,7 @@ def emit(ir, source_code=None):
     return "\n".join(out) + "\n"
 
 
-def _portable_textures(code, image_names):
+def _portable_textures(code, image_names, repeat_names=()):
     """texture(img, uv) -> IMG_NORM_PIXEL(img, uv) for ISF image inputs so the
     file works in hosts that compile ISF with old GLSL versions."""
     toks = G.tokenize(code)
@@ -154,6 +188,9 @@ def _portable_textures(code, image_names):
                 commas = _top_level_commas(toks, sig[pos + 1], close)
                 if len(commas) == 1:          # no bias argument
                     t.text = "IMG_NORM_PIXEL"
+                    if arg.text in repeat_names:  # ISF hosts clamp; emulate GL_REPEAT
+                        toks[commas[0]].text = ", fract("
+                        toks[close].text = "))"
     return G.untokenize(toks)
 
 

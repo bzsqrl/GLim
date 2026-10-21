@@ -27,6 +27,8 @@ class Image:
     source: str = "host"      # host | imported | none
     index: int = 0            # host input index
     path: str = ""            # imported image path
+    repeat: bool = True       # wrap mode for imported images
+    noise_size: int = 256     # size of generated noise when the file is missing
 
 
 @dataclass

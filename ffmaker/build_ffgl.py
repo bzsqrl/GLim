@@ -105,7 +105,9 @@ def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None
         os.makedirs(ws, exist_ok=True)
         tpl = paths.templates_dir()
         sdk = paths.ffgl_sdk_dir().replace("\\", "/")
-        for fn in ("Plugin.cpp", "FFMakerPlugin.h", "Plugin.def"):
+        for fn in sorted(os.listdir(os.path.join(tpl, "ffgl"))):
+            if fn == "CMakeLists.txt":
+                continue
             with open(os.path.join(tpl, "ffgl", fn), encoding="utf-8") as f:
                 _write_if_changed(os.path.join(ws, fn), f.read())
         with open(os.path.join(tpl, "ffgl", "CMakeLists.txt"), encoding="utf-8") as f:

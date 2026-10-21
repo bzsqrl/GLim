@@ -88,13 +88,12 @@ def main(argv=None):
             ok_count += 1
             continue
         if args.to in ("isf", "both"):
-            os.makedirs(out_dir, exist_ok=True)
-            isf_path = os.path.join(out_dir, stem + ".fs")
             if ir.dialect == "isf":
                 print(f"  (ISF source: no ISF export needed)")
             else:
-                with open(isf_path, "w", encoding="utf-8") as f:
-                    f.write(emit_isf.emit(ir))
+                ir.name = stem
+                isf_path = emit_isf.write(ir, out_dir)
+                ir.name = name
                 print(f"✓ {stem} → {isf_path}")
         if args.to in ("ffgl", "both"):
             from . import build_ffgl

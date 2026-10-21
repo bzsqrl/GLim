@@ -715,16 +715,20 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     # ISF Export
     # -----------------------------------------------------------------------
-    def _isf_text(self, code, name, path):
-        """Returns (text, note) or raises."""
+    def _isf_export(self, code, name, path, out_dir):
+        """Write <name>.fs (plus texture files) into out_dir. Returns (fs_path, note)."""
         res = pipeline.convert_ffgl(code, name=name, path=path,
                                     extract_params=self.extract_params_var.get())
         if res.ir.dialect == "isf":
-            return code, "already ISF, copied unchanged"
+            dst = os.path.join(out_dir, name + ".fs")
+            with open(dst, "w", encoding="utf-8") as f:
+                f.write(code)
+            return dst, "already ISF, copied unchanged"
         if not res.ok:
             raise RuntimeError("shader does not compile: " +
                                "; ".join(f"line {l}: {m}" for l, m in res.errors[:3]))
-        return emit_isf.emit(res.ir), f"{len(res.ir.params)} inputs"
+        res.ir.name = name
+        return emit_isf.write(res.ir, out_dir), f"{len(res.ir.params)} inputs"
 
     def _export_isf_single(self):
         code = self.textbox_code.get("1.0", "end-1c").strip()
@@ -742,10 +746,9 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if not save_path:
             return
         try:
-            text, note = self._isf_text(code, name, getattr(self, "_source_path", None))
-            with open(save_path, "w", encoding="utf-8") as f:
-                f.write(text)
-            self.log(f"✓ Exported ISF to {save_path} ({note})")
+            dst, note = self._isf_export(code, Path(save_path).stem,
+                                         getattr(self, "_source_path", None), os.path.dirname(save_path))
+            self.log(f"✓ Exported ISF to {dst} ({note})")
         except Exception as exc:
             self.log(f"ERROR: Export failed: {exc}")
 
@@ -764,10 +767,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         for item in items:
             try:
                 code = open(item.path, encoding="utf-8", errors="replace").read()
-                text, note = self._isf_text(code, item.name, item.path)
-                out_path = os.path.join(out_dir, f"{item.name}{suffix}.fs")
-                with open(out_path, "w", encoding="utf-8") as f:
-                    f.write(text)
+                _, note = self._isf_export(code, item.name + suffix, item.path, out_dir)
                 self.log(f"  [{item.fname}] ✓ {note}")
                 ok += 1
             except Exception as exc:
