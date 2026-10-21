@@ -55,6 +55,8 @@ def program_glsl(ir, prog):
         out.append(f"#define {name} {FFGL_SYMBOLS[sym]}\n")
     if ir.dialect == "isf":
         out.append(ISF_MACROS)
+    if prog.prelude:
+        out.append(prog.prelude.rstrip("\n") + "\n")
     out.append("#line 1\n")
     code = prog.code
     out.append(code)
@@ -70,6 +72,8 @@ def program_glsl(ir, prog):
         res = f"vec3(vec2(textureSize({ch}, 0)), 1.0)" if ch and ch in samplers else "vec3(ffm_Resolution, 1.0)"
         out.append(f"    ffm_ChannelRes[{i}] = {res}; ffm_ChannelTime[{i}] = ffm_Time;\n")
     out.append("    ffm_init();\n")
+    if prog.prelude:
+        out.append("    ffm_vs_main();\n")
     if prog.entry == "mainImage":
         out.append("    vec4 ffm_c = vec4(0.0, 0.0, 0.0, 1.0);\n")
         out.append("    mainImage(ffm_c, gl_FragCoord.xy);\n")

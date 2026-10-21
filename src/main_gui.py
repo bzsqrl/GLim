@@ -723,6 +723,10 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             dst = os.path.join(out_dir, name + ".fs")
             with open(dst, "w", encoding="utf-8") as f:
                 f.write(code)
+            vs = os.path.splitext(path)[0] + ".vs" if path else ""
+            if vs and os.path.isfile(vs):
+                import shutil
+                shutil.copy2(vs, os.path.join(out_dir, name + ".vs"))
             return dst, "already ISF, copied unchanged"
         if not res.ok:
             raise RuntimeError("shader does not compile: " +

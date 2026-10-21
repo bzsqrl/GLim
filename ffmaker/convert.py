@@ -117,8 +117,15 @@ def convert(code, name="Shader", path=None, extract_params=True, promote_ints=Fa
         code = code[:hdr[1]] + "\n" * code[hdr[1]:hdr[2]].count("\n") + code[hdr[2]:]
         _isf_header_to_ir(header, ir, path)
 
+    vertex = None
+    if dialect == "isf" and path:
+        vs_path = os.path.splitext(path)[0] + ".vs"
+        if os.path.isfile(vs_path):
+            with open(vs_path, encoding="utf-8", errors="replace") as f:
+                vertex = _vertex_prelude(f.read(), ir)
     prog = _build_program(code, ir, path, extract_params, exclude, promote_ints,
-                          directives=channel_directives(code) if dialect == "shadertoy" else None)
+                          directives=channel_directives(code) if dialect == "shadertoy" else None,
+                          vertex=vertex)
     prog.force_opaque = dialect != "isf"
     ir.programs.append(prog)
     if not ir.passes:
@@ -128,7 +135,7 @@ def convert(code, name="Shader", path=None, extract_params=True, promote_ints=Fa
 
 
 def _build_program(code, ir, path, extract_params, exclude, promote_ints, directives=None,
-                   label="", line_offset=0, channels=None):
+                   label="", line_offset=0, channels=None, vertex=None):
     """Run the token pipeline on one program's source and return a Program."""
     # Each phase gets a fresh token list so it sees earlier rewrites.
     retok = lambda t: G.tokenize(G.untokenize(t))
@@ -138,7 +145,7 @@ def _build_program(code, ir, path, extract_params, exclude, promote_ints, direct
     toks = retok(toks)
     _map_uniform_decls(toks, ir, aliases)
     toks = retok(toks)
-    _map_varyings(toks, ir)
+    _map_varyings(toks, ir, skip=vertex["varyings"] if vertex else ())
     toks = retok(toks)
     _map_distinctive_names(toks, ir, aliases)
     if ir.dialect == "shadertoy" and directives is not None:
@@ -159,8 +166,49 @@ def _build_program(code, ir, path, extract_params, exclude, promote_ints, direct
     toks = retok(toks)
     entry = _entry_point(toks, ir)
     _rename_frag_outputs(toks)
+    prelude = ""
+    if vertex:
+        prelude = vertex["code"]
+        for k, v in vertex["aliases"].items():
+            aliases.setdefault(k, v)
     return Program(code=G.untokenize(toks), entry=entry, aliases=aliases, hoisted=hoisted,
-                   label=label, line_offset=line_offset, channels=channels)
+                   label=label, line_offset=line_offset, channels=channels, prelude=prelude)
+
+
+def _vertex_prelude(vs_code, ir):
+    """Turn an ISF .vs vertex shader into code run per pixel: its varyings
+    become globals and main() becomes ffm_vs_main()."""
+    vs_code = vs_code.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    toks = G.tokenize(vs_code)
+    _normalize(toks, ir)
+    toks = G.tokenize(G.untokenize(toks))
+    sig = G.significant(toks)
+    for pos, k in enumerate(sig):
+        t = toks[k]
+        if t.kind == "ident" and t.text in ("isf_vertShaderInit", "vv_vertShaderInit"):
+            j = pos
+            while j < len(sig) and toks[sig[j]].text != ";":
+                toks[sig[j]].text = ""
+                j += 1
+            if j < len(sig):
+                toks[sig[j]].text = ""
+        elif t.kind == "ident" and t.text == "gl_Position":
+            t.text = "ffm_vsPosition"
+    varyings = set()
+    for it in G.analyze(toks):
+        if it.kind == "decl":
+            q = [x for x in it.qualifiers if x in ("varying", "out")]
+            for x in q:
+                G.blank(toks, it.qual_idx[x], it.qual_idx[x])
+                varyings.update(d.name for d in it.decls)
+            if "uniform" in it.qualifiers:
+                _replace_range(toks, it.start, it.end, "")
+        elif it.kind == "func" and it.name == "main":
+            toks[it.name_idx].text = "ffm_vs_main"
+    aliases = {}
+    _map_distinctive_names(G.tokenize(G.untokenize(toks)), ir, aliases)
+    code = "vec4 ffm_vsPosition;\n// ── from ISF vertex shader (.vs) ──\n" + G.untokenize(toks)
+    return {"code": code, "aliases": aliases, "varyings": varyings}
 
 
 def _finish(ir, header):
@@ -465,7 +513,7 @@ def _param_for_uniform(nm, ty):
     return Param(nm, "float", humanize(nm), 0.5, 0.0, 1.0, origin="uniform")
 
 
-def _map_varyings(toks, ir):
+def _map_varyings(toks, ir, skip=()):
     """`varying`/`in` globals in fragment code (ISF .vs companions, sandbox
     surfacePosition) become plain globals or host aliases."""
     for it in G.analyze(toks):
@@ -475,6 +523,9 @@ def _map_varyings(toks, ir):
         if not q:
             continue
         names = [d.name for d in it.decls]
+        if names and all(n in skip for n in names):   # declared by the .vs prelude
+            _replace_range(toks, it.start, it.end, "")
+            continue
         if names == ["surfacePosition"]:
             _replace_range(toks, it.start, it.end, "")
             continue

@@ -53,6 +53,7 @@ class Program:
     label: str = ""           # pass name for multi-program shaders ("Buffer A")
     line_offset: int = 0      # lines of shared code (Common) prepended before the pass
     channels: list = None     # Shadertoy: sampler name feeding iChannel0..3
+    prelude: str = ""         # code placed before the user's (ISF .vs vertex logic)
 
 
 @dataclass
