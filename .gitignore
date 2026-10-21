@@ -1,0 +1,13 @@
+venv/
+build/
+dist/
+_release/
+output/
+deps/
+__pycache__/
+*.pyc
+boilerplates/build_temp*/
+boilerplates/ffgl/build/windows/x64/
+boilerplates/ffgl/build/windows/.vs/
+.ffmaker_cache/
+tests/out/
