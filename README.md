@@ -27,6 +27,8 @@ venv\Scripts\python src\main_gui.py
 
 Building plugins needs CMake and Visual Studio's C++ tools. GLEW is downloaded on the first build if `deps/` is missing.
 
+Updating an existing Windows checkout after the Mac port: see [WINDOWS_UPDATE.md](WINDOWS_UPDATE.md).
+
 ## macOS setup (for the Mac port)
 
 ```
