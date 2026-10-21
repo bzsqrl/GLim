@@ -8,9 +8,9 @@ import sys
 import threading
 import tkinter as tk
 from pathlib import Path
-from builder import build_plugin
-from isf_exporter import export_to_isf
-from paths import get_resource_path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from ffmaker import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: E402
+from ffmaker import convert as ffconvert                               # noqa: E402
 
 
 # --- Drag-and-drop support (optional, graceful fallback) ---
@@ -29,52 +29,26 @@ STATUS_BUILDING = ("⟳",  "#f59e0b")   # amber
 STATUS_DONE     = ("✓",  "#10b981")   # green
 STATUS_ERROR    = ("✗",  "#ef4444")   # red
 
-VALID_EXTENSIONS = {".fs", ".txt", ".glsl"}
+VALID_EXTENSIONS = {".fs", ".txt", ".glsl", ".frag", ".shader"}
 
 
 # ---------------------------------------------------------------------------
 # Auto-detect shader format from path or content
 # ---------------------------------------------------------------------------
 def detect_format(path: str = None, code: str = None) -> str:
-    # 1. Peak at code for characteristic headers
-    if not code and path:
-        try:
-            # Only read the first 2KB for detection
-            code = open(path, encoding="utf-8", errors="replace").read(2000)
-        except Exception:
-            pass
-
-    if code:
-        if "/*{" in code or "/*\n{" in code or "/* {" in code:
-            # Peek inside the ISF JSON header to distinguish FX from Source
-            import re, json
-            m = re.search(r'/\*\s*\{(.*?)\}\s*\*/', code, re.DOTALL)
-            if m:
-                try:
-                    hdr = json.loads("{" + m.group(1) + "}")
-                    inputs = hdr.get("INPUTS", [])
-                    cats   = [c.lower() for c in hdr.get("CATEGORIES", [])]
-                    has_image = any(i.get("TYPE", "").lower() == "image" for i in inputs)
-                    is_filter = any(c in cats for c in ("filter", "transition", "distortion", "blur", "stylize", "color effect"))
-                    if has_image or is_filter:
-                        return "ISF FX"
-                except Exception:
-                    pass
-            return "ISF (.fs)"
-        if "uniform float time;" in code and "uniform vec2 resolution;" in code:
-            return "GLSL Sandbox"
-        if "void mainImage" in code:
-            return "Shadertoy"
-
-    # 2. Fallback based on extension
-    if path:
-        ext = Path(path).suffix.lower()
-        if ext == ".fs":
-            return "ISF (.fs)"
-        if ext == ".txt":
-            return "Shadertoy"
-
-    return "ISF (.fs)"  # Default fallback
+    """Short label for the queue badge, e.g. 'ISF FX', 'Shadertoy', 'GLSL'."""
+    try:
+        if code is None:
+            code = open(path, encoding="utf-8", errors="replace").read()
+        ir = ffconvert.convert(code, extract_params=False)
+    except Exception:
+        return "?"
+    base = {"isf": "ISF", "shadertoy": "Shadertoy", "glsl": "GLSL"}[ir.dialect]
+    if ir.kind == "effect":
+        return base + " FX" if base != "Shadertoy" else "ST FX"
+    if ir.kind == "mixer":
+        return base + " Mix"
+    return base
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +91,13 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.configure(bg="#1a1a2e")
 
         self._build_layout()
+
+    # CustomTkinter's DPI tracker calls these on CTk windows; TkinterDnD.Tk lacks them.
+    def block_update_dimensions_event(self):
+        pass
+
+    def unblock_update_dimensions_event(self):
+        pass
 
     # -----------------------------------------------------------------------
     # Layout
@@ -435,19 +416,18 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         ctk.CTkFrame(row, width=4, height=24, fg_color="transparent").pack(side="left")
 
         # Type badge
-        if item.fmt == "ISF FX":
-            fmt_short = "ISF FX"
+        fmt_short = item.fmt
+        if item.fmt.endswith(" FX") or item.fmt.endswith(" Mix"):
             fmt_color = "#0d9488"   # teal
-        elif "ISF" in item.fmt:
-            fmt_short = "ISF"
+        elif item.fmt.startswith("ISF"):
             fmt_color = "#2563eb"
-        elif "Sandbox" in item.fmt:
-            fmt_short = "Sandbox"
-            fmt_color = "#ea580c" # orange
+        elif item.fmt.startswith("GLSL"):
+            fmt_color = "#ea580c"   # orange
+        elif item.fmt == "?":
+            fmt_color = "#6b7280"
         else:
-            fmt_short = "Shadertoy"
-            fmt_color = "#7c3aed" # purple
-            
+            fmt_color = "#7c3aed"   # purple
+
         type_lbl = ctk.CTkLabel(row, text=f" {fmt_short} ", fg_color=fmt_color,
                      corner_radius=4, text_color="white",
                      font=("Segoe UI", 11, "bold"), width=self.hdr_type.cget("width"))
@@ -557,7 +537,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         t.start()
 
     def _build_queue_thread(self, items: list[QueueItem]):
-        output_dir = get_resource_path("boilerplates")
+        output_dir = ffpaths.default_output_dir()
 
         ok = err = 0
         was_cancelled = False
@@ -566,51 +546,28 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             if self._cancel_event.is_set():
                 was_cancelled = True
                 break
-                
+
             item.status = "building"
             self._set_item_status(item, "building", "Building…")
             self._gui_log(f"[{item.fname}] Starting…")
 
             try:
                 code = open(item.path, encoding="utf-8", errors="replace").read()
-                from parser import parse_code
-                parsed = parse_code(code, item.fmt, extract_params=self.extract_params_var.get())
-
-                if "error" in parsed:
-                    for line in parsed["error"].splitlines():
-                        if line.strip():
-                            self._gui_log(f"  ERROR: {line}")
-                    item.status = "error"
-                    self._set_item_status(item, "error", "Parse error")
-                    err += 1
-                    continue
-
-                for w in parsed.get("warnings", []):
-                    self._gui_log(f"  WARN: {w}")
-
                 suffix = "-p" if self.extract_params_var.get() else ""
-                res = build_plugin(parsed, output_dir,
-                                   log_callback=self._gui_log,
-                                   plugin_name=item.name + suffix,
-                                   cancel_event=self._cancel_event)
-
-                if res and res.get("status") == "cancelled":
+                name = item.name + suffix
+                status, text = self._convert_and_build(code, name, item.path, output_dir)
+                if status == "cancelled":
                     item.status = "pending"
                     self._set_item_status(item, "pending", "Pending")
                     self._gui_log(f"[{item.fname}] Cancelled.")
                     was_cancelled = True
                     break
-                elif res and res.get("status") == "success":
-                    dll = res.get("dll_name", f"{item.name}.dll")
-                    item.status = "done"
-                    self._set_item_status(item, "done", dll)
-                    self._gui_log(f"[{item.fname}] ✓ Done → {dll}")
+                item.status = status
+                self._set_item_status(item, status, text)
+                if status == "done":
                     ok += 1
                 else:
-                    item.status = "error"
-                    self._set_item_status(item, "error", "Build failed")
                     err += 1
-
             except Exception as exc:
                 self._gui_log(f"  EXCEPTION: {exc}")
                 item.status = "error"
@@ -629,28 +586,64 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     # Single-file tab methods (unchanged from original)
     # -----------------------------------------------------------------------
+    def _convert_and_build(self, code, name, path, output_dir):
+        """Shared by queue and single-file builds. Returns (status, label)."""
+        log = self._gui_log
+        try:
+            res = pipeline.convert_ffgl(code, name=name, path=path,
+                                        extract_params=self.extract_params_var.get())
+        except ffconvert.ConvertError as e:
+            log(f"  ERROR: {e}")
+            return "error", "Not a shader"
+        for w in res.ir.warnings:
+            log(f"  WARN: {w}")
+        if res.demoted:
+            log(f"  Kept as constants (would not compile as sliders): {', '.join(res.demoted)}")
+        if not res.ok:
+            log("  Shader does not compile:")
+            for ln, msg in res.errors[:8]:
+                log(f"    line {ln}: {msg}")
+            return "error", "Shader error"
+        if not res.validated:
+            log(f"  Note: shader not GPU-validated {res.log}")
+        try:
+            dst = build_ffgl.build(res.ir, res.ffgl_glsl, name, out_dir=output_dir,
+                                   log=lambda m: log("  " + m), cancel_event=self._cancel_event)
+        except build_ffgl.BuildError as e:
+            if str(e) == "cancelled":
+                return "cancelled", ""
+            log(f"  Build failed: {e}")
+            return "error", "Build failed"
+        log(f"[{name}] ✓ {res.ir.kind}, {len(res.ir.params)} params → {dst}")
+        return "done", os.path.basename(dst)
+
     def analyze_code(self):
         self.log("Analyzing shader code...")
         code = self.textbox_code.get("1.0", "end-1c")
 
-        # If name entry is empty, populate a generic name
         if not self.entry_plugin_name.get().strip():
             self.entry_plugin_name.delete(0, "end")
             self.entry_plugin_name.insert(0, "FFMakerPlugin")
 
-        fmt  = detect_format(code=code)
-        self.log(f"Auto-detected format: {fmt}")
-
-        from parser import parse_code
-        result = parse_code(code, fmt, extract_params=self.extract_params_var.get())
-
-        if "error" in result:
-            for line in result["error"].splitlines():
-                self.log(f"ERROR: {line}" if line.strip() else "")
+        try:
+            res = pipeline.convert_ffgl(code, name=self.entry_plugin_name.get().strip(),
+                                        path=getattr(self, "_source_path", None),
+                                        extract_params=self.extract_params_var.get())
+        except ffconvert.ConvertError as e:
+            self.log(f"ERROR: {e}")
             return
-
-        for w in result.get("warnings", []):
+        ir = res.ir
+        self.log(f"Detected: {ir.dialect} {ir.kind}")
+        for w in ir.warnings:
             self.log(f"WARNING: {w}")
+        if res.demoted:
+            self.log(f"Kept as constants (would not compile as sliders): {', '.join(res.demoted)}")
+        if not res.ok:
+            self.log("Shader does not compile:")
+            for ln, msg in res.errors[:8]:
+                self.log(f"  line {ln}: {msg}")
+        elif res.validated:
+            self.log("✓ Shader compiles on this GPU.")
 
         # Rebuild the params panel
         self.label_no_params.pack_forget()
@@ -658,50 +651,38 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             if widget != self.label_no_params:
                 widget.destroy()
 
-        inputs = result.get("inputs", [])
-        user_inputs  = [i for i in inputs if not i.get("_builtin")]
-        const_inputs = [i for i in user_inputs if i.get("_source") == "const_extract"]
+        promoted = [p for p in ir.params if p.origin in ("const", "define")]
+        self.log(f"Found {len(ir.params)} controllable parameter(s).")
+        if promoted:
+            self.log(f"  [{len(promoted)} auto-detected from constants]")
 
-        self.log(f"Found {len(user_inputs)} controllable parameter(s).")
-        if const_inputs:
-            self.log(f"  [{len(const_inputs)} auto-detected from const declarations]")
-
-        for inp in user_inputs:
-            name   = inp.get("NAME", "Unknown")
-            t      = inp.get("TYPE", "float")
-            source = inp.get("_source", "")
-
+        for p in ir.params:
             row = ctk.CTkFrame(self.scroll_params, fg_color="transparent")
             row.pack(fill="x", padx=5, pady=1)
-
-            ctk.CTkLabel(row, text=name, anchor="w").pack(side="left")
-            ctk.CTkLabel(row, text=t, text_color="#60a5fa", anchor="w").pack(side="left", padx=(6, 0))
-
-            if source == "const_extract":
+            ctk.CTkLabel(row, text=p.display(), anchor="w").pack(side="left")
+            kind = p.kind
+            if p.kind in ("float", "int", "speed") and p.min is not None:
+                kind += f" {p.min:g}–{p.max:g}"
+            ctk.CTkLabel(row, text=kind, text_color="#60a5fa", anchor="w").pack(side="left", padx=(6, 0))
+            if p.origin in ("const", "define"):
                 ctk.CTkLabel(row, text="[const]", text_color="#9ca3af",
                              font=("Consolas", 11)).pack(side="left", padx=(6, 0))
 
     def _build_single(self):
         self.log("Starting build…")
         self.btn_build_single.configure(state="disabled")
-
-        def gui_log(msg):
-            self.after(0, lambda m=msg: self.log(m))
+        code = self.textbox_code.get("1.0", "end-1c")
+        name = self.entry_plugin_name.get().strip() or "FFMakerPlugin"
+        path = getattr(self, "_source_path", None)
 
         def run():
-            from parser import parse_code
-            code   = self.textbox_code.get("1.0", "end-1c")
-            fmt    = detect_format(code=code)
-            parsed = parse_code(code, fmt)
-            out    = get_resource_path("boilerplates")
-
-            plugin_name = self.entry_plugin_name.get().strip() or "FFMakerPlugin"
-            res = build_plugin(parsed, out, log_callback=gui_log,
-                               plugin_name=plugin_name)
-            self.after(0, lambda: self.btn_build_single.configure(state="normal"))
-            if res and res.get("status") == "success":
-                dll = res.get("dll_name", "plugin.dll")
-                gui_log(f">> {dll} generated successfully!")
+            try:
+                self._cancel_event.clear()
+                self._convert_and_build(code, name, path, ffpaths.default_output_dir())
+            except Exception as exc:
+                self._gui_log(f"EXCEPTION: {exc}")
+            finally:
+                self.after(0, lambda: self.btn_build_single.configure(state="normal"))
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -723,6 +704,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.entry_plugin_name.insert(0, Path(path).stem)
 
             self._source_stem = Path(path).stem
+            self._source_path = path
             self.log(f"Loaded: {Path(path).name} (will export as {self.entry_plugin_name.get()}.dll)")
             self.analyze_code()
         except Exception as e:
@@ -732,6 +714,17 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     # ISF Export
     # -----------------------------------------------------------------------
+    def _isf_text(self, code, name, path):
+        """Returns (text, note) or raises."""
+        res = pipeline.convert_ffgl(code, name=name, path=path,
+                                    extract_params=self.extract_params_var.get())
+        if res.ir.dialect == "isf":
+            return code, "already ISF, copied unchanged"
+        if not res.ok:
+            raise RuntimeError("shader does not compile: " +
+                               "; ".join(f"line {l}: {m}" for l, m in res.errors[:3]))
+        return emit_isf.emit(res.ir), f"{len(res.ir.params)} inputs"
+
     def _export_isf_single(self):
         code = self.textbox_code.get("1.0", "end-1c").strip()
         if not code or code == "// Paste your shader code here...":
@@ -740,29 +733,18 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
         name = self.entry_plugin_name.get().strip() or "ExportedISF"
         suffix = "-p" if self.extract_params_var.get() else ""
-        out_name = f"{name}{suffix}.fs"
-
         save_path = ctk.filedialog.asksaveasfilename(
             title="Export ISF Shader",
-            initialfile=out_name,
+            initialfile=f"{name}{suffix}.fs",
             defaultextension=".fs",
             filetypes=[("ISF Shader", "*.fs"), ("All Files", "*.*")])
-        
         if not save_path:
             return
-
         try:
-            from parser import parse_shadertoy
-            # We assume single-file tab is always Shadertoy/GLSL logic
-            parsed = parse_shadertoy(code, extract_params=self.extract_params_var.get())
-            
-            isf_content = export_to_isf(parsed, plugin_name=name)
-            
+            text, note = self._isf_text(code, name, getattr(self, "_source_path", None))
             with open(save_path, "w", encoding="utf-8") as f:
-                f.write(isf_content)
-                
-            self.log(f"✓ Exported ISF to {save_path}")
-            
+                f.write(text)
+            self.log(f"✓ Exported ISF to {save_path} ({note})")
         except Exception as exc:
             self.log(f"ERROR: Export failed: {exc}")
 
@@ -771,29 +753,21 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if not items:
             self.log("Nothing to export.")
             return
-
         out_dir = ctk.filedialog.askdirectory(title="Select folder for ISF exports")
         if not out_dir:
             return
 
         self.log(f"Exporting {len(items)} items to ISF...")
         ok = 0
+        suffix = "-p" if self.extract_params_var.get() else ""
         for item in items:
             try:
                 code = open(item.path, encoding="utf-8", errors="replace").read()
-                from parser import parse_code
-                parsed = parse_code(code, item.fmt, extract_params=self.extract_params_var.get())
-                
-                if "error" in parsed:
-                    self.log(f"  [{item.fname}] Parse error, skipping.")
-                    continue
-                
-                isf_content = export_to_isf(parsed, plugin_name=item.name)
-                
-                suffix = "-p" if self.extract_params_var.get() else ""
+                text, note = self._isf_text(code, item.name, item.path)
                 out_path = os.path.join(out_dir, f"{item.name}{suffix}.fs")
                 with open(out_path, "w", encoding="utf-8") as f:
-                    f.write(isf_content)
+                    f.write(text)
+                self.log(f"  [{item.fname}] ✓ {note}")
                 ok += 1
             except Exception as exc:
                 self.log(f"  [{item.fname}] Export failed: {exc}")

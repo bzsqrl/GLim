@@ -1,3 +1,5 @@
 customtkinter
 pillow
 tkinterdnd2
+PyOpenGL
+glfw

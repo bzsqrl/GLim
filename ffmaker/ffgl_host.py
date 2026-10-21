@@ -112,6 +112,11 @@ class Plugin:
 
 def smoke_test(path, num_inputs=0, w=320, h=180, frames=30, frame_dt=1 / 60):
     """Load, run and read back a plugin. Returns dict with info, params, stats."""
+    with V.gpu():
+        return _smoke_test(path, num_inputs, w, h, frames, frame_dt)
+
+
+def _smoke_test(path, num_inputs, w, h, frames, frame_dt):
     ctx = V.context()
     gl = ctx.gl
     plug = Plugin(path)

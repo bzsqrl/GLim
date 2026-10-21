@@ -747,6 +747,11 @@ def _decide_kind(ir, header):
 
 
 def _dedupe_labels(ir):
+    # If the shader has its own "speed" control, call ours something else.
+    if any(p.kind != "speed" and p.display().lower() == "speed" for p in ir.params):
+        for p in ir.params:
+            if p.kind == "speed":
+                p.label = "Time Scale"
     seen = {}
     for p in ir.params:
         lab = p.display()

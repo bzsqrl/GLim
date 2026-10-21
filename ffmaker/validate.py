@@ -4,8 +4,11 @@ import ctypes
 import math
 import re
 import struct
+import threading
+from contextlib import contextmanager
 
 _ctx = None
+_lock = threading.RLock()
 
 VERTEX = """#version 410 core
 layout( location = 0 ) in vec4 vPosition;
@@ -27,6 +30,8 @@ class ValidatorUnavailable(Exception):
 class _Context:
     def __init__(self):
         try:
+            import logging
+            logging.getLogger("OpenGL").setLevel(logging.ERROR)
             import glfw
             import OpenGL
             OpenGL.ERROR_CHECKING = True
@@ -116,10 +121,27 @@ class _Context:
 
 
 def context():
+    """The shared validation context, made current on the calling thread.
+    Callers that issue GL calls should hold gpu() for the duration."""
     global _ctx
-    if _ctx is None:
-        _ctx = _Context()
-    return _ctx
+    with _lock:
+        if _ctx is None:
+            _ctx = _Context()
+        import glfw
+        glfw.make_context_current(_ctx.win)
+        return _ctx
+
+
+@contextmanager
+def gpu():
+    """Exclusive use of the validation GL context on this thread."""
+    with _lock:
+        ctx = context()
+        try:
+            yield ctx
+        finally:
+            import glfw
+            glfw.make_context_current(None)
 
 
 def parse_errors(log):
@@ -137,19 +159,24 @@ def parse_errors(log):
 
 def compile_programs(glsl_list):
     """Returns list of (ok, errors, log) per program."""
-    ctx = context()
-    out = []
-    for src in glsl_list:
-        prog, errs, log = ctx.program(src)
-        if prog:
-            ctx.gl.glDeleteProgram(prog)
-        out.append((prog is not None, errs, log))
-    return out
+    with gpu() as ctx:
+        out = []
+        for src in glsl_list:
+            prog, errs, log = ctx.program(src)
+            if prog:
+                ctx.gl.glDeleteProgram(prog)
+            out.append((prog is not None, errs, log))
+        return out
 
 
 def render(ir, glsl_list, width=320, height=180, times=(0.5, 2.0), frames_between=3):
     """Render the plugin offline. Returns dict with stats per sampled time and
     the RGBA bytes of the last frame."""
+    with gpu():
+        return _render(ir, glsl_list, width, height, times, frames_between)
+
+
+def _render(ir, glsl_list, width, height, times, frames_between):
     ctx = context()
     gl = ctx.gl
     progs = []
