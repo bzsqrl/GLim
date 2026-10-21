@@ -7,6 +7,7 @@ import os
 import sys
 import threading
 import tkinter as tk
+from tkinter import ttk
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ffmaker import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: E402
@@ -32,6 +33,7 @@ STATUS_DONE     = ("✓",  "#10b981")   # green
 STATUS_ERROR    = ("✗",  "#ef4444")   # red
 
 VALID_EXTENSIONS = {".fs", ".txt", ".glsl", ".frag", ".shader"}
+LOG_MAX_LINES = 5000    # older build-log lines are dropped so long batches stay fast
 
 
 # ---------------------------------------------------------------------------
@@ -61,13 +63,10 @@ class QueueItem:
         self.path   = path
         self.name   = Path(path).stem
         self.fname  = Path(path).name
-        self.fmt    = detect_format(path)
+        self.fmt    = "…"           # filled in by a background thread (detect_format)
         self.status = "pending"     # pending / building / done / error
         self.error  = ""
-        # UI widgets (filled in when row is created)
-        self.row_frame   = None
-        self.lbl_status  = None
-        self.lbl_icon    = None
+        self.iid    = None          # row id in the queue Treeview
 
 
 # ---------------------------------------------------------------------------
@@ -187,60 +186,83 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                       command=self._clear_queue).pack(side="left", padx=(0, 20))
 
         self.btn_export_isf_queue = ctk.CTkButton(
-            toolbar, text="↑ Export ISF", width=120,
+            toolbar, text="↑ Export ISF", width=170,
             fg_color="#10b981", hover_color="#059669",
             command=self._start_export_isf_queue)
         self.btn_export_isf_queue.pack(side="right", padx=(6, 0))
 
         self.btn_build_queue = ctk.CTkButton(
-            toolbar, text="▶  Build Queue", width=140,
+            toolbar, text="▶  Build Queue", width=170,
             fg_color="#6366f1", hover_color="#4f46e5",
             command=self._start_build_queue)
         self.btn_build_queue.pack(side="right")
 
-        # Column headers
-        hdr = ctk.CTkFrame(tab, fg_color="#1e2230", corner_radius=6)
-        hdr.grid(row=1, column=0, padx=6, pady=(0, 2), sticky="ew")
-        ctk.CTkLabel(hdr, text="#",        width=28,  anchor="center", text_color="#9ca3af", font=("Segoe UI", 12, "bold")).pack(side="left", padx=(10, 4))
-        
-        self.hdr_fname = ctk.CTkLabel(hdr, text="Filename", width=290, anchor="w", text_color="#9ca3af", font=("Segoe UI", 12, "bold"))
-        self.hdr_fname.pack(side="left")
-        
-        # Drag handle 1
-        self.drag_fname = ctk.CTkFrame(hdr, width=4, height=24, fg_color="transparent", cursor="sb_h_double_arrow")
-        self.drag_fname.pack(side="left")
-        self.drag_fname.bind("<ButtonPress-1>", self._on_press_fname)
-        self.drag_fname.bind("<B1-Motion>", self._on_drag_fname)
-        self.drag_fname.bind("<ButtonRelease-1>", self._on_release_fname)
+        # Queue list: a native Treeview only draws the visible rows, so it stays
+        # fast with thousands of files (one widget per row did not).
+        box = ctk.CTkFrame(tab, fg_color="#111827")
+        box.grid(row=2, column=0, padx=6, pady=(0, 6), sticky="nsew")
+        box.grid_columnconfigure(0, weight=1)
+        box.grid_rowconfigure(0, weight=1)
 
-        self.hdr_type = ctk.CTkLabel(hdr, text="Type",     width=78,  anchor="center", text_color="#9ca3af", font=("Segoe UI", 12, "bold"))
-        self.hdr_type.pack(side="left", padx=6)
-        
-        # Drag handle 2
-        self.drag_type = ctk.CTkFrame(hdr, width=4, height=24, fg_color="transparent", cursor="sb_h_double_arrow")
-        self.drag_type.pack(side="left")
-        self.drag_type.bind("<ButtonPress-1>", self._on_press_type)
-        self.drag_type.bind("<B1-Motion>", self._on_drag_type)
-        self.drag_type.bind("<ButtonRelease-1>", self._on_release_type)
+        scale = ctk.ScalingTracker.get_widget_scaling(box)
+        style = ttk.Style(self)
+        style.theme_use("clam")      # the native Windows/macOS themes ignore these colours
+        style.configure("Queue.Treeview", background="#111827", fieldbackground="#111827",
+                        foreground="#e5e7eb", bordercolor="#111827", borderwidth=0,
+                        rowheight=int(28 * scale), font=("Segoe UI", 12))
+        style.map("Queue.Treeview", background=[("selected", "#374151")],
+                  foreground=[("selected", "#ffffff")])
+        style.configure("Queue.Treeview.Heading", background="#1e2230", foreground="#9ca3af",
+                        bordercolor="#111827", relief="flat", font=("Segoe UI", 12, "bold"))
+        style.map("Queue.Treeview.Heading", background=[("active", "#2a3040")])
+        style.layout("Queue.Treeview", [("Treeview.treearea", {"sticky": "nsew"})])
 
-        self.hdr_status = ctk.CTkLabel(hdr, text="Status",   width=114, anchor="w", text_color="#9ca3af", font=("Segoe UI", 12, "bold"))
-        self.hdr_status.pack(side="left", padx=0)
+        self.tree = ttk.Treeview(box, style="Queue.Treeview", show="headings",
+                                 columns=("num", "file", "type", "status"))
+        for col, text, width, anchor, stretch in (
+                ("num", "#", 50, "e", False), ("file", "Filename", 360, "w", True),
+                ("type", "Type", 110, "center", False), ("status", "Status", 260, "w", True)):
+            self.tree.heading(col, text=text, anchor=anchor)
+            self.tree.column(col, width=int(width * scale), minwidth=int(40 * scale),
+                             anchor=anchor, stretch=stretch)
+        for status, (_, color) in (("pending", STATUS_PENDING), ("building", STATUS_BUILDING),
+                                   ("done", STATUS_DONE), ("error", STATUS_ERROR)):
+            self.tree.tag_configure(status, foreground=color)
+        self.tree.grid(row=0, column=0, sticky="nsew", padx=(4, 0), pady=4)
+        sb = ctk.CTkScrollbar(box, command=self.tree.yview)
+        sb.grid(row=0, column=1, sticky="ns", pady=4)
+        self.tree.configure(yscrollcommand=sb.set)
+        self._items_by_iid: dict[str, QueueItem] = {}
+        self._next_iid = 0
 
-        # Scrollable queue list
-        self.queue_frame = ctk.CTkScrollableFrame(tab, fg_color="#111827")
-        self.queue_frame.grid(row=2, column=0, padx=6, pady=(0, 6), sticky="nsew")
+        # Remove with Delete/Backspace; right-click for a menu; double-click opens the file.
+        # With rows selected, Build / Export act on just those (the buttons say so).
+        self.tree.bind("<Delete>", lambda e: self._remove_selected())
+        self.tree.bind("<BackSpace>", lambda e: self._remove_selected())
+        self.tree.bind("<Escape>", lambda e: self.tree.selection_set(()))
+        self.tree.bind("<Button-1>", self._on_queue_click, add="+")
+        self.tree.bind("<Double-1>", self._on_queue_double_click)
+        self.tree.bind("<<TreeviewSelect>>", lambda e: self._update_queue_buttons())
+        self._queue_menu = tk.Menu(self, tearoff=0)
+        self._queue_menu.add_command(label="Build Selected", command=self._start_build_queue)
+        self._queue_menu.add_command(label="Export Selected to ISF", command=self._start_export_isf_queue)
+        self._queue_menu.add_separator()
+        self._queue_menu.add_command(label="Open in Single File", command=self._open_selected)
+        self._queue_menu.add_command(label="Remove", command=self._remove_selected)
+        self.tree.bind("<Button-3>", self._on_queue_right_click)
+        self.tree.bind("<Button-2>", self._on_queue_right_click)      # macOS right-click
 
         # Drop-zone label (shown when empty)
         self.lbl_drop = ctk.CTkLabel(
-            self.queue_frame,
+            box,
             text="Drop .fs or .txt shader files here, or use 'Add Files' / 'Add Folder'",
-            text_color="#4b5563", font=("Arial", 13))
-        self.lbl_drop.pack(pady=40)
+            text_color="#4b5563", fg_color="#111827", font=("Arial", 13))
+        self._show_drop_hint(True)
 
         # Wire up drag-and-drop
         if _DND_AVAILABLE:
-            self.queue_frame.drop_target_register(DND_FILES)
-            self.queue_frame.dnd_bind("<<Drop>>", self._on_drop)
+            self.tree.drop_target_register(DND_FILES)
+            self.tree.dnd_bind("<<Drop>>", self._on_drop)
             self.drop_target_register(DND_FILES)
             self.dnd_bind("<<Drop>>", self._on_drop)
 
@@ -316,6 +338,9 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     def log(self, text: str):
         self.textbox_log.insert("end", f"> {text}\n")
+        lines = int(self.textbox_log.index("end-1c").split(".")[0])
+        if lines > LOG_MAX_LINES + 500:
+            self.textbox_log.delete("1.0", f"{lines - LOG_MAX_LINES}.0")
         self.textbox_log.see("end")
 
     def _gui_log(self, msg: str):
@@ -327,7 +352,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     def _add_paths(self, paths: list[str]):
         """Add a list of file paths to the queue (dedup by path)."""
         existing = {item.path for item in self._queue}
-        added = 0
+        new_items = []
         for p in paths:
             if not os.path.isfile(p):
                 continue
@@ -339,10 +364,28 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self._queue.append(item)
             existing.add(p)
             self._add_queue_row(item)
-            added += 1
-        if added:
-            self.lbl_drop.pack_forget()
-            self.log(f"Added {added} file(s) to queue. Total: {len(self._queue)}")
+            new_items.append(item)
+        if new_items:
+            self._show_drop_hint(False)
+            self.log(f"Added {len(new_items)} file(s) to queue. Total: {len(self._queue)}")
+            # Detecting the type runs the converter (~15 ms a file), so do it off the UI thread.
+            threading.Thread(target=self._detect_formats, args=(new_items,), daemon=True).start()
+
+    def _detect_formats(self, items: list[QueueItem]):
+        for item in items:
+            fmt = detect_format(item.path)
+            self.after(0, lambda it=item, f=fmt: self._set_item_format(it, f))
+
+    def _set_item_format(self, item: QueueItem, fmt: str):
+        item.fmt = fmt
+        if item.iid and self.tree.exists(item.iid):
+            self.tree.set(item.iid, "type", fmt)
+
+    def _show_drop_hint(self, show: bool):
+        if show:
+            self.lbl_drop.place(relx=0.5, rely=0.25, anchor="center")
+        else:
+            self.lbl_drop.place_forget()
 
     def _add_files_dialog(self):
         paths = ctk.filedialog.askopenfilenames(
@@ -380,153 +423,99 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             elif os.path.isfile(p):
                 all_files.append(p)
         self._add_paths(all_files)
-        
+
         # If dropping while the Single File tab is active, load the first file into the editor.
         if all_files and self.tabs.get() == "Single File":
             self._load_file_path(all_files[0])
 
+    def _remove_items(self, items: list[QueueItem]):
+        """Remove items from the queue (never the one being built) and renumber."""
+        items = [i for i in items if i.status != "building"]
+        if not items:
+            return 0
+        gone = set(map(id, items))
+        self.tree.delete(*[i.iid for i in items])
+        for i in items:
+            self._items_by_iid.pop(i.iid, None)
+        self._queue = [i for i in self._queue if id(i) not in gone]
+        for n, item in enumerate(self._queue, 1):
+            self.tree.set(item.iid, "num", n)
+        if not self._queue:
+            self._show_drop_hint(True)
+        return len(items)
+
     def _clear_completed(self):
         """Remove only successfully built items from the queue."""
-        to_remove = [item for item in self._queue if item.status == "done"]
-        for item in to_remove:
-            if item.row_frame:
-                item.row_frame.destroy()
-            self._queue.remove(item)
-        if not self._queue:
-            self.lbl_drop.pack(pady=40)
-        self.log(f"Cleared {len(to_remove)} completed item(s). Remaining: {len(self._queue)}")
+        n = self._remove_items([item for item in self._queue if item.status == "done"])
+        self.log(f"Cleared {n} completed item(s). Remaining: {len(self._queue)}")
 
     def _clear_queue(self):
-        for item in self._queue:
-            if item.row_frame:
-                item.row_frame.destroy()
-        self._queue.clear()
-        self.lbl_drop.pack(pady=40)
-        self.log("Queue cleared.")
+        n = self._remove_items(list(self._queue))
+        self.log("Queue cleared." if not self._queue else
+                 f"Cleared {n} item(s); the one being built stays. Remaining: {len(self._queue)}")
+
+    def _selected_items(self) -> list[QueueItem]:
+        return [self._items_by_iid[i] for i in self.tree.selection() if i in self._items_by_iid]
+
+    def _remove_selected(self):
+        self._remove_items(self._selected_items())
+
+    def _open_selected(self):
+        items = self._selected_items()
+        if items:
+            self.tabs.set("Single File")
+            self._load_file_path(items[0].path)
+
+    def _on_queue_double_click(self, event):
+        if self.tree.identify_row(event.y):
+            self._open_selected()
+
+    def _on_queue_click(self, event):
+        # Clicking empty space below the rows clears the selection (back to whole-queue mode).
+        if self.tree.identify_region(event.x, event.y) == "nothing":
+            self.tree.selection_set(())
+
+    def _on_queue_right_click(self, event):
+        iid = self.tree.identify_row(event.y)
+        if not iid:
+            return
+        if iid not in self.tree.selection():
+            self.tree.selection_set(iid)
+        busy = "disabled" if self._building else "normal"
+        self._queue_menu.entryconfigure("Build Selected", state=busy)
+        self._queue_menu.entryconfigure("Export Selected to ISF",
+                                        state=self.btn_export_isf_queue.cget("state"))
+        self._queue_menu.tk_popup(event.x_root, event.y_root)
+
+    def _update_queue_buttons(self):
+        """Label Build / Export for what they will act on: the selection, or the whole queue."""
+        n = len(self.tree.selection())
+        if not self._building:
+            self.btn_build_queue.configure(
+                state="normal", fg_color="#6366f1", hover_color="#4f46e5",
+                text=f"▶  Build Selected ({n})" if n else "▶  Build Queue")
+        self.btn_export_isf_queue.configure(
+            text=f"↑ Export Selected ({n})" if n else "↑ Export ISF")
 
     def _add_queue_row(self, item: QueueItem):
-        """Render one row in the queue list."""
-        idx = len(self._queue)
-
-        row = ctk.CTkFrame(self.queue_frame, fg_color="#1a2030",
-                           corner_radius=6, height=34)
-        row.pack(fill="x", padx=4, pady=2)
-        row.pack_propagate(False)
-        item.row_frame = row
-
-
-        # Index
-        ctk.CTkLabel(row, text=f"{idx:>2}", width=28,
-                     font=("Segoe UI", 12), text_color="#6b7280").pack(side="left", padx=(10, 4))
-
-        # Filename (truncated)
-        fname_lbl = ctk.CTkLabel(row, text=self._truncate_fname(item.fname, self.hdr_fname.cget("width")), 
-                                 width=self.hdr_fname.cget("width"), anchor="w", font=("Segoe UI", 13))
-        fname_lbl.pack(side="left")
-        item.lbl_fname = fname_lbl
-
-        # Spacer to align with header drag handle
-        ctk.CTkFrame(row, width=4, height=24, fg_color="transparent").pack(side="left")
-
-        # Type badge
-        fmt_short = item.fmt
-        if item.fmt.endswith(" FX") or item.fmt.endswith(" Mix"):
-            fmt_color = "#0d9488"   # teal
-        elif item.fmt.startswith("ISF"):
-            fmt_color = "#2563eb"
-        elif item.fmt.startswith("GLSL"):
-            fmt_color = "#ea580c"   # orange
-        elif item.fmt == "?":
-            fmt_color = "#6b7280"
-        else:
-            fmt_color = "#7c3aed"   # purple
-
-        type_lbl = ctk.CTkLabel(row, text=f" {fmt_short} ", fg_color=fmt_color,
-                     corner_radius=4, text_color="white",
-                     font=("Segoe UI", 11, "bold"), width=self.hdr_type.cget("width"))
-        type_lbl.pack(side="left", padx=6)
-        item.lbl_type = type_lbl
-
-        # Spacer to align with header drag handle
-        ctk.CTkFrame(row, width=4, height=24, fg_color="transparent").pack(side="left")
-
-        # Status (icon + text)
-        icon_lbl = ctk.CTkLabel(row, text=STATUS_PENDING[0], width=22,
-                                font=("Arial", 13), text_color=STATUS_PENDING[1])
-        icon_lbl.pack(side="left")
-        status_lbl = ctk.CTkLabel(row, text="Pending", width=90, anchor="w",
-                                  font=("Segoe UI", 12), text_color=STATUS_PENDING[1])
-        status_lbl.pack(side="left", padx=(2, 0))
-
-        item.lbl_icon   = icon_lbl
-        item.lbl_status = status_lbl
-
-        # Remove button
-        def _remove_self(it=item):
-            it.row_frame.destroy()
-            if it in self._queue:
-                self._queue.remove(it)
-            if not self._queue:
-                self.lbl_drop.pack(pady=40)
-        ctk.CTkButton(row, text="✕", width=28, height=24,
-                      fg_color="transparent", hover_color="#374151",
-                      command=_remove_self).pack(side="right", padx=4)
+        """Add one row to the queue list."""
+        self._next_iid += 1
+        item.iid = f"q{self._next_iid}"
+        self._items_by_iid[item.iid] = item
+        self.tree.insert("", "end", iid=item.iid, tags=("pending",),
+                         values=(len(self._queue), item.fname, item.fmt,
+                                 f"{STATUS_PENDING[0]}  Pending"))
 
     def _set_item_status(self, item: QueueItem, status: str, text: str = ""):
-        icons = {
-            "pending":  STATUS_PENDING,
-            "building": STATUS_BUILDING,
-            "done":     STATUS_DONE,
-            "error":    STATUS_ERROR,
-        }
-        icon_char, color = icons.get(status, STATUS_PENDING)
+        icon_char = {"building": STATUS_BUILDING, "done": STATUS_DONE,
+                     "error": STATUS_ERROR}.get(status, STATUS_PENDING)[0]
         label = text or status.capitalize()
+
         def _update():
-            if item.lbl_icon:
-                item.lbl_icon.configure(text=icon_char, text_color=color)
-            if item.lbl_status:
-                item.lbl_status.configure(text=label, text_color=color)
+            if item.iid and self.tree.exists(item.iid):
+                self.tree.item(item.iid, tags=(status,))
+                self.tree.set(item.iid, "status", f"{icon_char}  {label}")
         self.after(0, _update)
-
-    # -----------------------------------------------------------------------
-    # Column Resizing Logic
-    # -----------------------------------------------------------------------
-    def _truncate_fname(self, text: str, width: int) -> str:
-        # Approximate width for Segoe UI 13 is ~7.5 pixels per char
-        max_chars = max(5, int(width / 7.5))
-        if len(text) > max_chars:
-            return text[:max_chars - 1] + "…"
-        return text
-
-    def _on_press_fname(self, event):
-        self._drag_start_x = event.x_root
-        self._drag_start_w = self.hdr_fname.cget("width")
-
-    def _on_drag_fname(self, event):
-        delta = event.x_root - self._drag_start_x
-        new_width = max(100, self._drag_start_w + delta)
-        self.hdr_fname.configure(width=new_width)
-
-    def _on_release_fname(self, event):
-        new_width = self.hdr_fname.cget("width")
-        for item in self._queue:
-            if hasattr(item, "lbl_fname"):
-                item.lbl_fname.configure(width=new_width, text=self._truncate_fname(item.fname, new_width))
-
-    def _on_press_type(self, event):
-        self._drag_start_x_type = event.x_root
-        self._drag_start_w_type = self.hdr_type.cget("width")
-
-    def _on_drag_type(self, event):
-        delta = event.x_root - self._drag_start_x_type
-        new_width = max(60, self._drag_start_w_type + delta)
-        self.hdr_type.configure(width=new_width)
-
-    def _on_release_type(self, event):
-        new_width = self.hdr_type.cget("width")
-        for item in self._queue:
-            if hasattr(item, "lbl_type"):
-                item.lbl_type.configure(width=new_width)
 
     # -----------------------------------------------------------------------
     # Batch build
@@ -538,11 +527,17 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self._gui_log("── Cancel requested... ──")
             return
             
-        pending = [i for i in self._queue if i.status in ("pending", "error")]
+        selected = set(self.tree.selection())
+        if selected:        # selected rows are (re)built whatever their status
+            pending = [i for i in self._queue if i.iid in selected and i.status != "building"]
+        else:
+            pending = [i for i in self._queue if i.status in ("pending", "error")]
         if not pending:
             self.log("Nothing to build (all items are done or queue is empty).")
             return
-            
+        if selected:
+            self.log(f"Building {len(pending)} selected item(s)…")
+
         self._building = True
         self._cancel_event.clear()
         self.btn_build_queue.configure(text="Cancel Build", fg_color="#ef4444", hover_color="#dc2626")
@@ -595,8 +590,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self._gui_log(f"── Batch complete: {ok} succeeded, {err} failed ──")
             
         self._building = False
-        self.after(0, lambda: self.btn_build_queue.configure(
-            state="normal", text="▶  Build Queue", fg_color="#6366f1", hover_color="#4f46e5"))
+        self.after(0, self._update_queue_buttons)
 
     # -----------------------------------------------------------------------
     # Single-file tab methods (unchanged from original)
@@ -766,7 +760,9 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.log(f"ERROR: Export failed: {exc}")
 
     def _start_export_isf_queue(self):
-        items = [i for i in self._queue if i.status in ("pending", "done", "error")]
+        selected = set(self.tree.selection())
+        items = [i for i in self._queue if i.status in ("pending", "done", "error")
+                 and (not selected or i.iid in selected)]
         if not items:
             self.log("Nothing to export.")
             return
@@ -775,18 +771,23 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             return
 
         self.log(f"Exporting {len(items)} items to ISF...")
-        ok = 0
         suffix = "-p" if self.extract_params_var.get() else ""
-        for item in items:
-            try:
-                code = open(item.path, encoding="utf-8", errors="replace").read()
-                _, note = self._isf_export(code, item.name + suffix, item.path, out_dir)
-                self.log(f"  [{item.fname}] ✓ {note}")
-                ok += 1
-            except Exception as exc:
-                self.log(f"  [{item.fname}] Export failed: {exc}")
+        self.btn_export_isf_queue.configure(state="disabled")
 
-        self.log(f"✓ ISF Export complete: {ok}/{len(items)} successful.")
+        def run():          # off the UI thread, so long exports don't freeze the window
+            ok = 0
+            for item in items:
+                try:
+                    code = open(item.path, encoding="utf-8", errors="replace").read()
+                    _, note = self._isf_export(code, item.name + suffix, item.path, out_dir)
+                    self._gui_log(f"  [{item.fname}] ✓ {note}")
+                    ok += 1
+                except Exception as exc:
+                    self._gui_log(f"  [{item.fname}] Export failed: {exc}")
+            self._gui_log(f"✓ ISF Export complete: {ok}/{len(items)} successful.")
+            self.after(0, lambda: self.btn_export_isf_queue.configure(state="normal"))
+
+        threading.Thread(target=run, daemon=True).start()
 
 def _selftest(shader, out_dir):
     """Headless check of a (packaged) build: convert, GPU-validate and build one
