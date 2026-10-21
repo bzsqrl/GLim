@@ -16,6 +16,7 @@ class Param:
     values: list = None       # long: option values
     pixel_space: bool = False # point2D: value is in pixels (ISF default when MIN/MAX absent)
     origin: str = "isf"       # isf | const | define | uniform | synthetic
+    hidden: bool = False      # user chose not to expose it: compiled in as a constant
 
     def display(self):
         return self.label or humanize(self.name)

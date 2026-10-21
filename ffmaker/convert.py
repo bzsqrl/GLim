@@ -97,7 +97,7 @@ def sanitize_json(text):
 # ── Public entry point ───────────────────────────────────────────────────────
 
 def convert(code, name="Shader", path=None, extract_params=True, promote_ints=False,
-            exclude=(), dialect=None):
+            exclude=(), dialect=None, channels=None):
     """Parse + transform shader source into a ShaderIR."""
     code = code.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
     if dialect is None:
@@ -124,7 +124,8 @@ def convert(code, name="Shader", path=None, extract_params=True, promote_ints=Fa
             with open(vs_path, encoding="utf-8", errors="replace") as f:
                 vertex = _vertex_prelude(f.read(), ir)
     prog = _build_program(code, ir, path, extract_params, exclude, promote_ints,
-                          directives=channel_directives(code) if dialect == "shadertoy" else None,
+                          directives={**channel_directives(code), **(channels or {})}
+                          if dialect == "shadertoy" else None,
                           vertex=vertex)
     prog.force_opaque = dialect != "isf"
     ir.programs.append(prog)

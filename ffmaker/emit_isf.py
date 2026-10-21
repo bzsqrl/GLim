@@ -74,8 +74,13 @@ def emit(ir, source_code=None):
         elif im.source != "host":
             inputs.append({"NAME": im.name, "TYPE": "image", "LABEL": im.name})
 
+    from .emit_ffgl import glsl_literal
     for p in ir.params:
         lab = p.display()
+        if p.hidden:
+            if p.name:
+                defines.append(f"const {p.glsl_type} {p.name} = {glsl_literal(p)};")
+            continue
         if p.kind == "speed":
             inputs.append({"NAME": "ffmSpeed", "LABEL": "Speed", "TYPE": "float",
                            "DEFAULT": p.default, "MIN": p.min, "MAX": p.max})

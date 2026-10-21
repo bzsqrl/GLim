@@ -46,7 +46,9 @@ def program_glsl(ir, prog):
     (via #line) so compiler errors point at the user's own line numbers."""
     out = [HOST_BLOCK]
     for p in ir.params:
-        if p.name:
+        if p.name and p.hidden:
+            out.append(f"const {p.glsl_type} {p.name} = {glsl_literal(p)};\n")
+        elif p.name:
             out.append(f"uniform {p.glsl_type} {p.name};\n")
     samplers = sampler_names(ir)
     for s in samplers:
@@ -85,6 +87,25 @@ def program_glsl(ir, prog):
         out.append("    ffm_FragColor.a = 1.0;\n")
     out.append("}\n")
     return "".join(out)
+
+
+def glsl_literal(p):
+    """GLSL constant for a param's current default."""
+    def f(x):
+        r = repr(float(x))
+        return r if ("." in r or "e" in r) else r + ".0"
+    v = p.default
+    if p.glsl_type == "bool":
+        return "true" if v else "false"
+    if p.glsl_type == "int":
+        return str(int(v))
+    if p.glsl_type in ("vec2", "vec3", "vec4"):
+        n = int(p.glsl_type[-1])
+        vals = (list(v) + [1.0] * 4)[:n]
+        if p.pixel_space:
+            vals = [vals[0], vals[1]]
+        return f"{p.glsl_type}(" + ", ".join(f(x) for x in vals) + ")"
+    return f(v)
 
 
 def sampler_names(ir):
@@ -187,6 +208,8 @@ def shader_data_header(ir, programs_glsl, plugin_name):
 
     defs = []
     for idx, p in enumerate(ir.params):
+        if p.hidden:
+            continue
         opt_l, opt_v, nopt = "nullptr", "nullptr", 0
         d = [0.0, 0.0, 0.0, 0.0]
         mn = [0.0, 0.0]

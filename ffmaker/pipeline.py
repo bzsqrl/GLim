@@ -18,14 +18,21 @@ class Result:
 
 
 def convert_ffgl(code, name="Shader", path=None, extract_params=True, promote_ints=False,
-                 validate=True, max_rounds=6):
+                 validate=True, max_rounds=6, settings=None):
     """Convert to FFGL GLSL, compiling with the GPU when available. If a
-    promoted constant breaks compilation, it's put back and we retry."""
-    exclude = set()
+    promoted constant breaks compilation, it's put back and we retry.
+    `settings` defaults to the shader's <name>.ffmaker.json, if any."""
+    from . import settings as S
+    if settings is None:
+        settings = S.load(path)
+    user_excluded = S.excluded_constants(settings)
+    exclude = set(user_excluded)
     res = Result()
     for _ in range(max_rounds):
         ir = C.convert(code, name=name, path=path, extract_params=extract_params,
-                       promote_ints=promote_ints, exclude=exclude)
+                       promote_ints=promote_ints, exclude=exclude,
+                       channels=settings.get("channels"))
+        S.apply(ir, settings)
         glsl = [emit_ffgl.program_glsl(ir, p) for p in ir.programs]
         res.ir, res.ffgl_glsl = ir, glsl
         if not validate:
@@ -50,7 +57,7 @@ def convert_ffgl(code, name="Shader", path=None, extract_params=True, promote_in
         if not blamed:
             return res
         exclude |= blamed
-        res.demoted = sorted(exclude)
+        res.demoted = sorted(exclude - user_excluded)
     return res
 
 

@@ -173,34 +173,109 @@ def render(ir, glsl_list, width=320, height=180, times=(0.5, 2.0), frames_betwee
     """Render the plugin offline. Returns dict with stats per sampled time and
     the RGBA bytes of the last frame."""
     with gpu():
-        return _render(ir, glsl_list, width, height, times, frames_between)
+        pv = Previewer(ir, glsl_list, width, height)
+        try:
+            dt = 1.0 / 60.0
+            results, pixels = [], None
+            for t_sample in times:
+                steps = max(1, frames_between)
+                sim_time = max(0.0, t_sample - steps * dt)
+                for _ in range(steps):
+                    sim_time += dt
+                    pv.render_frame(sim_time, dt)
+                pixels = pv.read()
+                results.append(_stats(pixels))
+            return {"frames": results, "rgba": pixels, "size": (width, height)}
+        finally:
+            pv.close()
 
 
-def _render(ir, glsl_list, width, height, times, frames_between):
-    ctx = context()
-    gl = ctx.gl
-    progs = []
-    for src in glsl_list:
-        p, errs, log = ctx.program(src)
-        if not p:
-            raise RuntimeError(f"compile failed: {errs[:1]}")
-        progs.append(p)
-    out_tex = ctx._texture(width, height, None)
-    out_fbo = gl.glGenFramebuffers(1)
-    gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, out_fbo)
-    gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, out_tex, 0)
+class Previewer:
+    """Runs a converted shader the way the FFGL runtime does (passes, feedback
+    buffers, embedded images, audio, params). Create/use inside gpu()."""
 
-    targets = {}
-    for p in ir.passes:
-        if p.target and p.target not in targets:
-            targets[p.target] = {"pass": p, "tex": [None, None], "fbo": [None, None], "front": 0, "size": None}
+    def __init__(self, ir, glsl_list, width=320, height=180):
+        self.ctx = ctx = context()
+        gl = self.gl = ctx.gl
+        self.ir = ir
+        self.width, self.height = width, height
+        self.frame = 0
+        self.values = {}            # param index -> live value (defaults otherwise)
+        self.input_tex = list(ctx.test_input)
+        self._own_input = []
+        self.progs = []
+        for src in glsl_list:
+            prog, errs, log = ctx.program(src)
+            if not prog:
+                self.close()
+                raise RuntimeError(f"compile failed: {errs[:1]}")
+            self.progs.append(prog)
+        self.out_tex = ctx._texture(width, height, None)
+        self.out_fbo = gl.glGenFramebuffers(1)
+        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, self.out_fbo)
+        gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, self.out_tex, 0)
+        gl.glClearColor(0, 0, 0, 1)
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
-    def ensure_target(t, w, h):
+        self.targets = {}
+        for ps in ir.passes:
+            if ps.target and ps.target not in self.targets:
+                self.targets[ps.target] = {"pass": ps, "tex": [None, None], "fbo": [None, None],
+                                           "front": 0, "size": None}
+
+        from . import images as IMG
+        self.img_tex = {}
+        for k, im in enumerate([i for i in ir.images if i.source == "imported"]):
+            w_, h_, px = IMG.rgba(im, k)
+            tex = ctx._texture(w_, h_, px)
+            gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
+            gl.glGenerateMipmap(gl.GL_TEXTURE_2D)
+            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR_MIPMAP_LINEAR)
+            wrap = gl.GL_REPEAT if im.repeat else gl.GL_CLAMP_TO_EDGE
+            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, wrap)
+            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, wrap)
+            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+            self.img_tex[im.name] = tex
+        for im in ir.images:
+            if im.source == "audio":
+                self.img_tex[im.name] = self._audio_texture(im.rows)
+
+    def _audio_texture(self, rows):
+        gl = self.gl
+        # Synthetic spectrum: strong bass falling off, like real music.
+        spec = [math.exp(-i / 80.0) * (0.7 + 0.3 * math.sin(i * 0.37)) for i in range(512)]
+        data = struct.pack(f"{512 * rows}f", *(spec * rows))
+        tex = gl.glGenTextures(1)
+        gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
+        gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_R32F, 512, rows, 0, gl.GL_RED, gl.GL_FLOAT, data)
+        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
+        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
+        gl.glTexParameteriv(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_SWIZZLE_RGBA,
+                            [gl.GL_RED, gl.GL_RED, gl.GL_RED, gl.GL_ONE])
+        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+        return tex
+
+    def set_input_image(self, w, h, rgba_bottom_up, index=0):
+        """Replace the test pattern fed to host image inputs."""
+        tex = self.ctx._texture(w, h, rgba_bottom_up)
+        self._own_input.append(tex)
+        while len(self.input_tex) <= index:
+            self.input_tex.append(self.input_tex[0])
+        self.input_tex[index] = tex
+
+    def value(self, i, p):
+        return self.values.get(i, p.default)
+
+    def _ensure_target(self, t, w, h):
+        gl = self.gl
         if t["size"] == (w, h):
             return
+        if t["tex"][0]:
+            gl.glDeleteTextures(t["tex"])
+            gl.glDeleteFramebuffers(2, t["fbo"])
         fmt = gl.GL_RGBA32F if t["pass"].float else gl.GL_RGBA8
         for i in range(2):
-            t["tex"][i] = ctx._texture(w, h, None, fmt)
+            t["tex"][i] = self.ctx._texture(w, h, None, fmt)
             t["fbo"][i] = gl.glGenFramebuffers(1)
             gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, t["fbo"][i])
             gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, t["tex"][i], 0)
@@ -208,115 +283,102 @@ def _render(ir, glsl_list, width, height, times, frames_between):
             gl.glClear(gl.GL_COLOR_BUFFER_BIT)
         t["size"] = (w, h)
 
-    from . import images as IMG
-    img_tex = {}
-    for k, im in enumerate([i for i in ir.images if i.source == "imported"]):
-        w_, h_, px = IMG.rgba(im, k)
-        tex = ctx._texture(w_, h_, px)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
-        gl.glGenerateMipmap(gl.GL_TEXTURE_2D)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR_MIPMAP_LINEAR)
-        wrap = gl.GL_REPEAT if im.repeat else gl.GL_CLAMP_TO_EDGE
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, wrap)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, wrap)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
-        img_tex[im.name] = tex
+    def render_frame(self, sim_time, dt):
+        gl, ctx, ir = self.gl, self.ctx, self.ir
+        width, height = self.width, self.height
+        named = {p.name: _Live(p, self.value(i, p)) for i, p in enumerate(ir.params) if p.name}
+        mouse = next(((i, p) for i, p in enumerate(ir.params) if p.kind == "mouse"), None)
+        click = next(((i, p) for i, p in enumerate(ir.params) if p.kind == "mouseclick"), None)
+        for pi, ps in enumerate(ir.passes):
+            w, h = width, height
+            if ps.target:
+                t = self.targets[ps.target]
+                w, h = _pass_size(ps, width, height, named)
+                self._ensure_target(t, w, h)
+                gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, t["fbo"][1 - t["front"]])
+            else:
+                gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, self.out_fbo)
+            gl.glViewport(0, 0, w, h)
+            prog = self.progs[ps.program]
+            gl.glUseProgram(prog)
+            _u(gl, prog, "ffm_Resolution", 2, (w, h))
+            _u(gl, prog, "ffm_Time", 1, (sim_time,))
+            _u(gl, prog, "ffm_TimeDelta", 1, (dt,))
+            _ui(gl, prog, "ffm_Frame", self.frame)
+            _ui(gl, prog, "ffm_PassIndex", pi)
+            _u(gl, prog, "ffm_Date", 4, (2026.0, 9.0, 20.0, 43200.0 + sim_time))
+            mx, my = (0.0, 0.0)
+            if mouse:
+                mv = self.value(*mouse)
+                mx, my = mv[0] * w, mv[1] * h
+            down = bool(click and self.value(*click))
+            _u(gl, prog, "ffm_Mouse", 4, (mx, my, mx if down else -mx, my if down else -my))
+            for live in named.values():
+                _set_param(gl, prog, live, w, h)
+            unit = 0
+            for im in ir.images:
+                tex = ctx.black
+                if im.source == "host":
+                    tex = self.input_tex[min(im.index, len(self.input_tex) - 1)]
+                elif im.source in ("imported", "audio"):
+                    tex = self.img_tex[im.name]
+                unit = _bind(gl, prog, im.name, tex, unit)
+            for name, t in self.targets.items():
+                tex = t["tex"][t["front"]] if t["tex"][0] else ctx.black
+                unit = _bind(gl, prog, name, tex, unit)
+            gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+            if ps.target:
+                self.targets[ps.target]["front"] ^= 1
+        if ir.passes[-1].target:
+            t = self.targets[ir.passes[-1].target]
+            gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, t["fbo"][t["front"]])
+            gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, self.out_fbo)
+            gl.glBlitFramebuffer(0, 0, t["size"][0], t["size"][1], 0, 0, width, height,
+                                 gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
+        self.frame += 1
+        # Events are one-frame pulses, as in the plugin.
+        for i, p in enumerate(ir.params):
+            if p.kind == "event":
+                self.values[i] = False
 
-    for im in ir.images:
-        if im.source == "audio":
-            # Synthetic spectrum: strong bass falling off, like real music.
-            spec = [math.exp(-i / 80.0) * (0.7 + 0.3 * math.sin(i * 0.37)) for i in range(512)]
-            data = struct.pack(f"{512 * im.rows}f", *(spec * im.rows))
-            tex = gl.glGenTextures(1)
-            gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
-            gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_R32F, 512, im.rows, 0, gl.GL_RED, gl.GL_FLOAT, data)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
-            gl.glTexParameteriv(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_SWIZZLE_RGBA,
-                                [gl.GL_RED, gl.GL_RED, gl.GL_RED, gl.GL_ONE])
-            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
-            img_tex[im.name] = tex
-
-    values = {p.name: p for p in ir.params if p.name}
-    results = []
-    frame = 0
-    sim_time = 0.0
-    dt = 1.0 / 60.0
-    pixels = None
-    for t_sample in times:
-        steps = max(1, frames_between)
-        start_t = max(0.0, t_sample - steps * dt)
-        sim_time = start_t
-        for _ in range(steps):
-            sim_time += dt
-            for pi, ps in enumerate(ir.passes):
-                w, h = width, height
-                if ps.target:
-                    t = targets[ps.target]
-                    w, h = _pass_size(ps, width, height, values)
-                    ensure_target(t, w, h)
-                    gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, t["fbo"][1 - t["front"]])
-                else:
-                    gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, out_fbo)
-                gl.glViewport(0, 0, w, h)
-                prog = progs[ps.program]
-                gl.glUseProgram(prog)
-                _u(gl, prog, "ffm_Resolution", 2, (w, h))
-                _u(gl, prog, "ffm_Time", 1, (sim_time,))
-                _u(gl, prog, "ffm_TimeDelta", 1, (dt,))
-                _ui(gl, prog, "ffm_Frame", frame)
-                _ui(gl, prog, "ffm_PassIndex", pi)
-                _u(gl, prog, "ffm_Date", 4, (2026.0, 9.0, 20.0, 43200.0 + sim_time))
-                mp = next((p for p in ir.params if p.kind == "mouse"), None)
-                mc = next((p for p in ir.params if p.kind == "mouseclick"), None)
-                mx, my = (mp.default[0] * w, mp.default[1] * h) if mp else (0.0, 0.0)
-                down = bool(mc and mc.default)
-                _u(gl, prog, "ffm_Mouse", 4, (mx, my, mx if down else -mx, my if down else -my))
-                for p in ir.params:
-                    if p.name:
-                        _set_param(gl, prog, p, w, h)
-                unit = 0
-                for im in ir.images:
-                    tex = ctx.black
-                    if im.source == "host":
-                        tex = ctx.test_input[min(im.index, 1)]
-                    elif im.source in ("imported", "audio"):
-                        tex = img_tex[im.name]
-                    unit = _bind(gl, prog, im.name, tex, unit)
-                for name, t in targets.items():
-                    tex = t["tex"][t["front"]] if t["tex"][0] else ctx.black
-                    unit = _bind(gl, prog, name, tex, unit)
-                gl.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-                if ps.target:
-                    targets[ps.target]["front"] ^= 1
-            if ir.passes[-1].target:
-                t = targets[ir.passes[-1].target]
-                gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, t["fbo"][t["front"]])
-                gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, out_fbo)
-                gl.glBlitFramebuffer(0, 0, t["size"][0], t["size"][1], 0, 0, width, height,
-                                     gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
-            frame += 1
-        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, out_fbo)
+    def read(self):
+        gl = self.gl
+        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, self.out_fbo)
         gl.glFinish()
-        pixels = gl.glReadPixels(0, 0, width, height, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE)
-        if not isinstance(pixels, (bytes, bytearray)):
-            pixels = bytes(pixels)
-        results.append(_stats(pixels))
+        px = gl.glReadPixels(0, 0, self.width, self.height, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE)
+        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, 0)
+        return px if isinstance(px, (bytes, bytearray)) else bytes(px)
 
-    # cleanup
-    gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, 0)
-    gl.glUseProgram(0)
-    for p in progs:
-        gl.glDeleteProgram(p)
-    gl.glDeleteFramebuffers(1, [out_fbo])
-    gl.glDeleteTextures([out_tex])
-    if img_tex:
-        gl.glDeleteTextures(list(img_tex.values()))
-    for t in targets.values():
-        if t["tex"][0]:
-            gl.glDeleteTextures(t["tex"])
-            gl.glDeleteFramebuffers(2, t["fbo"])
-    return {"frames": results, "rgba": pixels, "size": (width, height)}
+    def close(self):
+        gl = self.gl
+        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, 0)
+        gl.glUseProgram(0)
+        for p in self.progs:
+            gl.glDeleteProgram(p)
+        self.progs = []
+        if getattr(self, "out_fbo", None):
+            gl.glDeleteFramebuffers(1, [self.out_fbo])
+            gl.glDeleteTextures([self.out_tex])
+            self.out_fbo = None
+        if getattr(self, "img_tex", None):
+            gl.glDeleteTextures(list(self.img_tex.values()))
+            self.img_tex = {}
+        for t in getattr(self, "targets", {}).values():
+            if t["tex"][0]:
+                gl.glDeleteTextures(t["tex"])
+                gl.glDeleteFramebuffers(2, t["fbo"])
+                t["tex"] = [None, None]
+        if self._own_input:
+            gl.glDeleteTextures(self._own_input)
+            self._own_input = []
+
+
+class _Live:
+    """A param with a live value, shaped like ir.Param for _set_param/_pass_size."""
+    def __init__(self, p, value):
+        self.name, self.kind, self.glsl_type = p.name, p.kind, p.glsl_type
+        self.pixel_space, self.values = p.pixel_space, p.values
+        self.default = value
 
 
 def _pass_size(ps, W, H, values):
