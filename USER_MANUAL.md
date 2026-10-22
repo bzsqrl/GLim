@@ -35,7 +35,7 @@ The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFMaker` (ma
 2. Click **Build Queue** to make FFGL plugins, or **Export ISF** to make `.fs` files.
 3. Plugins are written to `FFMaker\output\`. Copy them to Resolume's FFGL plugin folder (set in *Preferences → Video → FFGL plugins*; on macOS, `~/Documents/Resolume Arena/Extra Effects` works by default), then restart Resolume.
 
-In the queue, select rows with a click (Shift/Ctrl-click for several):
+In the queue, select rows with a click (Shift/Ctrl-click for several), or press **Ctrl+A** (⌘A on macOS) to select them all. Ctrl+A works anywhere on the Queue tab; in text fields it keeps its usual meaning.
 - **Build Selected (n)** / **Export Selected (n)**: with rows selected, the two buttons act on just those rows. Selected rows are rebuilt even if they're already done. Click empty space in the list or press **Esc** to deselect; the buttons then work on the whole queue again (Build skips rows that are already done).
 - **Reset Status** sets built and failed rows back to Pending, so **Build Queue** converts them again (for example after changing settings) without reloading the files. With rows selected it reads **Reset Selected (n)** and resets just those.
 - **Delete** removes the selected rows. Right-click for the same actions plus **Open in Single File**; double-clicking a row also opens it in the editor. On macOS, Control-click also opens the menu.

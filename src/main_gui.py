@@ -259,6 +259,11 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if sys.platform == "darwin":    # older Tk on macOS reports right-click as button 2 (elsewhere it's the middle button)
             self.tree.bind("<Button-2>", self._on_queue_right_click)
             self.tree.bind("<Control-Button-1>", self._on_queue_right_click)   # Mac Control-click
+        # Ctrl+A (⌘A on macOS) selects every queue row anywhere in the window,
+        # except in text fields, which keep their own Ctrl+A.
+        mod = "Command" if sys.platform == "darwin" else "Control"
+        for key in ("a", "A"):
+            self.bind_all(f"<{mod}-{key}>", self._select_all_queue, add="+")
 
         # Drop-zone label (shown when empty)
         self.lbl_drop = ctk.CTkLabel(
@@ -487,6 +492,13 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     def _on_queue_double_click(self, event):
         if self.tree.identify_row(event.y):
             self._open_selected()
+
+    def _select_all_queue(self, event):
+        if self.tabs.get() != "Queue" or isinstance(event.widget, (tk.Text, tk.Entry, ttk.Entry)):
+            return None
+        self.tree.selection_set(self.tree.get_children())
+        self.tree.focus_set()       # so Delete / Esc act on the selection next
+        return "break"
 
     def _on_queue_click(self, event):
         # Clicking empty space below the rows clears the selection (back to whole-queue mode).
