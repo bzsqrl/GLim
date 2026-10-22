@@ -43,4 +43,6 @@ venv/bin/python src/main_gui.py
 
 To build the packaged app: `venv/bin/python compile.py` (writes `dist/FFMaker.app`).
 
+Updating an existing Mac checkout after the Windows work (queue rewrite, slider fix): see [MAC_UPDATE.md](MAC_UPDATE.md).
+
 Drag-and-drop in the GUI uses `tkdnd`, which the `tkinterdnd2` package includes for macOS and Windows. Without it, the GUI falls back to the Add Files / Add Folder buttons.

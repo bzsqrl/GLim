@@ -70,3 +70,18 @@ Location: `output/test_batch_v3/` (rebuild with `venv/bin/python -m ffmaker --to
 | `shadertoy_tempo` | Left half brightens over each **bar**, then drops; right half **flashes on every beat**. Change Resolume's BPM and both follow. |
 
 **MadMapper:** load the `.fs` files from the same folder, keeping the `.png` files next to them. `shadertoy_sampler` should look the same as in Resolume (the tiled panel may show faint seams at tile edges). In `shadertoy_buffer` the small discs may look a little more jagged, since ISF has no mipmaps. `shadertoy_tempo` has a **BPM** slider; at 120 the right half flashes twice a second.
+
+---
+
+# Test batch v4: smooth sliders and `#define` channels
+
+Location: `output/test_batch_v4/`. Rebuild it with the command in [MAC_UPDATE.md](MAC_UPDATE.md), step 4. It has 4 FFGL plugins and the matching ISF files. Windows: all four pass FFMaker's test host.
+
+| Plugin | What to check |
+| :-- | :-- |
+| `bare_fractalSymetry` | Moving **Speed**, **Time Scale** or **View Rotation Factor Input** changes the speed **without jumping** the animation. |
+| `bare_lopyfrac3dOrthofractalEvolution` | **Speed** and **Rotation Speed X/Y/Z** change the speed without jumps. |
+| `shadertoy_rate_params` | **Rate**, **Rate2** and **Wobble** change the speed without jumps. |
+| `shadertoy_define_channel` | A blue dot circling with a fading trail, brighter with audio. Its channels are only used inside `#define`s. |
+
+**MadMapper:** the `.fs` files render like the plugins, but the speed and rate sliders **still jump** the animation. That's expected: ISF exports keep the plain time × slider product.

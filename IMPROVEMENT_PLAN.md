@@ -62,6 +62,11 @@ Not yet checked inside Resolume or MadMapper.
 **Done since the Mac port:**
 - **Per-channel sampler settings** (`filter`, `wrap`, `vflip`) from Shadertoy JSON, channel directives and the editor's channel menus. FFGL plugins and the preview use GL sampler objects (a buffer can be read with different settings in different passes; mipmapped buffers rebuild their mipmaps after each render). ISF exports emulate `nearest` and `repeat` in the shader.
 - **Tempo:** `iBPM`, `iBeat`, `iBarPhase` from FFGL `SetBeatInfo` (120 BPM fallback); ISF exports get a BPM slider. The test host can send beat info (`smoke_test(..., beat=(bpm, phase))`).
+- **Windows sync of the Mac port** passed with no code changes (MSVC built the sampler and tempo C++ as is).
+- **`#define` channels:** Shadertoy channels used only inside macro bodies are now declared and wired (`ac835b5`).
+- **Queue rewrite** (`5a72770`, `100a29c`): a native `ttk.Treeview`, so 800+ files load in under a second. Type detection and queue ISF export run in the background. Build/Export Selected, Delete to remove, a right-click menu.
+- **Sliders multiplied by time no longer scrub in FFGL** (`2892180`): `time * slider` becomes a running total (`ffm_phaseN`, `FFM_PHASES`) that the plugin and preview keep. ISF exports keep the plain product. A hidden persistent-buffer version for ISF failed in MadMapper (several shaders blank; Speed still jumped) and was reverted.
+- **Mac:** the above hasn't been run on macOS yet. See `MAC_UPDATE.md`.
 
 **Next:**
 1. **Smaller items:**
