@@ -51,6 +51,8 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
   - **Rename** it. That's the name Resolume and MadMapper show.
   - Set the **min/max** range.
   - Set the **starting value** with the slider, switch, dropdown or color picker.
+  - Type a value: click the number to the right of a slider, type, and press Enter (Esc cancels). If the value is outside the min/max range, the range widens to fit.
+  - Reset a slider to the shader's own default: right-click it (on macOS also Control-click).
 - **Save settings.** Writes `<shader>.ffmaker.json` next to the shader. **Compile FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
 
 **Packaged app:** `dist\FFMaker.exe` (build it with `venv\Scripts\python compile.py`) runs without Python installed. Building plugins still needs CMake and Visual Studio's C++ tools.

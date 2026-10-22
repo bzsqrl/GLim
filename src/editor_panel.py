@@ -2,6 +2,7 @@
 the parameter editor. Edits are written into a settings dict (the shader's
 .ffmaker.json); changes that alter the GLSL ask the app to recompile."""
 import os
+import sys
 import time
 import tkinter as tk
 from tkinter import colorchooser
@@ -384,25 +385,49 @@ class EditorPanel(ctk.CTkFrame):
 
     def _range_control(self, body, i, p, key, state):
         is_int = p.kind == "int"
+        fmt = lambda v: str(int(round(v))) if is_int else f"{v:.3f}"
         line = ctk.CTkFrame(body, fg_color="transparent")
         line.pack(fill="x")
-        val_lbl = ctk.CTkLabel(line, text=f"{p.default:.3f}" if not is_int else str(int(p.default)), width=56)
-        val_lbl.pack(side="right", padx=(6, 0))
+        # Value readout; click it to type a value (Enter applies, Esc cancels).
+        readout = ctk.CTkFrame(line, fg_color="transparent", width=56, height=28)
+        readout.pack(side="right", padx=(6, 0))
+        readout.pack_propagate(False)
+        val_lbl = ctk.CTkLabel(readout, text=fmt(p.default), width=56)
+        val_lbl.pack(fill="both", expand=True)
+        val_entry = ctk.CTkEntry(readout, width=56)
         e_max = ctk.CTkEntry(line, width=50)
         e_max.insert(0, f"{p.max:g}")
         e_max.pack(side="right")
         e_min = ctk.CTkEntry(line, width=50)
         e_min.insert(0, f"{p.min:g}")
         e_min.pack(side="left")
-        steps = int(p.max - p.min) if is_int and 0 < p.max - p.min <= 1000 else None
+        steps = lambda lo, hi: int(hi - lo) if is_int and 0 < hi - lo <= 1000 else None
 
         def move(v):
             v = int(round(v)) if is_int else float(v)
-            val_lbl.configure(text=str(v) if is_int else f"{v:.3f}")
+            val_lbl.configure(text=fmt(v))
             self._set_value(i, p, v)
-        sl = ctk.CTkSlider(line, from_=p.min, to=p.max, number_of_steps=steps, state=state, command=move)
+        sl = ctk.CTkSlider(line, from_=p.min, to=p.max, number_of_steps=steps(p.min, p.max),
+                           state=state, command=move)
         sl.set(p.default)
         sl.pack(side="left", fill="x", expand=True, padx=4)
+
+        def set_range(lo, hi):
+            p.min, p.max = lo, hi
+            ov = self._pset(key)
+            ov["min"], ov["max"] = lo, hi
+            for e, x in ((e_min, lo), (e_max, hi)):
+                e.delete(0, "end")
+                e.insert(0, f"{x:g}")
+            sl.configure(from_=lo, to=hi, number_of_steps=steps(lo, hi))
+
+        def set_value(v):
+            """Move the slider to v, widening the range first if v is outside it."""
+            v = int(round(v)) if is_int else float(v)
+            if v < p.min or v > p.max:
+                set_range(min(p.min, v), max(p.max, v))
+            sl.set(v)
+            move(v)
 
         def commit_range(_e=None):
             try:
@@ -412,16 +437,50 @@ class EditorPanel(ctk.CTkFrame):
             if lo == hi or (lo, hi) == (p.min, p.max):
                 return
             lo, hi = min(lo, hi), max(lo, hi)
-            p.min, p.max = lo, hi
-            ov = self._pset(key)
-            ov["min"], ov["max"] = lo, hi
             cur = min(max(sl.get(), lo), hi)
-            sl.configure(from_=lo, to=hi, number_of_steps=int(hi - lo) if is_int and 0 < hi - lo <= 1000 else None)
+            set_range(lo, hi)
             sl.set(cur)
             move(cur)
         for e in (e_min, e_max):
             e.bind("<Return>", commit_range)
             e.bind("<FocusOut>", commit_range)
+
+        if state == "disabled":
+            return
+
+        def reset(_e=None):
+            # Back to the shader's own default; drop the saved default override.
+            set_value(p.source_default if p.source_default is not None else p.default)
+            self._pset(key).pop("default", None)
+            return "break"
+        for seq in ["<Button-3>"] + (["<Button-2>", "<Control-Button-1>"] if sys.platform == "darwin" else []):
+            sl.bind(seq, reset)
+
+        def edit(_e=None):
+            val_entry.delete(0, "end")
+            val_entry.insert(0, val_lbl.cget("text"))
+            val_lbl.pack_forget()
+            val_entry.pack(fill="both", expand=True)
+            val_entry.focus_set()
+            val_entry.select_range(0, "end")
+
+        def finish(apply):
+            if not val_entry.winfo_ismapped():
+                return
+            txt = val_entry.get().strip()
+            val_entry.pack_forget()
+            val_lbl.pack(fill="both", expand=True)
+            if apply:
+                try:
+                    set_value(float(txt))
+                except ValueError:
+                    pass
+        val_lbl.bind("<Button-1>", edit)
+        val_lbl.configure(cursor="xterm")
+        val_entry.bind("<Return>", lambda e: finish(True))
+        val_entry.bind("<KP_Enter>", lambda e: finish(True))
+        val_entry.bind("<FocusOut>", lambda e: finish(True))
+        val_entry.bind("<Escape>", lambda e: finish(False))
 
     def _color_control(self, body, i, p, state):
         rgba = (list(p.default) + [1.0] * 4)[:4]
