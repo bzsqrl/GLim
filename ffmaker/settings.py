@@ -59,6 +59,8 @@ def apply(ir, settings):
     """Apply label/range/default/visibility overrides to a converted ShaderIR."""
     overrides = settings.get("params", {})
     for p in ir.params:
+        if p.source_default is None:
+            p.source_default = list(p.default) if isinstance(p.default, (list, tuple)) else p.default
         ov = overrides.get(param_key(p))
         if not ov:
             continue
