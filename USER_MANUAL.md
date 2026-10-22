@@ -42,7 +42,7 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
 - Drag the column header edges to resize columns.
 
 **Single File tab (editor):** open or paste a shader and click **Analyze Code** (or press Ctrl+Enter; ⌘+Enter on macOS). You get:
-- **Live preview.** Rendered on your GPU the same way the plugin renders it.
+- **Live preview.** Rendered on your GPU the same way the plugin renders it. Click **⛶**, double-click the preview, or press **Ctrl+F** (⌘F on macOS) for **fullscreen** on the monitor FFMaker is on; press **Esc** or **Ctrl+F** / ⌘F again to return. Fullscreen renders at screen resolution (up to 1920 wide, scaled up beyond that). With FFMaker on a second monitor, slider changes show up live.
   - Play/pause with ⏸; restart time and feedback buffers with ⟲.
   - For effects, preview over the test pattern, or choose **Load image…** to use your own picture.
 - **Channels.** For Shadertoy shaders, pick what each `iChannel` reads: the clip (`input`), `noise`, `audio`, `none`, or an image file. The **filter** and **wrap** menus next to it set how the channel is sampled (see *Sampler settings* below).
@@ -53,6 +53,7 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
   - Set the **starting value** with the slider, switch, dropdown or color picker.
   - Type a value: click the number to the right of a slider, type, and press Enter (Esc cancels). If the value is outside the min/max range, the range widens to fit.
   - Reset a slider to the shader's own default: right-click it (on macOS also Control-click).
+  - Nudge a slider with the keyboard: click it (its handle turns amber), then press **←** / **→** to step it by 1/100 of its range (1 for whole numbers).
 - **Save settings.** Writes `<shader>.ffmaker.json` next to the shader. **Compile FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
 
 **Packaged app:** `dist\FFMaker.exe` (build it with `venv\Scripts\python compile.py`) runs without Python installed. Building plugins still needs CMake and Visual Studio's C++ tools.

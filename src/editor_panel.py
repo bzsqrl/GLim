@@ -32,6 +32,7 @@ class EditorPanel(ctk.CTkFrame):
         self.last_tick = None
         self._photo = None
         self._input_image = None              # (w, h, rgba) for effect previews
+        self._fs = None                       # (FullscreenView, its Previewer) while fullscreen
 
         # Two columns: preview + channels on the left, parameters on the right.
         left = ctk.CTkFrame(self, fg_color="transparent")
@@ -47,6 +48,15 @@ class EditorPanel(ctk.CTkFrame):
         self.btn_play = ctk.CTkButton(transport, text="⏸", width=36, command=self._toggle_play)
         self.btn_play.pack(side="left")
         ctk.CTkButton(transport, text="⟲", width=36, command=self.restart).pack(side="left", padx=4)
+        ctk.CTkButton(transport, text="⛶", width=36, command=self.enter_fullscreen).pack(side="left")
+        self.preview.bind("<Double-Button-1>", lambda e: self.enter_fullscreen())
+        # Esc in FFMaker also leaves fullscreen (e.g. with FFMaker on another monitor).
+        top = self.winfo_toplevel()
+        top.bind("<Escape>", lambda e: self.exit_fullscreen(), add="+")
+        # Ctrl+F (⌘F on macOS) toggles fullscreen while the Single File tab is showing.
+        mod = "Command" if sys.platform == "darwin" else "Control"
+        for key in ("f", "F"):
+            top.bind(f"<{mod}-{key}>", self._toggle_fullscreen, add="+")
         self.lbl_time = ctk.CTkLabel(transport, text="", width=70, anchor="w", text_color="#9ca3af")
         self.lbl_time.pack(side="left", padx=4)
         self.input_menu = ctk.CTkOptionMenu(transport, values=["Test pattern", "Load image…"],
@@ -106,6 +116,7 @@ class EditorPanel(ctk.CTkFrame):
             self.log(f"Preview unavailable: {e}")
 
     def _close_previewer(self):
+        self.exit_fullscreen()
         if self.previewer:
             try:
                 from ffmaker import validate as V
@@ -143,18 +154,72 @@ class EditorPanel(ctk.CTkFrame):
             self._input_image = None
         self.restart()
 
+    # ── Fullscreen ───────────────────────────────────────────────────────────
+    def enter_fullscreen(self):
+        """Show the preview fullscreen on FFMaker's monitor; Esc returns."""
+        if self._fs or not self.previewer:
+            return
+        from ffmaker import validate as V
+        top = self.winfo_toplevel()
+        near = (top.winfo_rootx() + top.winfo_width() // 2, top.winfo_rooty() + top.winfo_height() // 2)
+        view = pv = None
+        try:
+            with V.gpu():
+                view = V.FullscreenView(near)
+                pv = V.Previewer(self.res.ir, self.res.ffgl_glsl, *view.render_size)
+                if self._input_image:
+                    w, h, px = self._input_image
+                    pv.set_input_image(w, h, px, 0)
+                    pv.set_input_image(w, h, px, 1)
+            pv.values = self.previewer.values     # same dict: slider moves show up live
+            self._fs = (view, pv)
+        except Exception as e:
+            self.log(f"Fullscreen unavailable: {e}")
+            with V.gpu():
+                if pv:
+                    pv.close()
+                if view:
+                    view.close()
+
+    def _toggle_fullscreen(self, _e=None):
+        if self._fs:
+            self.exit_fullscreen()
+        elif self.winfo_viewable():         # only from the Single File tab
+            self.enter_fullscreen()
+        else:
+            return None
+        return "break"
+
+    def exit_fullscreen(self):
+        if not self._fs:
+            return
+        view, pv = self._fs
+        self._fs = None
+        try:
+            from ffmaker import validate as V
+            with V.gpu():
+                pv.close()
+                view.close()
+        except Exception:
+            pass
+        try:
+            self.winfo_toplevel().focus_force()
+        except tk.TclError:
+            pass
+
     # ── Render loop ──────────────────────────────────────────────────────────
     def _tick(self):
         now = time.perf_counter()
         dt = 0.0 if self.last_tick is None else min(now - self.last_tick, 0.25)
         self.last_tick = now
+        if self._fs and self.previewer:
+            self._tick_fullscreen(dt)       # vsync in the swap paces this to the display
+            self.after(1, self._tick)
+            return
         if self.previewer and self.winfo_ismapped():
             try:
                 from ffmaker import validate as V
-                speed = 1.0
-                for i, p in enumerate(self.res.ir.params):
-                    if p.kind == "speed":
-                        speed = float(self.previewer.values.get(i, p.default))
+                speed = self._speed()
                 if self.playing:
                     self.sim_time += dt * speed
                 with V.gpu():
@@ -173,6 +238,32 @@ class EditorPanel(ctk.CTkFrame):
                 self.log(f"Preview stopped: {e}")
                 self._close_previewer()
         self.after(33, self._tick)
+
+    def _speed(self):
+        for i, p in enumerate(self.res.ir.params):
+            if p.kind == "speed":
+                return float(self.previewer.values.get(i, p.default))
+        return 1.0
+
+    def _tick_fullscreen(self, dt):
+        """While fullscreen, render there (at screen size) instead of the small preview."""
+        from ffmaker import validate as V
+        view, pv = self._fs
+        try:
+            with V.gpu():
+                if not view.poll():
+                    raise StopIteration
+                speed = self._speed()
+                if self.playing:
+                    self.sim_time += dt * speed
+                pv.render_frame(self.sim_time, dt * speed if self.playing else 0.0)
+                view.show(pv)
+            self.lbl_time.configure(text=f"{self.sim_time:6.1f}s")
+        except StopIteration:
+            self.exit_fullscreen()
+        except Exception as e:
+            self.log(f"Fullscreen stopped: {e}")
+            self.exit_fullscreen()
 
     # ── Settings helpers ─────────────────────────────────────────────────────
     def _pset(self, key):
@@ -378,6 +469,8 @@ class EditorPanel(ctk.CTkFrame):
                 sl = ctk.CTkSlider(line, from_=mn[axis], to=mx[axis], state=state, command=move)
                 sl.set(vals[axis])
                 sl.pack(side="left", fill="x", expand=True)
+                if state != "disabled":
+                    self._arrow_keys(sl, move)
                 lbl.pack(side="left")
         elif p.kind == "fft":
             ctk.CTkLabel(body, text="Live audio spectrum from the host (preview uses a test spectrum)",
@@ -447,6 +540,7 @@ class EditorPanel(ctk.CTkFrame):
 
         if state == "disabled":
             return
+        self._arrow_keys(sl, move, is_int)
 
         def reset(_e=None):
             # Back to the shader's own default; drop the saved default override.
@@ -508,3 +602,23 @@ class EditorPanel(ctk.CTkFrame):
             sl.configure(command=alpha)
             sl.set(rgba[3])
             sl.pack(side="left")
+            if state != "disabled":
+                self._arrow_keys(sl, alpha)
+
+    def _arrow_keys(self, sl, command, is_int=False):
+        """Click a slider to focus it (its handle turns amber); Left/Right then
+        step it by 1/100 of its range (1 for integers), within min/max."""
+        canvas = sl._canvas
+        sl.bind("<Button-1>", lambda e: canvas.focus_set(), add=True)
+        normal = sl.cget("button_color")
+        canvas.bind("<FocusIn>", lambda e: sl.configure(button_color="#f59e0b"), add="+")
+        canvas.bind("<FocusOut>", lambda e: sl.configure(button_color=normal), add="+")
+
+        def step(direction):
+            lo, hi = sorted((float(sl.cget("from_")), float(sl.cget("to"))))
+            d = 1.0 if is_int else (hi - lo) / 100.0
+            sl.set(min(max(sl.get() + direction * d, lo), hi))
+            command(sl.get())
+            return "break"
+        canvas.bind("<Left>", lambda e: step(-1))
+        canvas.bind("<Right>", lambda e: step(1))

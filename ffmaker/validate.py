@@ -4,6 +4,7 @@ import ctypes
 import math
 import re
 import struct
+import sys
 import threading
 from contextlib import contextmanager
 
@@ -427,6 +428,96 @@ class Previewer:
         if getattr(self, "samplers", None):
             gl.glDeleteSamplers(len(self.samplers), list(self.samplers.values()))
             self.samplers = {}
+
+
+class FullscreenView:
+    """A fullscreen window on one monitor that shows a Previewer's output. It
+    shares textures with the validation context, so frames go to the screen
+    without a CPU copy. Create, show and close inside gpu(), on the main thread."""
+
+    def __init__(self, near=None, max_width=1920):
+        import glfw
+        self.glfw = glfw
+        self.ctx = ctx = context()
+        self.gl = gl = ctx.gl
+        mon = glfw.get_primary_monitor()
+        if near:                                   # the monitor containing this screen point
+            for m in glfw.get_monitors():
+                mx, my = glfw.get_monitor_pos(m)
+                vm = glfw.get_video_mode(m)
+                if mx <= near[0] < mx + vm.size.width and my <= near[1] < my + vm.size.height:
+                    mon = m
+        vm = glfw.get_video_mode(mon)
+        glfw.default_window_hints()
+        # Same mode as the desktop, so the monitor doesn't switch modes; stays up when
+        # focus moves to FFMaker on another monitor.
+        for hint, value in ((glfw.CONTEXT_VERSION_MAJOR, 4), (glfw.CONTEXT_VERSION_MINOR, 1),
+                            (glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE),
+                            (glfw.OPENGL_FORWARD_COMPAT, True), (glfw.AUTO_ICONIFY, False),
+                            (glfw.RED_BITS, vm.bits.red), (glfw.GREEN_BITS, vm.bits.green),
+                            (glfw.BLUE_BITS, vm.bits.blue), (glfw.REFRESH_RATE, vm.refresh_rate)):
+            glfw.window_hint(hint, value)
+        self.win = glfw.create_window(vm.size.width, vm.size.height, "FFMaker preview", mon, ctx.win)
+        glfw.default_window_hints()
+        if not self.win:
+            glfw.make_context_current(ctx.win)
+            raise RuntimeError("could not open a fullscreen window")
+        self.closed = False
+        glfw.set_key_callback(self.win, self._key)
+        glfw.set_input_mode(self.win, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+        self.screen = glfw.get_framebuffer_size(self.win)
+        scale = min(1.0, max_width / max(1, self.screen[0]))
+        self.render_size = (max(1, int(self.screen[0] * scale)), max(1, int(self.screen[1] * scale)))
+        glfw.make_context_current(self.win)
+        glfw.swap_interval(1)                      # vsync: paced by the display, no tearing
+        self.fbo = gl.glGenFramebuffers(1)        # framebuffers aren't shared between contexts
+        self._tex = None
+        glfw.make_context_current(ctx.win)
+
+    def _key(self, win, key, scancode, action, mods):
+        """Esc, or Ctrl+F (⌘F on macOS) as in FFMaker, closes the view."""
+        glfw = self.glfw
+        if action != glfw.PRESS:
+            return
+        mod = glfw.MOD_SUPER if sys.platform == "darwin" else glfw.MOD_CONTROL
+        if key == glfw.KEY_ESCAPE or (key == glfw.KEY_F and mods & mod):
+            self.closed = True
+
+    def poll(self):
+        """Process window events. False once the user closed it (Esc)."""
+        self.glfw.poll_events()
+        if self.glfw.window_should_close(self.win):
+            self.closed = True
+        return not self.closed
+
+    def show(self, pv):
+        """Put pv's last rendered frame on the screen."""
+        gl, glfw = self.gl, self.glfw
+        gl.glFlush()                               # finish the frame before the other context reads it
+        glfw.make_context_current(self.win)
+        try:
+            gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, self.fbo)
+            if self._tex != pv.out_tex:
+                gl.glFramebufferTexture2D(gl.GL_READ_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0,
+                                          gl.GL_TEXTURE_2D, pv.out_tex, 0)
+                self._tex = pv.out_tex
+            gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, 0)
+            gl.glViewport(0, 0, self.screen[0], self.screen[1])
+            gl.glBlitFramebuffer(0, 0, pv.width, pv.height, 0, 0, self.screen[0], self.screen[1],
+                                 gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
+            glfw.swap_buffers(self.win)
+        finally:
+            glfw.make_context_current(self.ctx.win)
+
+    def close(self):
+        gl, glfw = self.gl, self.glfw
+        if not self.win:
+            return
+        glfw.make_context_current(self.win)
+        gl.glDeleteFramebuffers(1, [self.fbo])
+        glfw.make_context_current(self.ctx.win)
+        glfw.destroy_window(self.win)
+        self.win = None
 
 
 class _Live:
