@@ -440,6 +440,16 @@ def _double_click_time():
     return 0.5
 
 
+def _cocoa_set_level(nswindow, level):
+    """[nswindow setLevel:level] through the Objective-C runtime (no PyObjC)."""
+    objc = ctypes.cdll.LoadLibrary("/usr/lib/libobjc.A.dylib")
+    objc.sel_registerName.restype = ctypes.c_void_p
+    objc.sel_registerName.argtypes = [ctypes.c_char_p]
+    send = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long)(
+        ("objc_msgSend", objc))
+    send(nswindow, objc.sel_registerName(b"setLevel:"), level)
+
+
 class FullscreenView:
     """A fullscreen window on one monitor that shows a Previewer's output. It
     shares textures with the validation context, so frames go to the screen
@@ -467,7 +477,19 @@ class FullscreenView:
                             (glfw.RED_BITS, vm.bits.red), (glfw.GREEN_BITS, vm.bits.green),
                             (glfw.BLUE_BITS, vm.bits.blue), (glfw.REFRESH_RATE, vm.refresh_rate)):
             glfw.window_hint(hint, value)
-        self.win = glfw.create_window(vm.size.width, vm.size.height, "FFMaker preview", mon, ctx.win)
+        if sys.platform == "darwin":
+            # macOS reports video modes in points, so a monitor-fullscreen window
+            # switches a Retina display to a low-resolution mode. Cover the monitor
+            # with a borderless window above the menu bar instead.
+            glfw.window_hint(glfw.DECORATED, False)
+            glfw.window_hint(glfw.RESIZABLE, False)
+            self.win = glfw.create_window(vm.size.width, vm.size.height, "FFMaker preview", None, ctx.win)
+            if self.win:
+                glfw.set_window_pos(self.win, *glfw.get_monitor_pos(mon))
+                _cocoa_set_level(glfw.get_cocoa_window(self.win), 25)   # NSMainMenuWindowLevel + 1
+                glfw.focus_window(self.win)
+        else:
+            self.win = glfw.create_window(vm.size.width, vm.size.height, "FFMaker preview", mon, ctx.win)
         glfw.default_window_hints()
         if not self.win:
             glfw.make_context_current(ctx.win)
@@ -547,6 +569,10 @@ class FullscreenView:
         glfw.make_context_current(self.win)
         gl.glDeleteFramebuffers(1, [self.fbo])
         glfw.make_context_current(self.ctx.win)
+        # Show the cursor before destroying the window: on macOS the hidden cursor
+        # otherwise stays hidden over FFMaker afterwards.
+        glfw.set_input_mode(self.win, glfw.CURSOR, glfw.CURSOR_NORMAL)
+        glfw.poll_events()
         glfw.destroy_window(self.win)
         self.win = None
 
