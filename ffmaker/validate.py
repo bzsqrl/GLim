@@ -395,6 +395,23 @@ class Previewer:
             if p.kind == "event":
                 self.values[i] = False
 
+    def resize(self, width, height):
+        """Render at a new size from the next frame on (buffers re-allocate
+        themselves; feedback buffers start over)."""
+        if (width, height) == (self.width, self.height):
+            return
+        gl = self.gl
+        gl.glDeleteFramebuffers(1, [self.out_fbo])
+        gl.glDeleteTextures([self.out_tex])
+        self.width, self.height = width, height
+        self.out_tex = self.ctx._texture(width, height, None)
+        self.out_fbo = gl.glGenFramebuffers(1)
+        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, self.out_fbo)
+        gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, self.out_tex, 0)
+        gl.glClearColor(0, 0, 0, 1)
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, 0)
+
     def read(self):
         gl = self.gl
         gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, self.out_fbo)
@@ -450,102 +467,206 @@ def _cocoa_set_level(nswindow, level):
     send(nswindow, objc.sel_registerName(b"setLevel:"), level)
 
 
-class FullscreenView:
-    """A fullscreen window on one monitor that shows a Previewer's output. It
-    shares textures with the validation context, so frames go to the screen
-    without a CPU copy. Create, show and close inside gpu(), on the main thread."""
+class OutputView:
+    """A window that shows a Previewer's output. It shares textures with the
+    validation context, so frames go to the screen without a CPU copy.
 
-    def __init__(self, near=None, max_width=1920):
+    windowed=False: fullscreen on the monitor nearest `near` (FFMaker's), closed
+    by Esc, Ctrl+F (⌘F) or a double-click.
+    windowed=True: a normal window ("output window"), on another monitor when
+    there is one, that can be moved and resized. Double-click or Ctrl+F toggles
+    fullscreen on the monitor it's on; Esc goes back to the window; its close
+    button closes it.
+    Left / Right set `nav` (playlist). Create, use and close inside gpu(), on
+    the main thread."""
+
+    TITLE = "FFMaker output  (double-click or Ctrl+F: fullscreen, ←/→: queue)"
+
+    def __init__(self, near=None, windowed=False, max_width=1920):
         import glfw
         self.glfw = glfw
         self.ctx = ctx = context()
         self.gl = gl = ctx.gl
-        mon = glfw.get_primary_monitor()
-        if near:                                   # the monitor containing this screen point
-            for m in glfw.get_monitors():
-                mx, my = glfw.get_monitor_pos(m)
-                vm = glfw.get_video_mode(m)
-                if mx <= near[0] < mx + vm.size.width and my <= near[1] < my + vm.size.height:
-                    mon = m
-        vm = glfw.get_video_mode(mon)
+        self.max_width = max_width
+        self.windowed = windowed                   # opened as a window (Esc returns to it)
+        self.fullscreen = False
+        self._saved = None                         # window pos/size while fullscreen
+        home = _monitor_at(glfw, near) if near else glfw.get_primary_monitor()
         glfw.default_window_hints()
-        # Same mode as the desktop, so the monitor doesn't switch modes; stays up when
-        # focus moves to FFMaker on another monitor.
         for hint, value in ((glfw.CONTEXT_VERSION_MAJOR, 4), (glfw.CONTEXT_VERSION_MINOR, 1),
                             (glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE),
-                            (glfw.OPENGL_FORWARD_COMPAT, True), (glfw.AUTO_ICONIFY, False),
-                            (glfw.RED_BITS, vm.bits.red), (glfw.GREEN_BITS, vm.bits.green),
-                            (glfw.BLUE_BITS, vm.bits.blue), (glfw.REFRESH_RATE, vm.refresh_rate)):
+                            (glfw.OPENGL_FORWARD_COMPAT, True), (glfw.AUTO_ICONIFY, False)):
             glfw.window_hint(hint, value)
-        if sys.platform == "darwin":
-            # macOS reports video modes in points, so a monitor-fullscreen window
-            # switches a Retina display to a low-resolution mode. Cover the monitor
-            # with a borderless window above the menu bar instead.
+        if windowed:
+            # On another monitor when there is one, else next to FFMaker.
+            others = [m for m in glfw.get_monitors() if m != home]
+            mon = others[0] if others else home
+            mx, my, mw, mh = glfw.get_monitor_workarea(mon)
+            w, h = min(960, mw * 2 // 3), min(540, mh * 2 // 3)
+            glfw.window_hint(glfw.VISIBLE, False)
+            self.win = glfw.create_window(w, h, self.TITLE, None, ctx.win)
+            if self.win:
+                glfw.set_window_pos(self.win, mx + (mw - w) // 2, my + (mh - h) // 2)
+                glfw.show_window(self.win)
+        else:
+            vm = glfw.get_video_mode(home)
+            for hint, value in ((glfw.RED_BITS, vm.bits.red), (glfw.GREEN_BITS, vm.bits.green),
+                                (glfw.BLUE_BITS, vm.bits.blue), (glfw.REFRESH_RATE, vm.refresh_rate)):
+                glfw.window_hint(hint, value)
+            # A borderless window covering the monitor (see _cover), not a GLFW
+            # monitor-fullscreen window.
             glfw.window_hint(glfw.DECORATED, False)
             glfw.window_hint(glfw.RESIZABLE, False)
-            self.win = glfw.create_window(vm.size.width, vm.size.height, "FFMaker preview", None, ctx.win)
+            self.win = glfw.create_window(vm.size.width, vm.size.height, self.TITLE, None, ctx.win)
             if self.win:
-                glfw.set_window_pos(self.win, *glfw.get_monitor_pos(mon))
-                _cocoa_set_level(glfw.get_cocoa_window(self.win), 25)   # NSMainMenuWindowLevel + 1
-                glfw.focus_window(self.win)
-        else:
-            self.win = glfw.create_window(vm.size.width, vm.size.height, "FFMaker preview", mon, ctx.win)
+                self._cover(home)
+            self.fullscreen = True
         glfw.default_window_hints()
         if not self.win:
             glfw.make_context_current(ctx.win)
-            raise RuntimeError("could not open a fullscreen window")
+            raise RuntimeError("could not open the output window")
         self.closed = False
         self.nav = 0                               # -1 / +1: Left / Right pressed (playlist)
+        self._toggle = self._escape = False
         self._last_click = None
         glfw.set_key_callback(self.win, self._key)
         glfw.set_mouse_button_callback(self.win, self._mouse)
-        glfw.set_input_mode(self.win, glfw.CURSOR, glfw.CURSOR_HIDDEN)
-        self.screen = glfw.get_framebuffer_size(self.win)
-        scale = min(1.0, max_width / max(1, self.screen[0]))
-        self.render_size = (max(1, int(self.screen[0] * scale)), max(1, int(self.screen[1] * scale)))
+        if self.fullscreen:
+            glfw.set_input_mode(self.win, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+        glfw.focus_window(self.win)
         glfw.make_context_current(self.win)
         glfw.swap_interval(1)                      # vsync: paced by the display, no tearing
         self.fbo = gl.glGenFramebuffers(1)        # framebuffers aren't shared between contexts
         self._tex = None
         glfw.make_context_current(ctx.win)
+        # Window pixels, refreshed by poll(): GLFW only allows window queries on
+        # the main thread, and frames may be drawn on another one.
+        self.fb_size = glfw.get_framebuffer_size(self.win)
 
+    # ── Fullscreen on/off ──
+    def _cover(self, mon):
+        """Fullscreen as a borderless window covering the monitor, kept on top,
+        rather than GLFW's monitor fullscreen:
+        - macOS reports video modes in points, so monitor fullscreen switches a
+          Retina display to a low-resolution mode. Raised above the menu bar.
+        - Windows gives a window that exactly covers a monitor "fullscreen"
+          presentation, and switches in and out of it (a visible flash) whenever
+          focus moves to or from it. One pixel taller than the monitor avoids that;
+          the extra row is off-screen."""
+        glfw = self.glfw
+        vm = glfw.get_video_mode(mon)
+        w, h = vm.size.width, vm.size.height
+        if sys.platform == "darwin":
+            glfw.set_window_pos(self.win, *glfw.get_monitor_pos(mon))
+            glfw.set_window_size(self.win, w, h)
+            _cocoa_set_level(glfw.get_cocoa_window(self.win), 25)    # NSMainMenuWindowLevel + 1
+        else:
+            glfw.set_window_attrib(self.win, glfw.FLOATING, True)    # above the taskbar
+            glfw.set_window_pos(self.win, *glfw.get_monitor_pos(mon))
+            glfw.set_window_size(self.win, w, h + 1)
+        # No focus change here: going fullscreen from FFMaker (Ctrl+F there) leaves
+        # the keyboard with FFMaker. A newly opened view takes focus in __init__.
+
+    def set_fullscreen(self, on):
+        """Output window only: fullscreen on the monitor it's on, or back to the window."""
+        glfw = self.glfw
+        if on == self.fullscreen or not self.windowed:
+            return
+        if on:
+            x, y = glfw.get_window_pos(self.win)
+            w, h = glfw.get_window_size(self.win)
+            self._saved = (x, y, w, h)
+            mon = _monitor_at(self.glfw, (x + w // 2, y + h // 2))
+            glfw.set_window_attrib(self.win, glfw.DECORATED, False)
+            self._cover(mon)
+            glfw.set_input_mode(self.win, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+        else:
+            x, y, w, h = self._saved
+            if sys.platform == "darwin":
+                _cocoa_set_level(glfw.get_cocoa_window(self.win), 0)   # NSNormalWindowLevel
+            else:
+                glfw.set_window_attrib(self.win, glfw.FLOATING, False)
+            glfw.set_window_attrib(self.win, glfw.DECORATED, True)
+            glfw.set_window_size(self.win, w, h)
+            glfw.set_window_pos(self.win, x, y)
+            glfw.set_input_mode(self.win, glfw.CURSOR, glfw.CURSOR_NORMAL)
+        self.fullscreen = on
+
+    def toggle(self):
+        """Ctrl+F / double-click / ⛶: the output window toggles fullscreen; the
+        plain fullscreen view closes."""
+        if self.windowed:
+            self.set_fullscreen(not self.fullscreen)
+        else:
+            self.closed = True
+
+    def escape(self):
+        """Esc: the output window leaves fullscreen; the plain fullscreen view closes."""
+        if self.windowed:
+            self.set_fullscreen(False)
+        else:
+            self.closed = True
+
+    # ── Input ──
     def _key(self, win, key, scancode, action, mods):
-        """Esc, or Ctrl+F (⌘F on macOS) as in FFMaker, closes the view;
-        Left / Right ask for the previous / next shader."""
         glfw = self.glfw
         if action != glfw.PRESS:
             return
         mod = glfw.MOD_SUPER if sys.platform == "darwin" else glfw.MOD_CONTROL
-        if key == glfw.KEY_ESCAPE or (key == glfw.KEY_F and mods & mod):
-            self.closed = True
+        if key == glfw.KEY_ESCAPE:
+            self._escape = True
+        elif key == glfw.KEY_F and mods & mod:
+            self._toggle = True
         elif key in (glfw.KEY_LEFT, glfw.KEY_RIGHT):
             self.nav = -1 if key == glfw.KEY_LEFT else 1
 
     def _mouse(self, win, button, action, mods):
-        """A double-click closes the view, as a double-click on the preview opens it."""
         if button != self.glfw.MOUSE_BUTTON_LEFT or action != self.glfw.PRESS:
             return
         import time
         now = time.perf_counter()
         if self._last_click is not None and now - self._last_click <= _double_click_time():
-            self.closed = True
+            self._toggle = True
+            now = None                             # a third click starts a new double-click
         self._last_click = now
+
+    def poll(self):
+        """Process window events and act on them (main thread). False once the
+        view should close."""
+        self.glfw.poll_events()
+        # Act outside the callbacks: changing the window from inside them isn't safe.
+        if self._toggle:
+            self._toggle = False
+            self.toggle()
+        if self._escape:
+            self._escape = False
+            self.escape()
+        if self.glfw.window_should_close(self.win):
+            self.closed = True
+        self.fb_size = self.glfw.get_framebuffer_size(self.win)
+        return not self.closed
+
+    # ── Drawing (any thread, inside gpu()) ──
+    def render_size(self):
+        """The size to render at: the window's pixels, at most max_width wide."""
+        fw, fh = self.fb_size
+        if fw <= 0 or fh <= 0:                     # minimised
+            return None
+        scale = min(1.0, self.max_width / fw)
+        return max(1, int(fw * scale)), max(1, int(fh * scale))
 
     def reattach(self):
         """Call when switching Previewers: re-attach the texture on the next show
         (a new texture can reuse a deleted one's id)."""
         self._tex = None
 
-    def poll(self):
-        """Process window events. False once the user closed it (Esc)."""
-        self.glfw.poll_events()
-        if self.glfw.window_should_close(self.win):
-            self.closed = True
-        return not self.closed
-
     def show(self, pv):
-        """Put pv's last rendered frame on the screen."""
+        """Put pv's last rendered frame in the window, scaled to fit (letterboxed
+        if the shapes differ, e.g. mid-resize)."""
         gl, glfw = self.gl, self.glfw
+        fw, fh = self.fb_size
+        if fw <= 0 or fh <= 0:
+            return
         gl.glFlush()                               # finish the frame before the other context reads it
         glfw.make_context_current(self.win)
         try:
@@ -555,8 +676,13 @@ class FullscreenView:
                                           gl.GL_TEXTURE_2D, pv.out_tex, 0)
                 self._tex = pv.out_tex
             gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, 0)
-            gl.glViewport(0, 0, self.screen[0], self.screen[1])
-            gl.glBlitFramebuffer(0, 0, pv.width, pv.height, 0, 0, self.screen[0], self.screen[1],
+            gl.glViewport(0, 0, fw, fh)
+            gl.glClearColor(0, 0, 0, 1)
+            gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+            s = min(fw / pv.width, fh / pv.height)
+            w, h = int(pv.width * s), int(pv.height * s)
+            x, y = (fw - w) // 2, (fh - h) // 2
+            gl.glBlitFramebuffer(0, 0, pv.width, pv.height, x, y, x + w, y + h,
                                  gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
             glfw.swap_buffers(self.win)
         finally:
@@ -575,6 +701,16 @@ class FullscreenView:
         glfw.poll_events()
         glfw.destroy_window(self.win)
         self.win = None
+
+
+def _monitor_at(glfw, point):
+    """The monitor containing a screen point (primary if none does)."""
+    for m in glfw.get_monitors():
+        mx, my = glfw.get_monitor_pos(m)
+        vm = glfw.get_video_mode(m)
+        if mx <= point[0] < mx + vm.size.width and my <= point[1] < my + vm.size.height:
+            return m
+    return glfw.get_primary_monitor()
 
 
 class _Live:

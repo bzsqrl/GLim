@@ -3,6 +3,7 @@ the parameter editor. Edits are written into a settings dict (the shader's
 .ffmaker.json); changes that alter the GLSL ask the app to recompile."""
 import os
 import sys
+import threading
 import time
 import tkinter as tk
 from tkinter import colorchooser
@@ -13,6 +14,7 @@ from PIL import Image, ImageTk
 from ffmaker import settings as S
 
 PREVIEW_W, PREVIEW_H = 384, 216
+SMALL_FPS_WITH_OUTPUT = 10      # small preview rate while the output window draws the full one
 CHANNEL_CHOICES = ["input", "noise", "audio", "none", "file…"]
 FILTER_CHOICES = ["filter", "nearest", "linear", "mipmap"]   # first entry = Shadertoy default
 WRAP_CHOICES = ["wrap", "clamp", "repeat"]
@@ -33,11 +35,14 @@ class EditorPanel(ctk.CTkFrame):
         self._photo = None
         self._input_image = None              # (w, h, rgba) for effect previews
         self._fs = None                       # fullscreen state, see "Fullscreen" below
-        # Set by the app: the queue's file paths (fullscreen playlist), a function
-        # converting one for preview, and a callback loading a path into the editor.
+        # Set by the app: the queue's file paths, a function converting one for
+        # preview, and on_select(path, res), which loads a converted queue file
+        # into the Single File tab (the output then follows, see load()).
         self.get_playlist = lambda: []
         self.convert_path = None
-        self.on_fullscreen_exit = None
+        self.on_select = None
+        self._queue_label_tick = 0
+        self._small_shown = 0.0
 
         # Two columns: preview + channels on the left, parameters on the right.
         left = ctk.CTkFrame(self, fg_color="transparent")
@@ -53,11 +58,15 @@ class EditorPanel(ctk.CTkFrame):
         self.btn_play = ctk.CTkButton(transport, text="⏸", width=36, command=self._toggle_play)
         self.btn_play.pack(side="left")
         ctk.CTkButton(transport, text="⟲", width=36, command=self.restart).pack(side="left", padx=4)
-        ctk.CTkButton(transport, text="⛶", width=36, command=self.enter_fullscreen).pack(side="left")
-        self.preview.bind("<Double-Button-1>", lambda e: self.enter_fullscreen())
-        # Esc in FFMaker also leaves fullscreen (e.g. with FFMaker on another monitor).
+        ctk.CTkButton(transport, text="⛶", width=36, command=self._toggle_fullscreen).pack(side="left")
+        self.btn_output = ctk.CTkButton(transport, text="Output", width=60, command=self.open_output_window)
+        self.btn_output.pack(side="left", padx=(4, 0))
+        self._output_btn_colors = (self.btn_output.cget("fg_color"), self.btn_output.cget("hover_color"))
+        self._output_btn_open = False
+        self.preview.bind("<Double-Button-1>", lambda e: self._toggle_fullscreen())
+        # Esc in FFMaker also leaves fullscreen (e.g. with the output on another monitor).
         top = self.winfo_toplevel()
-        top.bind("<Escape>", lambda e: self.exit_fullscreen(), add="+")
+        top.bind("<Escape>", lambda e: self._escape_output(), add="+")
         # Ctrl+F (⌘F on macOS) toggles fullscreen while the Single File tab is showing.
         mod = "Command" if sys.platform == "darwin" else "Control"
         for key in ("f", "F"):
@@ -67,6 +76,13 @@ class EditorPanel(ctk.CTkFrame):
         self.input_menu = ctk.CTkOptionMenu(transport, values=["Test pattern", "Load image…"],
                                             width=130, command=self._input_choice)
         self.input_menu.pack(side="right")
+        # Previous / next shader in the queue (also ← / → in the output window).
+        queue_nav = ctk.CTkFrame(left, fg_color="transparent")
+        queue_nav.pack(fill="x", padx=8, pady=(4, 0))
+        ctk.CTkButton(queue_nav, text="←", width=36, command=lambda: self.step_queue(-1)).pack(side="left")
+        ctk.CTkButton(queue_nav, text="→", width=36, command=lambda: self.step_queue(1)).pack(side="left", padx=4)
+        self.lbl_queue = ctk.CTkLabel(queue_nav, text="", anchor="w", text_color="#9ca3af")
+        self.lbl_queue.pack(side="left", padx=4)
 
         # ── Channels (Shadertoy) ──
         self.channel_frame = ctk.CTkFrame(left, fg_color="transparent")
@@ -96,14 +112,17 @@ class EditorPanel(ctk.CTkFrame):
         self._close_previewer()
         if not keep_time:
             self.sim_time = 0.0
+        # Previewer first: it switches the output, which then keeps playing (on its
+        # own thread) while the slower parameter widgets are rebuilt.
+        if res.ok and res.validated:
+            self._open_previewer()
         self._build_channels()
         self._build_params()
         if res.ir.kind in ("effect", "mixer"):
             self.input_menu.pack(side="right")
         else:
             self.input_menu.pack_forget()
-        if res.ok and res.validated:
-            self._open_previewer()
+        self._update_queue_label()
 
     def _open_previewer(self):
         try:
@@ -119,9 +138,28 @@ class EditorPanel(ctk.CTkFrame):
         except Exception as e:
             self.previewer = None
             self.log(f"Preview unavailable: {e}")
+            return
+        self._sync_output()
+
+    def _sync_output(self):
+        """The output (fullscreen or output window) always shows the shader loaded
+        here: switch it to the new previewer's shader, sharing its slider values."""
+        if not self._fs or not self.previewer:
+            return
+        from ffmaker import validate as V
+        view, old = self._fs["view"], self._fs["pv"]
+        try:
+            with V.gpu():                   # the output thread renders only while holding this
+                pv = self._fs_previewer(view, self.res)
+                pv.values = self.previewer.values
+                self._fs.update(pv=pv, res=self.res, path=self.shader_path)
+                old.close()
+                view.reattach()
+        except Exception as e:
+            self.log(f"Output stopped: {e}")
+            self.exit_fullscreen()
 
     def _close_previewer(self):
-        self.exit_fullscreen(load_last=False)
         if self.previewer:
             try:
                 from ffmaker import validate as V
@@ -160,21 +198,22 @@ class EditorPanel(ctk.CTkFrame):
         self.restart()
 
     # ── Fullscreen ───────────────────────────────────────────────────────────
-    # self._fs = {"view", "pv", "res", "path"} while fullscreen. Left/Right step
-    # through the app's queue (get_playlist) like a playlist; on exit the app
-    # loads the last shader shown into the Single File tab (on_fullscreen_exit).
+    # self._fs = {"view", "pv", "res", "path"} while fullscreen or the output window
+    # is open. It always shows the shader loaded in this tab (see _sync_output);
+    # Left/Right in it step through the queue (step_queue).
 
     def _fs_previewer(self, view, res):
         from ffmaker import validate as V
-        pv = V.Previewer(res.ir, res.ffgl_glsl, *view.render_size)
+        pv = V.Previewer(res.ir, res.ffgl_glsl, *(view.render_size() or (960, 540)))
         if self._input_image:
             w, h, px = self._input_image
             pv.set_input_image(w, h, px, 0)
             pv.set_input_image(w, h, px, 1)
         return pv
 
-    def enter_fullscreen(self):
-        """Show the preview fullscreen on FFMaker's monitor; Esc returns."""
+    def enter_fullscreen(self, windowed=False):
+        """Show the preview fullscreen on FFMaker's monitor (Esc returns), or with
+        windowed=True in an output window that can go fullscreen on another monitor."""
         if self._fs or not self.previewer:
             return
         from ffmaker import validate as V
@@ -183,25 +222,59 @@ class EditorPanel(ctk.CTkFrame):
         view = pv = None
         try:
             with V.gpu():
-                view = V.FullscreenView(near)
+                view = V.OutputView(near, windowed=windowed)
                 pv = self._fs_previewer(view, self.res)
             pv.values = self.previewer.values     # same dict: slider moves show up live
-            self._fs = {"view": view, "pv": pv, "res": self.res, "path": self.shader_path}
+            stop = threading.Event()
+            self._fs = {"view": view, "pv": pv, "res": self.res, "path": self.shader_path,
+                        "stop": stop, "error": None}
+            self._fs["thread"] = threading.Thread(target=self._output_loop, args=(self._fs, stop),
+                                                  daemon=True)
+            self._fs["thread"].start()
         except Exception as e:
-            self.log(f"Fullscreen unavailable: {e}")
+            self.log(f"{'Output window' if windowed else 'Fullscreen'} unavailable: {e}")
             with V.gpu():
                 if pv:
                     pv.close()
                 if view:
                     view.close()
 
-    def _fs_step(self, direction):
-        """Fullscreen playlist: show the previous / next shader in the queue that compiles."""
-        from ffmaker import validate as V
+    def open_output_window(self):
+        """The Output button toggles the output window: the live render in its own
+        window, which can be moved to another monitor and made fullscreen there
+        (double-click or Ctrl+F). A second press closes it, unless it's fullscreen
+        (Esc first) or plain fullscreen is showing."""
+        if not self._fs:
+            self.enter_fullscreen(windowed=True)
+        elif self._fs["view"].windowed and not self._fs["view"].fullscreen:
+            self.exit_fullscreen()
+        self._update_output_button()
+
+    def _update_output_button(self):
+        """Highlight the Output button while the output window is open."""
+        is_open = bool(self._fs and self._fs["view"].windowed)
+        if is_open != self._output_btn_open:
+            self._output_btn_open = is_open
+            fg, hover = ("#f59e0b", "#d97706") if is_open else self._output_btn_colors
+            self.btn_output.configure(fg_color=fg, hover_color=hover)
+
+    def _escape_output(self):
+        """Esc in FFMaker: the output window leaves fullscreen; plain fullscreen closes."""
+        if self._fs:
+            from ffmaker import validate as V
+            with V.gpu():
+                self._fs["view"].escape()
+
+    # ── Queue playlist ───────────────────────────────────────────────────────
+    def step_queue(self, direction):
+        """Load the previous / next shader in the queue that compiles into this tab
+        (the output follows). Wraps around; starts at either end if the current
+        shader isn't in the queue. The ← / → buttons and the output's arrow keys."""
         paths = self.get_playlist()
         if not paths:
+            self.log("The queue is empty: add shaders on the Queue tab to step through them.")
             return
-        cur = self._fs["path"]
+        cur = self.shader_path
         i = paths.index(cur) if cur in paths else (-1 if direction > 0 else len(paths))
         for _ in range(len(paths)):
             i = (i + direction) % len(paths)
@@ -212,42 +285,47 @@ class EditorPanel(ctk.CTkFrame):
             try:
                 res = self.convert_path(path)
             except Exception as e:
-                self.log(f"Playlist: skipped {name} ({e})")
+                self.log(f"Queue: skipped {name} ({e})")
                 continue
             if not (res.ok and res.validated):
-                self.log(f"Playlist: skipped {name} (doesn't compile)")
+                self.log(f"Queue: skipped {name} (doesn't compile)")
                 continue
-            view, old = self._fs["view"], self._fs["pv"]
-            try:
-                with V.gpu():
-                    pv = self._fs_previewer(view, res)
-                    for k, p in enumerate(res.ir.params):
-                        pv.values[k] = p.default
-                    old.close()
-                    view.reattach()
-            except Exception as e:
-                self.log(f"Playlist: skipped {name} ({e})")
-                continue
-            self._fs.update(pv=pv, res=res, path=path)
-            self.sim_time = 0.0             # each shader starts from the beginning
             self.log(f"▶ {name} ({i + 1}/{len(paths)})")
+            self.on_select(path, res)       # loads it here, from the start; the output follows
             return
+        self.log("No other shader in the queue compiles.")
+
+    def _update_queue_label(self):
+        paths = self.get_playlist()
+        if not paths:
+            text = "queue empty"
+        elif self.shader_path in paths:
+            text = f"{paths.index(self.shader_path) + 1} / {len(paths)} in queue"
+        else:
+            text = f"not in queue ({len(paths)})"
+        self.lbl_queue.configure(text=text)
 
     def _toggle_fullscreen(self, _e=None):
+        """⛶, Ctrl+F, double-click: with the output window open, toggle its
+        fullscreen; otherwise open / close fullscreen on FFMaker's monitor."""
         if self._fs:
-            self.exit_fullscreen()
+            from ffmaker import validate as V
+            with V.gpu():
+                self._fs["view"].toggle()      # plain fullscreen: marks it closed
         elif self.winfo_viewable():         # only from the Single File tab
             self.enter_fullscreen()
         else:
             return None
         return "break"
 
-    def exit_fullscreen(self, load_last=True):
-        """Leave fullscreen. If the playlist moved on to another shader, the app
-        loads it into the Single File tab (unless load_last is False)."""
+    def exit_fullscreen(self):
+        """Close fullscreen / the output window. (It always shows the shader loaded
+        here, so nothing needs reloading.)"""
         if not self._fs:
             return
         fs, self._fs = self._fs, None
+        fs["stop"].set()
+        fs["thread"].join(timeout=2)
         try:
             from ffmaker import validate as V
             with V.gpu():
@@ -259,40 +337,53 @@ class EditorPanel(ctk.CTkFrame):
             self.winfo_toplevel().focus_force()
         except tk.TclError:
             pass
-        if load_last and fs["path"] and fs["path"] != self.shader_path and self.on_fullscreen_exit:
-            self.on_fullscreen_exit(fs["path"])
 
     # ── Render loop ──────────────────────────────────────────────────────────
     def _tick(self):
         now = time.perf_counter()
         dt = 0.0 if self.last_tick is None else min(now - self.last_tick, 0.25)
         self.last_tick = now
-        if self._fs and self.previewer:
-            self._tick_fullscreen(dt)       # vsync in the swap paces this to the display
-            self.after(1, self._tick)
+        self._queue_label_tick += 1
+        if self._queue_label_tick % 30 == 0:       # the queue can change on the other tab
+            self._update_queue_label()
+        self._update_output_button()               # the output can also close from its own window
+        if self._fs:
+            # The output draws itself on its own thread (and advances the clock); here:
+            # its events and keys, and the small preview at a lower rate so it stays live
+            # without taking time from the output.
+            self._tick_output()
+            if self._fs and now - self._small_shown >= 1 / SMALL_FPS_WITH_OUTPUT:
+                self._draw_small(now - self._small_shown, advance=False)
+            self.after(15, self._tick)
             return
-        if self.previewer and self.winfo_ismapped():
-            try:
-                from ffmaker import validate as V
-                speed = self._speed()
-                if self.playing:
-                    self.sim_time += dt * speed
-                with V.gpu():
-                    self.previewer.render_frame(self.sim_time, dt * speed if self.playing else 0.0)
-                    px = self.previewer.read()
-                img = Image.frombytes("RGBA", (PREVIEW_W, PREVIEW_H), px).transpose(Image.FLIP_TOP_BOTTOM)
-                bg = Image.new("RGBA", img.size, (24, 24, 24, 255))   # show transparency as dark grey
-                img = Image.alpha_composite(bg, img).convert("RGB")
-                if self._photo is None:
-                    self._photo = ImageTk.PhotoImage(img)
-                    self.preview.configure(image=self._photo, width=PREVIEW_W, height=PREVIEW_H)
-                else:
-                    self._photo.paste(img)
-                self.lbl_time.configure(text=f"{self.sim_time:6.1f}s")
-            except Exception as e:
-                self.log(f"Preview stopped: {e}")
-                self._close_previewer()
+        self._draw_small(dt, advance=True)
         self.after(33, self._tick)
+
+    def _draw_small(self, dt, advance):
+        """Render the small preview. advance=False: the output thread owns the clock."""
+        self._small_shown = time.perf_counter()
+        if not (self.previewer and self.winfo_ismapped()):
+            return
+        try:
+            from ffmaker import validate as V
+            speed = self._speed()
+            if advance and self.playing:
+                self.sim_time += dt * speed
+            with V.gpu():
+                self.previewer.render_frame(self.sim_time, min(dt, 0.25) * speed if self.playing else 0.0)
+                px = self.previewer.read()
+            img = Image.frombytes("RGBA", (PREVIEW_W, PREVIEW_H), px).transpose(Image.FLIP_TOP_BOTTOM)
+            bg = Image.new("RGBA", img.size, (24, 24, 24, 255))   # show transparency as dark grey
+            img = Image.alpha_composite(bg, img).convert("RGB")
+            if self._photo is None:
+                self._photo = ImageTk.PhotoImage(img)
+                self.preview.configure(image=self._photo, width=PREVIEW_W, height=PREVIEW_H)
+            else:
+                self._photo.paste(img)
+            self.lbl_time.configure(text=f"{self.sim_time:6.1f}s")
+        except Exception as e:
+            self.log(f"Preview stopped: {e}")
+            self._close_previewer()
 
     def _speed(self, res=None, pv=None):
         res, pv = res or self.res, pv or self.previewer
@@ -301,31 +392,65 @@ class EditorPanel(ctk.CTkFrame):
                 return float(pv.values.get(i, p.default))
         return 1.0
 
-    def _tick_fullscreen(self, dt):
-        """While fullscreen, render there (at screen size) instead of the small preview."""
-        from ffmaker import validate as V
-        view = self._fs["view"]
+    def _tick_output(self):
+        """Main thread, while the output is open: its window events (GLFW requires
+        the main thread for them), Left/Right, and the time readout. The small
+        preview pauses meanwhile."""
+        fs = self._fs
+        if fs["error"]:
+            self.log(f"Output stopped: {fs['error']}")
+            self.exit_fullscreen()
+            return
         try:
-            with V.gpu():
-                alive = view.poll()
-            if not alive:
-                raise StopIteration
-            if view.nav:
-                direction, view.nav = view.nav, 0
-                self._fs_step(direction)
-            pv, res = self._fs["pv"], self._fs["res"]
-            with V.gpu():
-                speed = self._speed(res, pv)
-                if self.playing:
-                    self.sim_time += dt * speed
-                pv.render_frame(self.sim_time, dt * speed if self.playing else 0.0)
-                view.show(pv)
-            self.lbl_time.configure(text=f"{self.sim_time:6.1f}s")
-        except StopIteration:
-            self.exit_fullscreen()
+            alive = fs["view"].poll()
         except Exception as e:
-            self.log(f"Fullscreen stopped: {e}")
+            self.log(f"Output stopped: {e}")
             self.exit_fullscreen()
+            return
+        if not alive:
+            self.exit_fullscreen()
+            return
+        view = fs["view"]
+        if view.nav:
+            direction, view.nav = view.nav, 0
+            self.step_queue(direction)
+        self.lbl_time.configure(text=f"{self.sim_time:6.1f}s")
+
+    def _output_loop(self, fs, stop):
+        """Output thread: render and show frames until stopped. It runs alongside
+        the UI, so rebuilding the parameter widgets after a shader switch (up to a
+        second for big shaders) doesn't stall the output. Holds gpu() per frame;
+        the shader it draws is whatever fs holds (switched under the same lock)."""
+        from ffmaker import validate as V
+        last = time.perf_counter()
+        while not stop.is_set():
+            start = time.perf_counter()
+            dt, last = min(start - last, 0.25), start
+            try:
+                with V.gpu():
+                    if stop.is_set():
+                        break
+                    view, pv, res = fs["view"], fs["pv"], fs["res"]
+                    size = view.render_size()  # follows the window as it's resized / goes fullscreen
+                    if size:
+                        if size != (pv.width, pv.height):
+                            pv.resize(*size)
+                            view.reattach()
+                        speed = self._speed(res, pv)
+                        if self.playing:
+                            self.sim_time += dt * speed
+                        pv.render_frame(self.sim_time, dt * speed if self.playing else 0.0)
+                        view.show(pv)          # vsync in the swap paces this loop
+            except Exception as e:
+                fs["error"] = e
+                return
+            # No vsync wait (minimised / hidden window): don't spin, and leave the UI
+            # thread time (Python runs one thread at a time).
+            spare = 1 / 60 - (time.perf_counter() - start)
+            if not size:
+                time.sleep(0.05)
+            elif spare > 0:
+                time.sleep(spare)
 
     # ── Settings helpers ─────────────────────────────────────────────────────
     def _pset(self, key):

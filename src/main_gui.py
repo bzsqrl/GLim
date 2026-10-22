@@ -324,11 +324,11 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.editor = EditorPanel(self.panes, on_recompile=lambda: self.analyze_code(keep_time=True),
                                   log=self.log)
         self.panes.add(self.editor, stretch="always", minsize=760)
-        # Fullscreen preview: Left/Right play through the queue; on exit, the last
-        # shader shown is loaded here.
+        # ← / → (buttons, or keys in the output window) step through the queue,
+        # loading each shader here; the output follows.
         self.editor.get_playlist = lambda: [i.path for i in self._queue]
         self.editor.convert_path = self._convert_for_preview
-        self.editor.on_fullscreen_exit = self._load_file_path
+        self.editor.on_select = lambda path, res: self._load_file_path(path, res=res)
         self.textbox_code.bind("<Control-Return>", lambda e: (self.analyze_code(), "break")[1])
         if sys.platform == "darwin":
             self.textbox_code.bind("<Command-Return>", lambda e: (self.analyze_code(), "break")[1])
@@ -669,7 +669,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         log(f"[{name}] ✓ {res.ir.kind}, {len(res.ir.params)} params → {dst}")
         return "done", os.path.basename(dst)
 
-    def analyze_code(self, keep_time=False):
+    def analyze_code(self, keep_time=False, res=None):
         code = self.textbox_code.get("1.0", "end-1c")
         if not keep_time:
             self.log("Analyzing shader code...")
@@ -678,9 +678,10 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.entry_plugin_name.insert(0, "FFMakerPlugin")
 
         try:
-            res = pipeline.convert_ffgl(code, name=self.entry_plugin_name.get().strip(),
-                                        path=self._source_path, settings=self.settings,
-                                        extract_params=self.extract_params_var.get())
+            if res is None:
+                res = pipeline.convert_ffgl(code, name=self.entry_plugin_name.get().strip(),
+                                            path=self._source_path, settings=self.settings,
+                                            extract_params=self.extract_params_var.get())
         except ffconvert.ConvertError as e:
             self.log(f"ERROR: {e}")
             return
@@ -738,13 +739,15 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.settings.pop("plugin_name", None)
 
     def _convert_for_preview(self, path):
-        """Convert a queue file (with its saved settings) for the fullscreen playlist."""
+        """Convert a queue file (with its saved settings) for ← / → in Single File."""
         code = open(path, encoding="utf-8", errors="replace").read()
-        return pipeline.convert_ffgl(code, name=Path(path).stem, path=path,
+        name = ffsettings.load(path).get("plugin_name") or Path(path).stem
+        return pipeline.convert_ffgl(code, name=name, path=path,
                                      extract_params=self.extract_params_var.get())
 
-    def _load_file_path(self, path: str):
-        """Helper to load a file into the Single File editor and analyze it."""
+    def _load_file_path(self, path: str, res=None):
+        """Helper to load a file into the Single File editor and analyze it.
+        res: an existing conversion of the file (with its saved settings) to reuse."""
         try:
             code = open(path, encoding="utf-8").read()
             self.textbox_code.delete("1.0", "end")
@@ -759,7 +762,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             if self.settings:
                 self.log(f"Loaded saved settings: {ffsettings.path_for(path)}")
             self.log(f"Loaded: {Path(path).name} (will export as {self.entry_plugin_name.get()}.dll)")
-            self.analyze_code()
+            self.analyze_code(res=res)
         except Exception as e:
             self.log(f"Error reading file: {e}")
 
