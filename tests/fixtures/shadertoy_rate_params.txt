@@ -1,0 +1,23 @@
+// Fixture: time * slider becomes a running total (ffm_phaseN) the host keeps,
+// so moving the slider changes the rate instead of jumping the animation.
+// Lines marked "phase" must be rewritten; lines marked "keep" must not.
+const float rate = 1.0;
+const float rate2 = 0.5;
+const float wobble = 0.3;
+#define T (iTime * rate2)                                       // phase (in a #define)
+
+float wave(float rate) { return sin(iTime * rate); }            // keep: parameter shadows the slider
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    float a = sin(iTime * rate + uv.x * 6.0);                   // phase
+    float b = 0.5 * iTime * rate * rate2;                       // phase (two sliders)
+    float c = uv.y / wobble * iTime;                            // keep: slider is a divisor
+    float d = iTime * wobble / 2.0;                             // phase
+    vec2 e = vec2(rate, 0.25) * iTime;                          // phase (per component)
+    float f = uv.x * iTime * wobble;                            // phase
+    float g = wave(2.0) + sin(T);
+    fragColor = vec4(0.5 + 0.5 * sin(a + b + d + e.x + e.y + f),
+                     0.5 + 0.5 * sin(c * 0.1 + g),
+                     0.5 + 0.5 * cos(uv.x * 3.0 + e.y), 1.0);
+}

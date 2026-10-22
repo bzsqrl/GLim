@@ -201,6 +201,8 @@ class Previewer:
         self.width, self.height = width, height
         self.frame = 0
         self.values = {}            # param index -> live value (defaults otherwise)
+        self.phases = None          # ir.phases running totals, as the plugin keeps them
+        self._phase_time = 0.0
         self.input_tex = list(ctx.test_input)
         self._own_input = []
         self.progs = []
@@ -307,6 +309,20 @@ class Previewer:
         named = {p.name: _Live(p, self.value(i, p)) for i, p in enumerate(ir.params) if p.name}
         mouse = next(((i, p) for i, p in enumerate(ir.params) if p.kind == "mouse"), None)
         click = next(((i, p) for i, p in enumerate(ir.params) if p.kind == "mouseclick"), None)
+        # Phases advance with the clock (which can jump, e.g. preview restart), at
+        # the sliders' current values.
+        rates = []
+        for ph in ir.phases:
+            r = 1.0
+            for nm in ph.params:
+                i, p = next((i, p) for i, p in enumerate(ir.params) if p.name == nm)
+                r *= float(self.value(i, p))
+            rates.append(r)
+        if self.phases is None:
+            self.phases = [r * sim_time for r in rates]
+        else:
+            self.phases = [ph + r * (sim_time - self._phase_time) for ph, r in zip(self.phases, rates)]
+        self._phase_time = sim_time
         for pi, ps in enumerate(ir.passes):
             w, h = width, height
             if ps.target:
@@ -322,6 +338,8 @@ class Previewer:
             _u(gl, prog, "ffm_Resolution", 2, (w, h))
             _u(gl, prog, "ffm_Time", 1, (sim_time,))
             _u(gl, prog, "ffm_TimeDelta", 1, (dt,))
+            for ph, v in zip(ir.phases, self.phases):
+                _u(gl, prog, ph.name, 1, (v,))
             _ui(gl, prog, "ffm_Frame", self.frame)
             _ui(gl, prog, "ffm_PassIndex", pi)
             beat = sim_time * 120.0 / 60.0     # the plugin's tempo when the host sends none

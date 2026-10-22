@@ -62,6 +62,15 @@ class Program:
 
 
 @dataclass
+class Phase:
+    """time * (float params) in the shader, replaced by a running total the host
+    keeps (total += product of the params' values * frame time). Moving one of
+    those sliders then changes the rate instead of jumping the animation."""
+    name: str                 # uniform the shader reads, e.g. ffm_phase0
+    params: tuple             # param names multiplied together (repeats allowed)
+
+
+@dataclass
 class ShaderIR:
     name: str
     dialect: str              # isf | shadertoy | glsl
@@ -73,6 +82,16 @@ class ShaderIR:
     meta: dict = field(default_factory=dict)
     warnings: list = field(default_factory=list)
     promoted: list = field(default_factory=list)   # names promoted from consts/defines
+    phases: list = field(default_factory=list)     # Phase: time * params, accumulated by the host
+
+    def phase(self, params):
+        """Name of the Phase for these params, creating it if needed."""
+        key = tuple(sorted(params))
+        for ph in self.phases:
+            if ph.params == key:
+                return ph.name
+        self.phases.append(Phase(f"ffm_phase{len(self.phases)}", key))
+        return self.phases[-1].name
 
     def param(self, name):
         return next((p for p in self.params if p.name == name), None)

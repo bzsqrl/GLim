@@ -419,6 +419,14 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	lastDelta = dt * speed;
 	clockTime += lastDelta;
 	realTime += dt;
+	phases.resize( FFM_NUM_PHASES, 0.0 );
+	for( int k = 0; k < FFM_NUM_PHASES; ++k )
+	{
+		double rate = FFM_PHASES[ k ].scale;
+		for( int i = 0; i < FFM_PHASES[ k ].count; ++i )
+			rate *= Value( FFM_PHASES[ k ].defs[ i ], 0 );
+		phases[ k ] += rate * lastDelta;
+	}
 	float bpm = 120.0f, barPhase, beat;
 	if( hasBeatInfo )
 	{
@@ -471,6 +479,8 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 		glUniform2f( glGetUniformLocation( prog, "ffm_Resolution" ), (float)w, (float)h );
 		glUniform1f( glGetUniformLocation( prog, "ffm_Time" ), (float)clockTime );
 		glUniform1f( glGetUniformLocation( prog, "ffm_TimeDelta" ), lastDelta );
+		for( int k = 0; k < FFM_NUM_PHASES; ++k )
+			glUniform1f( glGetUniformLocation( prog, FFM_PHASES[ k ].uniform ), (float)phases[ k ] );
 		glUniform1i( glGetUniformLocation( prog, "ffm_Frame" ), frame );
 		glUniform1i( glGetUniformLocation( prog, "ffm_PassIndex" ), pi );
 		glUniform1f( glGetUniformLocation( prog, "ffm_BPM" ), bpm );

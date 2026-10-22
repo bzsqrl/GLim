@@ -54,6 +54,8 @@ def program_glsl(ir, prog):
             out.append(f"const {p.glsl_type} {p.name} = {glsl_literal(p)};\n")
         elif p.name:
             out.append(f"uniform {p.glsl_type} {p.name};\n")
+    for ph in ir.phases:
+        out.append(f"uniform float {ph.name};  // running total of time * {' * '.join(ph.params)}\n")
     samplers = sampler_names(ir)
     for s in samplers:
         out.append(f"uniform sampler2D {s};\n")
@@ -271,6 +273,30 @@ def shader_data_header(ir, programs_glsl, plugin_name):
     lines += defs or ['    { "", "", FFM_K_FLOAT, { 0 }, { 0 }, { 1 }, 1, 0, nullptr, nullptr, 0 },']
     lines.append("};")
     lines.append(f"static const int FFM_NUM_PARAMS = {len(defs)};")
+    lines.append("")
+
+    # Phases: running totals of time * sliders. Hidden params are constants,
+    # folded into the scale.
+    def_index = {}
+    for p in ir.params:
+        if not p.hidden:
+            def_index[p.name or p.kind] = len(def_index)
+    phase_defs = []
+    for ph in ir.phases:
+        scale, idx = 1.0, []
+        for nm in ph.params:
+            p = ir.param(nm)
+            if p is None or p.hidden:
+                scale *= float(p.default) if p else 0.0
+            else:
+                idx.append(def_index[nm])
+        idx += [0] * (4 - len(idx))
+        n = sum(1 for nm in ph.params if ir.param(nm) and not ir.param(nm).hidden)
+        phase_defs.append(f"    {{ {_cstr(ph.name)}, {_cfloat(scale)}, {n}, {{ {', '.join(map(str, idx))} }} }},")
+    lines.append("static const FFMPhaseDef FFM_PHASES[] = {")
+    lines += phase_defs or ['    { "", 0.0f, 0, { 0, 0, 0, 0 } },']
+    lines.append("};")
+    lines.append(f"static const int FFM_NUM_PHASES = {len(phase_defs)};")
     lines.append("")
 
     targets = []
