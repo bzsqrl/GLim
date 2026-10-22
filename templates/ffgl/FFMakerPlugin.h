@@ -48,6 +48,17 @@ struct FFMParamDef
 	int numOptions;
 };
 
+// time * sliders in the shader, kept as a running total (phase += scale * product
+// of the params' values * frame time) so moving a slider changes the rate
+// instead of jumping the animation.
+struct FFMPhaseDef
+{
+	const char* uniform;
+	float scale; // product of hidden (constant) params
+	int count;   // live params multiplied in
+	int defs[ 4 ];// indices into FFM_PARAMS
+};
+
 struct FFMSamplerDef
 {
 	const char* name;
@@ -144,6 +155,7 @@ private:
 	double realTime    = 0.0;
 
 	double clockTime = 0.0;
+	std::vector< double > phases;// FFM_PHASES running totals
 	float lastDelta  = 0.0f;
 	int frame        = 0;
 	bool hasLastTick = false;

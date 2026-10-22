@@ -150,6 +150,13 @@ def emit(ir, source_code=None):
         if sym == "time" and not has_speed:
             expr = "TIME"
         defines.append(f"#define {name} {expr}")
+    # ISF has no state to keep a running total in, so phases are the plain
+    # product again (moving those sliders jumps the animation, as in the source).
+    # Named ffmPhaseN like the other ISF-side names (ffm_ is reserved on re-import).
+    time_expr = ISF_SYMBOLS["time"] if has_speed else "TIME"
+    phase_renames = {ph.name: ph.name.replace("ffm_phase", "ffmPhase") for ph in ir.phases}
+    for ph in ir.phases:
+        defines.append(f"#define {phase_renames[ph.name]} ({' * '.join(ph.params)} * {time_expr})")
 
     targets = [ps.target for ps in ir.passes if ps.target]
     if targets:
@@ -168,7 +175,7 @@ def emit(ir, source_code=None):
     toks = G.tokenize(body)
     # User code must not redefine names the ISF host provides.
     clash = {n: "user_" + n for n in G.declared_names(toks) if n in ISF_RESERVED or n.startswith("IMG_")}
-    G.rename_everywhere(toks, clash)
+    G.rename_everywhere(toks, {**clash, **phase_renames})
     # Some hosts (MadMapper on macOS) put gl_FragCoord's origin at the top, so
     # pixel coordinates are rebuilt from isf_FragNormCoord, which every host
     # sets with ISF's bottom-left origin.

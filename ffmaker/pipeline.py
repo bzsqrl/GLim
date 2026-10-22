@@ -86,6 +86,9 @@ def _blame(ir, raw):
         for nm in ir.promoted:
             if re.search(rf"\b{re.escape(nm)}\b", text):
                 blamed.add(nm)
+        for ph in ir.phases:        # time * slider was replaced by a phase name
+            if re.search(rf"\b{ph.name}\b", text):
+                blamed.update(n for n in ph.params if n in ir.promoted)
     if not blamed and beyond:
         # Error in hoisted init code — demote everything promoted to be safe.
         blamed = set(ir.promoted)

@@ -159,11 +159,14 @@ def _build_program(code, ir, path, extract_params, exclude, promote_ints, direct
     if extract_params and ir.dialect != "isf":
         _promote_constants(toks, ir, set(exclude), promote_ints)
         toks = retok(toks)
+    _rate_phases(toks, ir, aliases)
+    toks = retok(toks)
 
     _zero_init(toks)
     toks = retok(toks)
 
     dynamic = set(aliases) | {p.name for p in ir.params if p.name} | {i.name for i in ir.images}
+    dynamic |= {ph.name for ph in ir.phases}
     dynamic |= {p.target for p in ir.passes if p.target}
     hoisted = _hoist_globals(toks, dynamic)
     toks = retok(toks)
@@ -855,6 +858,203 @@ def _looks_mathematical(name, vals):
         if any(abs(v - m) < 1e-3 for m in _MATH_VALUES):
             return True
     return False
+
+
+# ── Rate params: time * slider becomes a running total ──────────────────────
+# `iTime * speed` jumps the animation when the slider moves, because it scales
+# the whole elapsed time. The host instead keeps phase += speed * frame time
+# (an ir.Phase) and the shader reads that, so the slider changes the rate only.
+
+_MAX_PHASE_PARAMS = 4
+_VEC_CTORS = {"vec2": 2, "vec3": 3, "vec4": 4}
+
+
+def _rate_phases(toks, ir, aliases):
+    times = {n for n, s in aliases.items() if s == "time"}
+    rates = {p.name for p in ir.params if p.name and p.kind == "float" and p.glsl_type == "float"}
+    if not times or not rates:
+        return
+    _rewrite_rate_products(toks, ir, times, rates, scoped=True)
+    # Products inside #define bodies too (`#define T (iTime * speed)`).
+    for t in toks:
+        if t.kind != "preproc":
+            continue
+        m = re.match(r"(\s*#\s*define\s+\w+(?:\([^)]*\))?)(.*)$", t.text, re.S)
+        if m and any(re.search(rf"\b{re.escape(n)}\b", m.group(2)) for n in times):
+            body = G.tokenize(m.group(2))
+            _rewrite_rate_products(body, ir, times, rates, scoped=False)
+            t.text = m.group(1) + G.untokenize(body)
+
+
+def _local_names(toks):
+    """(start, end, names) per function: names declared as its parameters or
+    locals (`TYPE name`), which shadow params of the same name."""
+    out = []
+    for it in G.analyze(toks):
+        if it.kind != "func" or not it.params or not it.body:
+            continue
+        names, prev = set(), None
+        for k in range(it.params[0], it.body[1] + 1):
+            t = toks[k]
+            if t.kind in G.TRIVIA:
+                continue
+            if t.kind == "ident" and prev is not None and prev.text in G.TYPES:
+                names.add(t.text)
+            prev = t
+        out.append((it.params[0], it.body[1], names))
+    return out
+
+
+def _rewrite_rate_products(toks, ir, times, rates, scoped):
+    n = 0
+    for _ in range(10000):
+        sig = G.significant(toks)
+        occ = [j for j, k in enumerate(sig) if toks[k].kind == "ident" and toks[k].text in times
+               and not (j > 0 and toks[sig[j - 1]].text == ".")]
+        if n >= len(occ):
+            return
+        shadowed = set()
+        if scoped:
+            k = sig[occ[n]]
+            for a, b, names in _local_names(toks):
+                if a <= k <= b:
+                    shadowed = names
+        if not _rewrite_one(toks, sig, occ[n], ir, times, rates - shadowed):
+            n += 1
+
+
+def _rewrite_one(toks, sig, j, ir, times, rates):
+    """Rewrite the product containing the time name at sig[j]. False if it
+    doesn't multiply time by sliders in a form that can be integrated."""
+    txt = lambda jj: toks[sig[jj]].text if 0 <= jj < len(sig) else ""
+
+    kind = lambda jj: toks[sig[jj]].kind if 0 <= jj < len(sig) else ""
+
+    def match_open(e):
+        depth = 0
+        for s in range(e, -1, -1):
+            if txt(s) in (")", "]"):
+                depth += 1
+            elif txt(s) in ("(", "["):
+                depth -= 1
+                if depth == 0:
+                    return s
+        return None
+
+    def back(e):
+        """Start of the postfix expression ending at e (ident, number, f(..), (..), x.y, a[i])."""
+        while True:
+            if txt(e) == "]":                 # a[i]: continue with the base expression
+                s = match_open(e)
+                if s is None:
+                    return None
+                e = s - 1
+                continue
+            if txt(e) == ")":
+                s = match_open(e)
+                if s is None:
+                    return None
+                start = s - 1 if kind(s - 1) == "ident" else s     # call or parentheses
+            elif kind(e) in ("ident", "number"):
+                start = e
+            else:
+                return None
+            if txt(start - 1) == ".":         # x.y: continue with x
+                e = start - 2
+                continue
+            return start
+
+    def fwd(s):
+        """End of the postfix expression starting at s."""
+        if txt(s) == "(":
+            e = sig.index(G.match_close(toks, sig[s]), s)
+        elif kind(s) in ("ident", "number"):
+            e = s
+            if txt(s + 1) == "(":
+                e = sig.index(G.match_close(toks, sig[s + 1]), s)
+        else:
+            return None
+        while txt(e + 1) in ("[", "."):
+            if txt(e + 1) == "[":
+                e = sig.index(G.match_close(toks, sig[e + 1]), e)
+            elif kind(e + 2) == "ident":
+                e += 2
+            else:
+                return None
+        return e
+
+    # Factors joined by '*' around the time name; a factor after '/' is a divisor.
+    factors = [(j, j)]
+    s = j
+    while txt(s - 1) == "*":
+        b = back(s - 2)
+        if b is None or txt(b - 1) == "/":
+            break
+        factors.insert(0, (b, s - 2))
+        s = b
+    e = j
+    while txt(e + 1) == "*":
+        f = fwd(e + 2)
+        if f is None:
+            break
+        factors.append((e + 2, f))
+        e = f
+
+    def single(f, names):
+        return f[0] == f[1] and toks[sig[f[0]]].kind == "ident" and toks[sig[f[0]]].text in names
+
+    if sum(single(f, times) for f in factors) != 1:
+        return False
+    params = [f for f in factors if single(f, rates)]
+    ctor = None
+    for f in factors:
+        if txt(f[0]) in _VEC_CTORS and txt(f[0] + 1) == "(" and txt(f[1]) == ")":
+            args, cur = [], []
+            for jj in range(f[0] + 2, f[1]):
+                if txt(jj) == ",":
+                    args.append(cur)
+                    cur = []
+                else:
+                    cur.append(jj)
+            args.append(cur)
+            simple = all(len(a) == 1 and toks[sig[a[0]]].kind in ("ident", "number") for a in args)
+            if simple and len(args) == _VEC_CTORS[txt(f[0])] and \
+                    any(toks[sig[a[0]]].text in rates for a in args):
+                ctor = (f, args)
+                break
+    names = [txt(f[0]) for f in params]
+    if (not names and not ctor) or len(names) + 1 > _MAX_PHASE_PARAMS:
+        return False
+
+    time_f = next(f for f in factors if single(f, times))
+
+    def drop(f):
+        i = factors.index(f)
+        if i > 0:
+            a = factors[i - 1][1] + 1         # the '*' before it
+            G.blank(toks, sig[a], sig[f[1]])
+        else:
+            G.blank(toks, sig[f[0]], sig[factors[1][0] - 1])   # it and the '*' after it
+
+    if ctor:
+        f, args = ctor
+        for a in args:
+            t = toks[sig[a[0]]]
+            if t.text in rates:
+                t.text = ir.phase(names + [t.text])
+            elif names:
+                t.text = f"{t.text} * {ir.phase(names)}"
+            else:
+                t.text = f"{t.text} * {toks[sig[j]].text}"
+        drop_list = params + [time_f]
+    else:
+        toks[sig[j]].text = ir.phase(names)
+        drop_list = params
+    # Drop right-to-left so earlier '*' positions stay valid.
+    for f in sorted(drop_list, key=lambda f: -f[0]):
+        drop(f)
+        factors.remove(f)
+    return True
 
 
 # ── Zero-initialisation (WebGL/ANGLE semantics) ─────────────────────────────
