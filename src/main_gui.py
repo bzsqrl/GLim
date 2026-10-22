@@ -178,6 +178,11 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                       command=self._add_files_dialog).pack(side="left", padx=(0, 6))
         ctk.CTkButton(toolbar, text="📁 Add Folder", width=120,
                       command=self._add_folder_dialog).pack(side="left", padx=(0, 6))
+        self.btn_reset_queue = ctk.CTkButton(
+            toolbar, text="⟲ Reset Status", width=150,
+            fg_color="#374151", hover_color="#4b5563",
+            command=self._reset_status)
+        self.btn_reset_queue.pack(side="left", padx=(0, 6))
         ctk.CTkButton(toolbar, text="✓ Clear Completed", width=140,
                       fg_color="#374151", hover_color="#4b5563",
                       command=self._clear_completed).pack(side="left", padx=(0, 6))
@@ -247,11 +252,13 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._queue_menu.add_command(label="Build Selected", command=self._start_build_queue)
         self._queue_menu.add_command(label="Export Selected to ISF", command=self._start_export_isf_queue)
         self._queue_menu.add_separator()
+        self._queue_menu.add_command(label="Reset Status", command=self._reset_status)
         self._queue_menu.add_command(label="Open in Single File", command=self._open_selected)
         self._queue_menu.add_command(label="Remove", command=self._remove_selected)
         self.tree.bind("<Button-3>", self._on_queue_right_click)
         if sys.platform == "darwin":    # older Tk on macOS reports right-click as button 2 (elsewhere it's the middle button)
             self.tree.bind("<Button-2>", self._on_queue_right_click)
+            self.tree.bind("<Control-Button-1>", self._on_queue_right_click)   # Mac Control-click
 
         # Drop-zone label (shown when empty)
         self.lbl_drop = ctk.CTkLabel(
@@ -450,6 +457,16 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         n = self._remove_items([item for item in self._queue if item.status == "done"])
         self.log(f"Cleared {n} completed item(s). Remaining: {len(self._queue)}")
 
+    def _reset_status(self):
+        """Set done / failed rows back to Pending (the selection, or the whole queue),
+        so Build Queue converts them again without reloading the files."""
+        items = self._selected_items() or self._queue
+        items = [i for i in items if i.status in ("done", "error")]
+        for item in items:
+            item.status, item.error = "pending", ""
+            self._set_item_status(item, "pending", "Pending")
+        self.log(f"Reset {len(items)} item(s) to Pending.")
+
     def _clear_queue(self):
         n = self._remove_items(list(self._queue))
         self.log("Queue cleared." if not self._queue else
@@ -497,6 +514,8 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                 text=f"▶  Build Selected ({n})" if n else "▶  Build Queue")
         self.btn_export_isf_queue.configure(
             text=f"↑ Export Selected ({n})" if n else "↑ Export ISF")
+        self.btn_reset_queue.configure(
+            text=f"⟲ Reset Selected ({n})" if n else "⟲ Reset Status")
 
     def _add_queue_row(self, item: QueueItem):
         """Add one row to the queue list."""
