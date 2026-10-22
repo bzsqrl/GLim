@@ -430,6 +430,16 @@ class Previewer:
             self.samplers = {}
 
 
+def _double_click_time():
+    """The system's double-click interval in seconds (Windows setting; 0.5 s elsewhere)."""
+    if sys.platform == "win32":
+        try:
+            return ctypes.windll.user32.GetDoubleClickTime() / 1000.0
+        except Exception:
+            pass
+    return 0.5
+
+
 class FullscreenView:
     """A fullscreen window on one monitor that shows a Previewer's output. It
     shares textures with the validation context, so frames go to the screen
@@ -464,7 +474,9 @@ class FullscreenView:
             raise RuntimeError("could not open a fullscreen window")
         self.closed = False
         self.nav = 0                               # -1 / +1: Left / Right pressed (playlist)
+        self._last_click = None
         glfw.set_key_callback(self.win, self._key)
+        glfw.set_mouse_button_callback(self.win, self._mouse)
         glfw.set_input_mode(self.win, glfw.CURSOR, glfw.CURSOR_HIDDEN)
         self.screen = glfw.get_framebuffer_size(self.win)
         scale = min(1.0, max_width / max(1, self.screen[0]))
@@ -486,6 +498,16 @@ class FullscreenView:
             self.closed = True
         elif key in (glfw.KEY_LEFT, glfw.KEY_RIGHT):
             self.nav = -1 if key == glfw.KEY_LEFT else 1
+
+    def _mouse(self, win, button, action, mods):
+        """A double-click closes the view, as a double-click on the preview opens it."""
+        if button != self.glfw.MOUSE_BUTTON_LEFT or action != self.glfw.PRESS:
+            return
+        import time
+        now = time.perf_counter()
+        if self._last_click is not None and now - self._last_click <= _double_click_time():
+            self.closed = True
+        self._last_click = now
 
     def reattach(self):
         """Call when switching Previewers: re-attach the texture on the next show
