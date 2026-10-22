@@ -324,6 +324,11 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.editor = EditorPanel(self.panes, on_recompile=lambda: self.analyze_code(keep_time=True),
                                   log=self.log)
         self.panes.add(self.editor, stretch="always", minsize=760)
+        # Fullscreen preview: Left/Right play through the queue; on exit, the last
+        # shader shown is loaded here.
+        self.editor.get_playlist = lambda: [i.path for i in self._queue]
+        self.editor.convert_path = self._convert_for_preview
+        self.editor.on_fullscreen_exit = self._load_file_path
         self.textbox_code.bind("<Control-Return>", lambda e: (self.analyze_code(), "break")[1])
         if sys.platform == "darwin":
             self.textbox_code.bind("<Command-Return>", lambda e: (self.analyze_code(), "break")[1])
@@ -731,6 +736,12 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.settings["plugin_name"] = name
         else:
             self.settings.pop("plugin_name", None)
+
+    def _convert_for_preview(self, path):
+        """Convert a queue file (with its saved settings) for the fullscreen playlist."""
+        code = open(path, encoding="utf-8", errors="replace").read()
+        return pipeline.convert_ffgl(code, name=Path(path).stem, path=path,
+                                     extract_params=self.extract_params_var.get())
 
     def _load_file_path(self, path: str):
         """Helper to load a file into the Single File editor and analyze it."""

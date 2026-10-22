@@ -32,7 +32,12 @@ class EditorPanel(ctk.CTkFrame):
         self.last_tick = None
         self._photo = None
         self._input_image = None              # (w, h, rgba) for effect previews
-        self._fs = None                       # (FullscreenView, its Previewer) while fullscreen
+        self._fs = None                       # fullscreen state, see "Fullscreen" below
+        # Set by the app: the queue's file paths (fullscreen playlist), a function
+        # converting one for preview, and a callback loading a path into the editor.
+        self.get_playlist = lambda: []
+        self.convert_path = None
+        self.on_fullscreen_exit = None
 
         # Two columns: preview + channels on the left, parameters on the right.
         left = ctk.CTkFrame(self, fg_color="transparent")
@@ -116,7 +121,7 @@ class EditorPanel(ctk.CTkFrame):
             self.log(f"Preview unavailable: {e}")
 
     def _close_previewer(self):
-        self.exit_fullscreen()
+        self.exit_fullscreen(load_last=False)
         if self.previewer:
             try:
                 from ffmaker import validate as V
@@ -155,6 +160,19 @@ class EditorPanel(ctk.CTkFrame):
         self.restart()
 
     # ── Fullscreen ───────────────────────────────────────────────────────────
+    # self._fs = {"view", "pv", "res", "path"} while fullscreen. Left/Right step
+    # through the app's queue (get_playlist) like a playlist; on exit the app
+    # loads the last shader shown into the Single File tab (on_fullscreen_exit).
+
+    def _fs_previewer(self, view, res):
+        from ffmaker import validate as V
+        pv = V.Previewer(res.ir, res.ffgl_glsl, *view.render_size)
+        if self._input_image:
+            w, h, px = self._input_image
+            pv.set_input_image(w, h, px, 0)
+            pv.set_input_image(w, h, px, 1)
+        return pv
+
     def enter_fullscreen(self):
         """Show the preview fullscreen on FFMaker's monitor; Esc returns."""
         if self._fs or not self.previewer:
@@ -166,13 +184,9 @@ class EditorPanel(ctk.CTkFrame):
         try:
             with V.gpu():
                 view = V.FullscreenView(near)
-                pv = V.Previewer(self.res.ir, self.res.ffgl_glsl, *view.render_size)
-                if self._input_image:
-                    w, h, px = self._input_image
-                    pv.set_input_image(w, h, px, 0)
-                    pv.set_input_image(w, h, px, 1)
+                pv = self._fs_previewer(view, self.res)
             pv.values = self.previewer.values     # same dict: slider moves show up live
-            self._fs = (view, pv)
+            self._fs = {"view": view, "pv": pv, "res": self.res, "path": self.shader_path}
         except Exception as e:
             self.log(f"Fullscreen unavailable: {e}")
             with V.gpu():
@@ -180,6 +194,44 @@ class EditorPanel(ctk.CTkFrame):
                     pv.close()
                 if view:
                     view.close()
+
+    def _fs_step(self, direction):
+        """Fullscreen playlist: show the previous / next shader in the queue that compiles."""
+        from ffmaker import validate as V
+        paths = self.get_playlist()
+        if not paths:
+            return
+        cur = self._fs["path"]
+        i = paths.index(cur) if cur in paths else (-1 if direction > 0 else len(paths))
+        for _ in range(len(paths)):
+            i = (i + direction) % len(paths)
+            path = paths[i]
+            if path == cur:
+                break                       # went all the way round
+            name = os.path.basename(path)
+            try:
+                res = self.convert_path(path)
+            except Exception as e:
+                self.log(f"Playlist: skipped {name} ({e})")
+                continue
+            if not (res.ok and res.validated):
+                self.log(f"Playlist: skipped {name} (doesn't compile)")
+                continue
+            view, old = self._fs["view"], self._fs["pv"]
+            try:
+                with V.gpu():
+                    pv = self._fs_previewer(view, res)
+                    for k, p in enumerate(res.ir.params):
+                        pv.values[k] = p.default
+                    old.close()
+                    view.reattach()
+            except Exception as e:
+                self.log(f"Playlist: skipped {name} ({e})")
+                continue
+            self._fs.update(pv=pv, res=res, path=path)
+            self.sim_time = 0.0             # each shader starts from the beginning
+            self.log(f"▶ {name} ({i + 1}/{len(paths)})")
+            return
 
     def _toggle_fullscreen(self, _e=None):
         if self._fs:
@@ -190,22 +242,25 @@ class EditorPanel(ctk.CTkFrame):
             return None
         return "break"
 
-    def exit_fullscreen(self):
+    def exit_fullscreen(self, load_last=True):
+        """Leave fullscreen. If the playlist moved on to another shader, the app
+        loads it into the Single File tab (unless load_last is False)."""
         if not self._fs:
             return
-        view, pv = self._fs
-        self._fs = None
+        fs, self._fs = self._fs, None
         try:
             from ffmaker import validate as V
             with V.gpu():
-                pv.close()
-                view.close()
+                fs["pv"].close()
+                fs["view"].close()
         except Exception:
             pass
         try:
             self.winfo_toplevel().focus_force()
         except tk.TclError:
             pass
+        if load_last and fs["path"] and fs["path"] != self.shader_path and self.on_fullscreen_exit:
+            self.on_fullscreen_exit(fs["path"])
 
     # ── Render loop ──────────────────────────────────────────────────────────
     def _tick(self):
@@ -239,21 +294,28 @@ class EditorPanel(ctk.CTkFrame):
                 self._close_previewer()
         self.after(33, self._tick)
 
-    def _speed(self):
-        for i, p in enumerate(self.res.ir.params):
+    def _speed(self, res=None, pv=None):
+        res, pv = res or self.res, pv or self.previewer
+        for i, p in enumerate(res.ir.params):
             if p.kind == "speed":
-                return float(self.previewer.values.get(i, p.default))
+                return float(pv.values.get(i, p.default))
         return 1.0
 
     def _tick_fullscreen(self, dt):
         """While fullscreen, render there (at screen size) instead of the small preview."""
         from ffmaker import validate as V
-        view, pv = self._fs
+        view = self._fs["view"]
         try:
             with V.gpu():
-                if not view.poll():
-                    raise StopIteration
-                speed = self._speed()
+                alive = view.poll()
+            if not alive:
+                raise StopIteration
+            if view.nav:
+                direction, view.nav = view.nav, 0
+                self._fs_step(direction)
+            pv, res = self._fs["pv"], self._fs["res"]
+            with V.gpu():
+                speed = self._speed(res, pv)
                 if self.playing:
                     self.sim_time += dt * speed
                 pv.render_frame(self.sim_time, dt * speed if self.playing else 0.0)

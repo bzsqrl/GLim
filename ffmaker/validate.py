@@ -463,6 +463,7 @@ class FullscreenView:
             glfw.make_context_current(ctx.win)
             raise RuntimeError("could not open a fullscreen window")
         self.closed = False
+        self.nav = 0                               # -1 / +1: Left / Right pressed (playlist)
         glfw.set_key_callback(self.win, self._key)
         glfw.set_input_mode(self.win, glfw.CURSOR, glfw.CURSOR_HIDDEN)
         self.screen = glfw.get_framebuffer_size(self.win)
@@ -475,13 +476,21 @@ class FullscreenView:
         glfw.make_context_current(ctx.win)
 
     def _key(self, win, key, scancode, action, mods):
-        """Esc, or Ctrl+F (⌘F on macOS) as in FFMaker, closes the view."""
+        """Esc, or Ctrl+F (⌘F on macOS) as in FFMaker, closes the view;
+        Left / Right ask for the previous / next shader."""
         glfw = self.glfw
         if action != glfw.PRESS:
             return
         mod = glfw.MOD_SUPER if sys.platform == "darwin" else glfw.MOD_CONTROL
         if key == glfw.KEY_ESCAPE or (key == glfw.KEY_F and mods & mod):
             self.closed = True
+        elif key in (glfw.KEY_LEFT, glfw.KEY_RIGHT):
+            self.nav = -1 if key == glfw.KEY_LEFT else 1
+
+    def reattach(self):
+        """Call when switching Previewers: re-attach the texture on the next show
+        (a new texture can reuse a deleted one's id)."""
+        self._tex = None
 
     def poll(self):
         """Process window events. False once the user closed it (Esc)."""
