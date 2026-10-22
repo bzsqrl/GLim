@@ -499,7 +499,9 @@ class OutputView:
             glfw.window_hint(hint, value)
         if windowed:
             # On another monitor when there is one, else next to FFMaker.
-            others = [m for m in glfw.get_monitors() if m != home]
+            # Compare by address: each GLFW call returns new ctypes pointer objects.
+            addr = lambda m: ctypes.cast(m, ctypes.c_void_p).value
+            others = [m for m in glfw.get_monitors() if addr(m) != addr(home)]
             mon = others[0] if others else home
             mx, my, mw, mh = glfw.get_monitor_workarea(mon)
             w, h = min(960, mw * 2 // 3), min(540, mh * 2 // 3)
@@ -542,6 +544,16 @@ class OutputView:
         # Window pixels, refreshed by poll(): GLFW only allows window queries on
         # the main thread, and frames may be drawn on another one.
         self.fb_size = glfw.get_framebuffer_size(self.win)
+        # Refresh rate of the window's monitor (e.g. 120 Hz on a MacBook Pro), refreshed
+        # by poll(): the frame-rate cap for drawing loops.
+        self.refresh = 60
+        self._update_refresh()
+
+    def _update_refresh(self):
+        glfw = self.glfw
+        x, y = glfw.get_window_pos(self.win)
+        w, h = glfw.get_window_size(self.win)
+        self.refresh = max(30, glfw.get_video_mode(_monitor_at(glfw, (x + w // 2, y + h // 2))).refresh_rate or 60)
 
     # ── Fullscreen on/off ──
     def _cover(self, mon):
@@ -557,9 +569,11 @@ class OutputView:
         vm = glfw.get_video_mode(mon)
         w, h = vm.size.width, vm.size.height
         if sys.platform == "darwin":
+            # Raise the level first: macOS keeps windows below it out from under the
+            # menu bar, so moving the window to the top would leave it pushed down.
+            _cocoa_set_level(glfw.get_cocoa_window(self.win), 25)    # NSMainMenuWindowLevel + 1
             glfw.set_window_pos(self.win, *glfw.get_monitor_pos(mon))
             glfw.set_window_size(self.win, w, h)
-            _cocoa_set_level(glfw.get_cocoa_window(self.win), 25)    # NSMainMenuWindowLevel + 1
         else:
             glfw.set_window_attrib(self.win, glfw.FLOATING, True)    # above the taskbar
             glfw.set_window_pos(self.win, *glfw.get_monitor_pos(mon))
@@ -644,6 +658,7 @@ class OutputView:
         if self.glfw.window_should_close(self.win):
             self.closed = True
         self.fb_size = self.glfw.get_framebuffer_size(self.win)
+        self._update_refresh()
         return not self.closed
 
     # ── Drawing (any thread, inside gpu()) ──

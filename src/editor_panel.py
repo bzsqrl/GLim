@@ -402,7 +402,12 @@ class EditorPanel(ctk.CTkFrame):
             self.exit_fullscreen()
             return
         try:
-            alive = fs["view"].poll()
+            # Under gpu(): window events can resize the window or switch it to
+            # fullscreen, which mustn't overlap a frame being drawn on the output
+            # thread (on macOS that aborts in Metal).
+            from ffmaker import validate as V
+            with V.gpu():
+                alive = fs["view"].poll()
         except Exception as e:
             self.log(f"Output stopped: {e}")
             self.exit_fullscreen()
@@ -423,6 +428,7 @@ class EditorPanel(ctk.CTkFrame):
         the shader it draws is whatever fs holds (switched under the same lock)."""
         from ffmaker import validate as V
         last = time.perf_counter()
+        due = None                          # when the next frame is due, if not paced by vsync
         while not stop.is_set():
             start = time.perf_counter()
             dt, last = min(start - last, 0.25), start
@@ -444,13 +450,22 @@ class EditorPanel(ctk.CTkFrame):
             except Exception as e:
                 fs["error"] = e
                 return
-            # No vsync wait (minimised / hidden window): don't spin, and leave the UI
-            # thread time (Python runs one thread at a time).
-            spare = 1 / 60 - (time.perf_counter() - start)
+            # No vsync wait (minimised / hidden window, or a macOS display where the
+            # swap doesn't block): pace to the monitor's refresh rate instead, and leave
+            # the UI thread time (Python runs one thread at a time). A frame that took
+            # over half a refresh already waited for vsync, so it doesn't sleep (sleep
+            # overshoots, and would miss the next refresh). Sleeping toward a running
+            # deadline keeps those overshoots from adding up.
+            frame = 1 / fs["view"].refresh
+            now = time.perf_counter()
             if not size:
                 time.sleep(0.05)
-            elif spare > 0:
-                time.sleep(spare)
+            elif now - start > frame / 2:
+                due = now
+            else:
+                due = max(due + frame, now - frame) if due else now + frame
+                if due > now:
+                    time.sleep(due - now)
 
     # ── Settings helpers ─────────────────────────────────────────────────────
     def _pset(self, key):
