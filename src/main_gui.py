@@ -3,6 +3,7 @@ FFMaker – Shader to FFGL Converter
 main_gui.py – Queue-first layout with drag-and-drop batch processing.
 """
 import customtkinter as ctk
+import gc
 import os
 import sys
 import threading
@@ -103,6 +104,20 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         # Create the GPU validation context now, on the main thread (required on
         # macOS; also makes the first Analyze faster).
         self.after(50, self._init_gpu)
+        # Garbage collection runs on this thread only. Left automatic, it runs on
+        # whichever thread is allocating, e.g. the output render thread while it holds
+        # the GPU lock. Collected Tk objects (fonts and variables from replaced
+        # parameter widgets) then wait for this thread, which may itself be waiting
+        # for the GPU lock: a deadlock (seen in the queue slideshow).
+        gc.disable()
+        self.after(50, self._collect_garbage)
+
+    def _collect_garbage(self):
+        """Python's automatic collection schedule, run from the Tk loop."""
+        (c0, c1, c2), (t0, t1, t2) = gc.get_count(), gc.get_threshold()
+        if c0 >= t0:
+            gc.collect(2 if c1 >= t1 and c2 >= t2 else 1 if c1 >= t1 else 0)
+        self.after(50, self._collect_garbage)
 
     def _set_icon(self):
         """FFMaker's icon for its windows (title bar, taskbar, Alt+Tab; the Dock
