@@ -37,6 +37,23 @@ def gpu_cache_key(res, values=None):
     return (tuple(res.ffgl_glsl), repr(sorted(values.items())))
 
 
+TOGGLE_GUARD_S = 0.3            # a toggle button ignores a second click this soon after one
+
+
+def toggle_command(command):
+    """For on/off buttons: ignore a second click within TOGGLE_GUARD_S, so a quick
+    double click (or a bounce) doesn't switch something on and straight off again.
+    (← / → and other one-shot buttons count every click.)"""
+    last = [0.0]
+
+    def run():
+        now = time.perf_counter()
+        if now - last[0] >= TOGGLE_GUARD_S:
+            last[0] = now
+            command()
+    return run
+
+
 def _tk_bg(widget):
     """The colour a CustomTkinter frame actually shows (for plain Tk children)."""
     return tk.Frame.cget(widget, "bg")
@@ -82,11 +99,11 @@ class EditorPanel(ctk.CTkFrame):
         self.preview.pack(padx=8, pady=(8, 4))
         transport = ctk.CTkFrame(left, fg_color="transparent")
         transport.pack(fill="x", padx=8)
-        self.btn_play = ctk.CTkButton(transport, text="⏸", width=36, command=self._toggle_play)
+        self.btn_play = ctk.CTkButton(transport, text="⏸", width=36, command=toggle_command(self._toggle_play))
         self.btn_play.pack(side="left")
         ctk.CTkButton(transport, text="⟲", width=36, command=self.restart).pack(side="left", padx=4)
-        ctk.CTkButton(transport, text="⛶", width=36, command=self._toggle_fullscreen).pack(side="left")
-        self.btn_output = ctk.CTkButton(transport, text="Output", width=60, command=self.open_output_window)
+        ctk.CTkButton(transport, text="⛶", width=36, command=toggle_command(self._toggle_fullscreen)).pack(side="left")
+        self.btn_output = ctk.CTkButton(transport, text="Output", width=60, command=toggle_command(self.open_output_window))
         self.btn_output.pack(side="left", padx=(4, 0))
         self._output_btn_colors = (self.btn_output.cget("fg_color"), self.btn_output.cget("hover_color"))
         self._output_btn_open = False
@@ -109,7 +126,7 @@ class EditorPanel(ctk.CTkFrame):
         ctk.CTkButton(queue_nav, text="←", width=36, command=lambda: self.step_queue(-1)).pack(side="left")
         ctk.CTkButton(queue_nav, text="→", width=36, command=lambda: self.step_queue(1)).pack(side="left", padx=4)
         # Slideshow: Auto steps to the next shader every N seconds, looping the queue.
-        self.btn_auto = ctk.CTkButton(queue_nav, text="Auto", width=50, command=self._toggle_auto)
+        self.btn_auto = ctk.CTkButton(queue_nav, text="Auto", width=50, command=toggle_command(self._toggle_auto))
         self.btn_auto.pack(side="left")
         self._auto_btn_colors = (self.btn_auto.cget("fg_color"), self.btn_auto.cget("hover_color"))
         self.auto_seconds = AUTO_SECONDS
@@ -138,7 +155,7 @@ class EditorPanel(ctk.CTkFrame):
                       command=self.measure_gpu).pack(side="right")
         self._gpu_btn_colors = ("#374151", "#4b5563")
         self.btn_gpu_live = ctk.CTkButton(gpu_row, text="Live", width=50, fg_color=self._gpu_btn_colors[0],
-                                          hover_color=self._gpu_btn_colors[1], command=self.toggle_gpu_live)
+                                          hover_color=self._gpu_btn_colors[1], command=toggle_command(self.toggle_gpu_live))
         self.btn_gpu_live.pack(side="right", padx=(0, 4))
         self.lbl_gpu_detail = W.label(left, "", fg=W.DIM, bg=bg, anchor="w")
         self.lbl_gpu_detail.pack(fill="x", padx=8)
@@ -623,6 +640,7 @@ class EditorPanel(ctk.CTkFrame):
             except Exception as e:
                 fs["error"] = e
                 return
+            V.let_waiters_in()              # the UI may be waiting to switch shaders etc.
             # No vsync wait (minimised / hidden window, or a macOS display where the
             # swap doesn't block): pace to the monitor's refresh rate instead, and leave
             # the UI thread time (Python runs one thread at a time). A frame that took

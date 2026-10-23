@@ -133,16 +133,42 @@ def context():
         return _ctx
 
 
+_waiting = 0                        # threads waiting to enter gpu() (see let_waiters_in)
+_waiting_guard = threading.Lock()
+
+
 @contextmanager
 def gpu():
     """Exclusive use of the validation GL context on this thread."""
-    with _lock:
+    global _waiting
+    with _waiting_guard:
+        _waiting += 1
+    try:
+        _lock.acquire()
+    finally:
+        with _waiting_guard:
+            _waiting -= 1
+    try:
         ctx = context()
         try:
             yield ctx
         finally:
             import glfw
             glfw.make_context_current(None)
+    finally:
+        _lock.release()
+
+
+def let_waiters_in(timeout=0.005):
+    """For loops that take gpu() frame after frame (the output thread, benchmark):
+    call between frames. Python's locks aren't fair, so a loop that takes the lock
+    straight back can keep another thread (e.g. the UI, switching shaders) waiting
+    for several frames; this lets a waiting thread in first (it then holds the lock,
+    and the loop's next gpu() waits for it)."""
+    import time
+    end = time.perf_counter() + timeout
+    while _waiting and time.perf_counter() < end:
+        time.sleep(0)
 
 
 @contextmanager
@@ -508,6 +534,7 @@ def benchmark(ir, glsl_list, values=None, size=BENCH_SIZE, seconds=1.0, max_fram
                 pv.render_frame(sim, 1 / 60)
                 gl.glEndQuery(gl.GL_TIME_ELAPSED)
                 ns = _query_ns(gl, q)
+            let_waiters_in()
             n, sim = n + 1, sim + 1 / 60
             elapsed = time.perf_counter() - t0
             if n <= 3 or (not times and elapsed < 0.2):     # warm-up
