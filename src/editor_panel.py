@@ -271,6 +271,7 @@ class EditorPanel(ctk.CTkFrame):
         (the output follows). Wraps around; starts at either end if the current
         shader isn't in the queue. The ← / → buttons and the output's arrow keys."""
         paths = self.get_playlist()
+        self._update_queue_label()
         if not paths:
             self.log("The queue is empty: add shaders on the Queue tab to step through them.")
             return

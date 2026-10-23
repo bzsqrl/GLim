@@ -527,6 +527,7 @@ class OutputView:
         if not self.win:
             glfw.make_context_current(ctx.win)
             raise RuntimeError("could not open the output window")
+        _set_window_icon(glfw, self.win)
         self.closed = False
         self.nav = 0                               # -1 / +1: Left / Right pressed (playlist)
         self._toggle = self._escape = False
@@ -716,6 +717,22 @@ class OutputView:
         glfw.poll_events()
         glfw.destroy_window(self.win)
         self.win = None
+
+
+def _set_window_icon(glfw, win):
+    """FFMaker's icon on the output window (title bar, taskbar). macOS windows
+    have no icons; the app's Dock icon is used there."""
+    if sys.platform == "darwin":
+        return
+    try:
+        import os
+        from PIL import Image
+        from . import paths
+        d = os.path.join(paths.icon_dir(), "png")
+        glfw.set_window_icon(win, 3, [Image.open(os.path.join(d, f"ffmaker_{s}.png")).convert("RGBA")
+                                      for s in (16, 32, 48)])
+    except Exception:
+        pass                                       # cosmetic
 
 
 def _monitor_at(glfw, point):

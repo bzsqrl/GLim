@@ -14,6 +14,7 @@ Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for
 | `templates/ffgl/` | The fixed C++ FFGL plugin runtime, driven by a generated `ShaderData.h` |
 | `boilerplates/ffgl/` | Vendored Resolume FFGL SDK (BSD-style license, see its `LICENSE.md`) |
 | `src/` | GUI (`main_gui.py`, `editor_panel.py`) |
+| `assets/icon/` | App icon: `FFMaker.ico` (Windows), `FFMaker.icns` (macOS), `FFMaker.png` (1024 px logo), window icons in `png/`. Regenerate with `python assets/icon/make_icon.py`. |
 | `tests/` | Regression runner (`run_corpus.py`) and feature fixtures |
 | `sample-shaders/` | Test corpus |
 
