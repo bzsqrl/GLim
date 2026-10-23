@@ -114,6 +114,7 @@ Open `dist/FFMaker.app`, or run `venv/bin/python src/main_gui.py`. In the **Queu
 | Sliders | Dragging moves the value. Clicking the track jumps there and can keep dragging. Right-click (or Control-click) resets. After a click, ← / → step the value and the handle turns amber. |
 | Menus | **long** parameters and the channel / filter / wrap menus open a menu on click, and a choice applies. |
 | GPU load | **Measure** (or **Live** on, then loading a shader) shows "measuring…", then e.g. **29% of 60 fps** with ms/frame under the preview. With Live off, switching shaders measures nothing. **Measure GPU** on the Queue tab fills the GPU @1080p column; clicking that heading sorts by it. With **Output** open the readout says "live in the output". (OpenGL timer queries; untested on macOS.) |
+| Buttons | Every click on a button works, also right after the output window or fullscreen closes, without moving the mouse first (`src/ctk_fixes.py`). A quick double click on a toggle (⛶, **Output**, **Auto**, **Live**, play/pause, **Build Queue**, **Measure GPU**) acts once; on ← / → it steps twice. |
 | Output window | With **Output** open, the small preview keeps updating (about 10 fps), and the slideshow (**Auto**) runs without stalling. On macOS the window-event poll still takes the GPU lock (`validate.window_lock`); on Windows it doesn't. |
 
 ## 7. Check the plugins in Resolume

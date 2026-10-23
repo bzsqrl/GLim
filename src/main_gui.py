@@ -14,7 +14,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ffmaker import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: E402
 from ffmaker import convert as ffconvert                               # noqa: E402
 from ffmaker import settings as ffsettings                             # noqa: E402
-from editor_panel import EditorPanel, gpu_cache_key                    # noqa: E402
+from editor_panel import EditorPanel, gpu_cache_key, toggle_command    # noqa: E402
+import ctk_fixes                                                       # noqa: E402
+
+ctk_fixes.apply()       # before any widget exists: buttons that ignored some clicks
 
 
 # --- Drag-and-drop support (optional, graceful fallback) ---
@@ -234,13 +237,13 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.btn_build_queue = ctk.CTkButton(
             toolbar, text="▶  Build Queue", width=170,
             fg_color="#6366f1", hover_color="#4f46e5",
-            command=self._start_build_queue)
+            command=toggle_command(self._start_build_queue))     # Build / Cancel
         self.btn_build_queue.pack(side="right")
 
         self.btn_measure_gpu = ctk.CTkButton(
             toolbar, text="⏱ Measure GPU", width=150,
             fg_color="#374151", hover_color="#4b5563",
-            command=self._start_measure_gpu)
+            command=toggle_command(self._start_measure_gpu))     # Measure / Stop
         self.btn_measure_gpu.pack(side="right", padx=(0, 6))
 
         # Queue list: a native Treeview only draws the visible rows, so it stays
