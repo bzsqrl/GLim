@@ -137,9 +137,8 @@ _waiting = 0                        # threads waiting to enter gpu() (see let_wa
 _waiting_guard = threading.Lock()
 
 
-@contextmanager
-def gpu():
-    """Exclusive use of the validation GL context on this thread."""
+def _acquire():
+    """Take _lock, counted as a waiter meanwhile (see let_waiters_in)."""
     global _waiting
     with _waiting_guard:
         _waiting += 1
@@ -148,6 +147,12 @@ def gpu():
     finally:
         with _waiting_guard:
             _waiting -= 1
+
+
+@contextmanager
+def gpu():
+    """Exclusive use of the validation GL context on this thread."""
+    _acquire()
     try:
         ctx = context()
         try:
@@ -180,8 +185,11 @@ def window_lock():
     allows events on the main thread while another thread draws and swaps, and
     waiting there would stall the UI for up to a frame (the swap waits for vsync)."""
     if sys.platform == "darwin":
-        with _lock:
+        _acquire()                  # counted, so the output thread lets it in between frames
+        try:
             yield
+        finally:
+            _lock.release()
     else:
         yield
 
@@ -621,6 +629,23 @@ def _cocoa_set_level(nswindow, level):
     send(nswindow, objc.sel_registerName(b"setLevel:"), level)
 
 
+def _cgl_current():
+    """macOS: the current context's CGLContextObj (None elsewhere)."""
+    if sys.platform != "darwin":
+        return None
+    cgl = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/OpenGL.framework/OpenGL")
+    cgl.CGLGetCurrentContext.restype = ctypes.c_void_p
+    return cgl.CGLGetCurrentContext()
+
+
+def _cgl_lock(obj, on):
+    if obj:
+        cgl = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/OpenGL.framework/OpenGL")
+        f = cgl.CGLLockContext if on else cgl.CGLUnlockContext
+        f.argtypes = [ctypes.c_void_p]
+        f(obj)
+
+
 class OutputView:
     """A window that shows a Previewer's output. It shares textures with the
     validation context, so frames go to the screen without a CPU copy.
@@ -693,6 +718,7 @@ class OutputView:
         glfw.focus_window(self.win)
         glfw.make_context_current(self.win)
         glfw.swap_interval(1)                      # vsync: paced by the display, no tearing
+        self._cgl = _cgl_current()                 # macOS: locked while drawing (see show)
         self.fbo = gl.glGenFramebuffers(1)        # framebuffers aren't shared between contexts
         self._tex = None
         glfw.make_context_current(ctx.win)
@@ -802,7 +828,12 @@ class OutputView:
     def poll(self):
         """Process window events and act on them (main thread). False once the
         view should close."""
-        self.glfw.poll_events()
+        # Not on macOS: there GLFW and Tk share one event queue, and Tk's loop already
+        # delivers this window's events. glfwPollEvents would also take Tk's events off
+        # the queue and send them on itself, past Tk's own handling, so clicks on
+        # FFMaker's buttons (Output, fullscreen) were sometimes lost.
+        if sys.platform != "darwin":
+            self.glfw.poll_events()
         # Act outside the callbacks: changing the window from inside them isn't safe.
         if self._toggle:
             self._toggle = False
@@ -839,6 +870,10 @@ class OutputView:
             return
         gl.glFlush()                               # finish the frame before the other context reads it
         glfw.make_context_current(self.win)
+        # macOS: AppKit updates this context on the main thread when the window is
+        # resized or moved, which mustn't overlap drawing (it crashes). The update
+        # takes the context's CGL lock, so drawing holds it too.
+        _cgl_lock(self._cgl, True)
         try:
             gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, self.fbo)
             if self._tex != pv.out_tex:
@@ -856,6 +891,7 @@ class OutputView:
                                  gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
             glfw.swap_buffers(self.win)
         finally:
+            _cgl_lock(self._cgl, False)
             glfw.make_context_current(self.ctx.win)
 
     def close(self):
