@@ -42,7 +42,7 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
 - Drag the column header edges to resize columns. Click the **Filename**, **Type** or **GPU** heading to sort the queue by it (click again to reverse). The sorted order becomes the queue's order, for builds and for ← / → and the slideshow.
 - **Analyze** fills the **GPU @1080p** column with each shader's GPU load (see *GPU load* below), for the selected rows or the whole queue. Press it again to stop (it reads **Stop Measuring** meanwhile; **Build FFGL** likewise reads **Cancel Build**). Sorting by GPU puts the heaviest first; ⚠ marks shaders that can't hold 60 fps at 1080p on this computer. The log names the heaviest one.
 
-**Single File tab (editor):** open or paste a shader and click **Analyze Code** (or press Ctrl+Enter; ⌘+Enter on macOS). You get:
+**Single File tab (editor):** open or paste a shader and click **Process Code** (or press Ctrl+Enter; ⌘+Enter on macOS). **Build FFGL (.dll)** (`.bundle` on macOS) then makes the plugin and **Export ISF (.fs)** the ISF file, as on the Queue tab. You get:
 - **Live preview.** Rendered on your GPU the same way the plugin renders it.
   - **Fullscreen:** click **⛶**, double-click the preview, or press **Ctrl+F** (⌘F on macOS) to fill the monitor FFMaker is on; press **Esc**, **Ctrl+F** / ⌘F again, or double-click to return.
   - **Output window (multi-monitor):** click **⧉** (left of ⛶) to show the live render in its own window, opened on another monitor if you have one. Move and resize it like any window; FFMaker stays usable, and slider changes show up live. Double-click it or press **Ctrl+F** / ⌘F (in it, or in FFMaker) to make it fullscreen on the monitor it's on; **Esc** goes back to the window. The **⧉** button is a toggle (amber while the window is open): press it again, or use the window's close button, to close it. While the output is fullscreen the button does nothing; press Esc first.
@@ -71,7 +71,7 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
   - While the output window (or fullscreen) is open, measuring times the output itself, at its actual resolution, instead of running a separate 1080p measurement alongside it: continuously with **Live** on ("live in the output"), or for one second when you press **Analyze** ("measured in the output"). These are the output's real frame times, so a light shader can read higher here than measured at 1080p: at 60 fps with little to do, the card lowers its clocks.
   - CPU load isn't shown: shaders run entirely on the GPU, and the plugin's CPU work per frame is tiny.
   - Results depend on the graphics card (and, on laptops, whether it's plugged in). Measurements from the queue and from this tab are shared for the session.
-- **Save settings.** Writes `<shader>.ffmaker.json` next to the shader. **Compile FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
+- **Save settings.** Writes `<shader>.ffmaker.json` next to the shader. **Build FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
 
 **Packaged app:** `dist\FFMaker.exe` (build it with `venv\Scripts\python compile.py`) runs without Python installed. Building plugins still needs CMake and Visual Studio's C++ tools.
 
