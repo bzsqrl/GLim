@@ -508,11 +508,12 @@ def _query_ns(gl, q, wait=True):
 
 
 def benchmark(ir, glsl_list, values=None, size=BENCH_SIZE, seconds=1.0, max_frames=120,
-              cancel=None):
+              cancel=None, warmup_s=0.2):
     """GPU time per frame (ms) of a converted shader at `size`, with param values
     `values` ({index: value}; else defaults). Renders frames back to back, as the
     clock runs at 60 fps, for about `seconds` after a short warm-up (first frames
-    upload textures, and the GPU raises its clocks). Each frame takes gpu() on its
+    upload textures, and the GPU raises its clocks; warmup_s=0 when it's already
+    busy, e.g. runs back to back). Each frame takes gpu() on its
     own, so the output and preview keep drawing in between.
     Returns {"ms": median, "p90": ms, "frames": n, "size": (w, h)}, or None if
     cancel() turned true."""
@@ -537,7 +538,7 @@ def benchmark(ir, glsl_list, values=None, size=BENCH_SIZE, seconds=1.0, max_fram
             let_waiters_in()
             n, sim = n + 1, sim + 1 / 60
             elapsed = time.perf_counter() - t0
-            if n <= 3 or (not times and elapsed < 0.2):     # warm-up
+            if n <= (3 if warmup_s else 1) or (not times and elapsed < warmup_s):   # warm-up
                 continue
             times.append(ns / 1e6)
             if len(times) >= max_frames or (len(times) >= 3 and elapsed > seconds):
@@ -554,7 +555,10 @@ def benchmark(ir, glsl_list, values=None, size=BENCH_SIZE, seconds=1.0, max_fram
 class GpuTimer:
     """Live GPU time of what's drawn between begin() and end(), read back a few
     frames later so it never stalls the drawing thread. Use in one context (the
-    validation context), inside gpu(). ms: a smoothed recent value, or None."""
+    validation context), inside gpu(). ms: a smoothed recent value, or None.
+    reset() when what's drawn changes (another shader, size)."""
+
+    SKIP = 2                    # first frames after a reset (set-up work, e.g. new buffers)
 
     def __init__(self, gl, count=4):
         self.gl = gl
@@ -562,6 +566,11 @@ class GpuTimer:
         self.pending = []
         self._q = None
         self.ms = None
+        self._skip = self.SKIP
+
+    def reset(self):
+        self.ms = None
+        self._skip = self.SKIP
 
     def begin(self):
         self.poll()
@@ -581,6 +590,9 @@ class GpuTimer:
             if ns is None:
                 break
             self.free.append(self.pending.pop(0))
+            if self._skip:
+                self._skip -= 1
+                continue
             ms = ns / 1e6
             self.ms = ms if self.ms is None else self.ms * 0.85 + ms * 0.15
 

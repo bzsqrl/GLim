@@ -100,11 +100,11 @@ Open `dist/FFMaker.app`, or run `venv/bin/python src/main_gui.py`. In the **Queu
 | Look | A dark list with `#`, Filename, Type and Status columns. The text should be readable in the fallback font. The Type column shows `…` briefly, then the type. |
 | Big batch | Make ~800 test files: `mkdir -p /tmp/q && for i in $(seq 1 10); do for f in sample-shaders/*; do cp "$f" "/tmp/q/${i}_$(basename "$f")"; done; done`. Drop `/tmp/q` on the queue. All rows should appear within a second or two, scrolling should be smooth and no rows should be blank. |
 | Select | Click a row, Shift-click a range, ⌘-click to add single rows. *(Not verified on macOS: Tk may use Control-click for this instead.)* |
-| Buttons | With rows selected, the buttons read **Build Selected (n)** and **Export Selected (n)** and act on just those rows. Esc, or clicking empty space below the rows, deselects; the buttons go back to **Build Queue** / **Export ISF**. |
+| Buttons | With rows selected, the buttons read e.g. **Build FFGL (n)** and **Export ISF (n)** and act on just those rows. Esc, or clicking empty space below the rows, deselects; the buttons go back to **Build FFGL** / **Export ISF**. |
 | Remove | The **delete** key (Backspace) removes the selected rows. |
 | Right-click | A two-finger click (or right mouse button) opens Build Selected / Export Selected to ISF / Open in Single File / Remove. **Control-click is not bound**; if that's the habit, it's a one-line addition (`<Control-Button-1>`) next to the `<Button-2>` binding in `src/main_gui.py`. |
 | Double-click | Opens the file in the **Single File** tab. |
-| While building | The window stays responsive during **Build Queue**, and **Cancel Build** stops it. |
+| While building | The window stays responsive during **Build FFGL**, and **Cancel Build** stops it. |
 
 **Parameter panel (since the efficiency pass).** In the **Single File** tab, the parameter rows and Shadertoy channel menus now use plain Tk/ttk widgets (`src/fast_widgets.py`), which have flat corners. They were only tested on Windows, so check them here:
 
@@ -113,9 +113,9 @@ Open `dist/FFMaker.app`, or run `venv/bin/python src/main_gui.py`. In the **Queu
 | Look | Dark rows, readable text, blue slider handles. The checkboxes and entries are dark, not white. |
 | Sliders | Dragging moves the value. Clicking the track jumps there and can keep dragging. Right-click (or Control-click) resets. After a click, ← / → step the value and the handle turns amber. |
 | Menus | **long** parameters and the channel / filter / wrap menus open a menu on click, and a choice applies. |
-| GPU load | **Measure** (or **Live** on, then loading a shader) shows "measuring…", then e.g. **29% of 60 fps** with ms/frame under the preview. With Live off, switching shaders measures nothing. **Measure GPU** on the Queue tab fills the GPU @1080p column; clicking that heading sorts by it. With **Output** open the readout says "live in the output". (OpenGL timer queries; untested on macOS.) |
-| Buttons | Every click on a button works, also right after the output window or fullscreen closes, without moving the mouse first (`src/ctk_fixes.py`). A quick double click on a toggle (⛶, **Output**, **Auto**, **Live**, play/pause, **Build Queue**, **Measure GPU**) acts once; on ← / → it steps twice. |
-| Output window | With **Output** open, the small preview keeps updating (about 10 fps), and the slideshow (**Auto**) runs without stalling. On macOS the window-event poll still takes the GPU lock (`validate.window_lock`); on Windows it doesn't. |
+| GPU load | **Analyze** (or **Live** on, then loading a shader) shows "measuring…", then e.g. **29% of 60 fps** with ms/frame under the preview. With Live off, switching shaders measures nothing. **Analyze** on the Queue tab fills the GPU @1080p column; clicking that heading sorts by it. With the output window (**⧉**) open the readout says "live in the output". (OpenGL timer queries; untested on macOS.) |
+| Buttons | Every click on a button works, also right after the output window or fullscreen closes, without moving the mouse first (`src/ctk_fixes.py`). A quick double click on a toggle (⛶, **⧉** (output window), **Auto**, **Live**, play/pause, **Build FFGL**, **Analyze**) acts once; on ← / → it steps twice. |
+| Output window | With the output window (**⧉**) open, the small preview keeps updating (about 10 fps), and the slideshow (**Auto**) runs without stalling. On macOS the window-event poll still takes the GPU lock (`validate.window_lock`); on Windows it doesn't. |
 
 ## 7. Check the plugins in Resolume
 
