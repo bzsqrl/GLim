@@ -14,6 +14,8 @@ from PIL import Image, ImageTk
 
 from ffmaker import settings as S
 
+import fast_widgets as W
+
 PREVIEW_W, PREVIEW_H = 384, 216
 SMALL_FPS_WITH_OUTPUT = 10      # small preview rate while the output window draws the full one
 AUTO_SECONDS = 10.0             # slideshow: default time each queue shader shows
@@ -21,6 +23,11 @@ AUTO_MIN_SECONDS = 1.0
 CHANNEL_CHOICES = ["input", "noise", "audio", "none", "file…"]
 FILTER_CHOICES = ["filter", "nearest", "linear", "mipmap"]   # first entry = Shadertoy default
 WRAP_CHOICES = ["wrap", "clamp", "repeat"]
+
+
+def _tk_bg(widget):
+    """The colour a CustomTkinter frame actually shows (for plain Tk children)."""
+    return tk.Frame.cget(widget, "bg")
 
 
 class EditorPanel(ctk.CTkFrame):
@@ -45,7 +52,7 @@ class EditorPanel(ctk.CTkFrame):
         self.convert_path = None
         self.on_select = None
         self._queue_label_tick = 0
-        self._small_shown = 0.0
+        self._small_visible = False         # main thread → output thread: draw the small preview
 
         # Two columns: preview + channels on the left, parameters on the right.
         left = ctk.CTkFrame(self, fg_color="transparent")
@@ -114,6 +121,8 @@ class EditorPanel(ctk.CTkFrame):
                       command=self.reset_settings).pack(side="right", padx=4)
         self.params_frame = ctk.CTkScrollableFrame(right)
         self.params_frame.pack(fill="both", expand=True, padx=8, pady=(4, 8))
+        W.setup(self)
+        self._params_bg = _tk_bg(self.params_frame)
         self.lbl_empty = ctk.CTkLabel(self.params_frame, text="Click 'Analyze Code' to load a shader.",
                                       text_color="gray")
         self.lbl_empty.pack(pady=10)
@@ -280,7 +289,7 @@ class EditorPanel(ctk.CTkFrame):
         """Esc in FFMaker: the output window leaves fullscreen; plain fullscreen closes."""
         if self._fs:
             from ffmaker import validate as V
-            with V.gpu():
+            with V.window_lock():
                 self._fs["view"].escape()
 
     # ── Queue playlist ───────────────────────────────────────────────────────
@@ -385,7 +394,7 @@ class EditorPanel(ctk.CTkFrame):
         fullscreen; otherwise open / close fullscreen on FFMaker's monitor."""
         if self._fs:
             from ffmaker import validate as V
-            with V.gpu():
+            with V.window_lock():
                 self._fs["view"].toggle()      # plain fullscreen: marks it closed
         elif self.winfo_viewable():         # only from the Single File tab
             self.enter_fullscreen()
@@ -424,30 +433,39 @@ class EditorPanel(ctk.CTkFrame):
         self._update_output_button()               # the output can also close from its own window
         self._tick_auto(dt)
         if self._fs:
-            # The output draws itself on its own thread (and advances the clock); here:
-            # its events and keys, and the small preview at a lower rate so it stays live
-            # without taking time from the output.
+            # The output draws itself on its own thread (and advances the clock), along
+            # with the small preview at a lower rate (SMALL_FPS_WITH_OUTPUT); here: its
+            # events and keys, and showing the small preview's pixels.
+            self._small_visible = bool(self.previewer) and self.winfo_ismapped()
             self._tick_output()
-            if self._fs and now - self._small_shown >= 1 / SMALL_FPS_WITH_OUTPUT:
-                self._draw_small(now - self._small_shown, advance=False)
+            px = self._fs.pop("small_px", None) if self._fs else None
+            if px:
+                self._show_small(px)
             self.after(15, self._tick)
             return
-        self._draw_small(dt, advance=True)
+        self._draw_small(dt)
         self.after(33, self._tick)
 
-    def _draw_small(self, dt, advance):
-        """Render the small preview. advance=False: the output thread owns the clock."""
-        self._small_shown = time.perf_counter()
+    def _draw_small(self, dt):
+        """Render the small preview (while the output is closed)."""
         if not (self.previewer and self.winfo_ismapped()):
             return
         try:
             from ffmaker import validate as V
             speed = self._speed()
-            if advance and self.playing:
+            if self.playing:
                 self.sim_time += dt * speed
             with V.gpu():
                 self.previewer.render_frame(self.sim_time, min(dt, 0.25) * speed if self.playing else 0.0)
                 px = self.previewer.read()
+        except Exception as e:
+            self.log(f"Preview stopped: {e}")
+            self._close_previewer()
+            return
+        self._show_small(px)
+
+    def _show_small(self, px):
+        try:
             img = Image.frombytes("RGBA", (PREVIEW_W, PREVIEW_H), px).transpose(Image.FLIP_TOP_BOTTOM)
             bg = Image.new("RGBA", img.size, (24, 24, 24, 255))   # show transparency as dark grey
             img = Image.alpha_composite(bg, img).convert("RGB")
@@ -460,6 +478,20 @@ class EditorPanel(ctk.CTkFrame):
         except Exception as e:
             self.log(f"Preview stopped: {e}")
             self._close_previewer()
+
+    def _render_small_for_output(self, fs, dt):
+        """Output thread, inside gpu(): render the small preview too, and leave its
+        pixels for the main thread to show (which then needn't wait for the GPU)."""
+        pv = self.previewer
+        if not (self._small_visible and pv and pv.progs):     # closed: being replaced
+            return
+        try:
+            speed = next((float(pv.values.get(i, p.default)) for i, p in enumerate(pv.ir.params)
+                          if p.kind == "speed"), 1.0)      # pv's own params (self.res may be newer)
+            pv.render_frame(self.sim_time, dt * speed if self.playing else 0.0)
+            fs["small_px"] = pv.read()
+        except Exception:
+            self._small_visible = False
 
     def _speed(self, res=None, pv=None):
         res, pv = res or self.res, pv or self.previewer
@@ -478,11 +510,10 @@ class EditorPanel(ctk.CTkFrame):
             self.exit_fullscreen()
             return
         try:
-            # Under gpu(): window events can resize the window or switch it to
-            # fullscreen, which mustn't overlap a frame being drawn on the output
-            # thread (on macOS that aborts in Metal).
+            # Window events can resize the window or switch it to fullscreen, which on
+            # macOS mustn't overlap a frame being drawn on the output thread.
             from ffmaker import validate as V
-            with V.gpu():
+            with V.window_lock():
                 alive = fs["view"].poll()
         except Exception as e:
             self.log(f"Output stopped: {e}")
@@ -505,6 +536,7 @@ class EditorPanel(ctk.CTkFrame):
         from ffmaker import validate as V
         last = time.perf_counter()
         due = None                          # when the next frame is due, if not paced by vsync
+        small_t = 0.0                       # when the small preview was last drawn
         while not stop.is_set():
             start = time.perf_counter()
             dt, last = min(start - last, 0.25), start
@@ -523,6 +555,9 @@ class EditorPanel(ctk.CTkFrame):
                             self.sim_time += dt * speed
                         pv.render_frame(self.sim_time, dt * speed if self.playing else 0.0)
                         view.show(pv)          # vsync in the swap paces this loop
+                        if start - small_t >= 1 / SMALL_FPS_WITH_OUTPUT:
+                            self._render_small_for_output(fs, min(start - small_t, 0.25))
+                            small_t = start
             except Exception as e:
                 fs["error"] = e
                 return
@@ -569,23 +604,24 @@ class EditorPanel(ctk.CTkFrame):
         chans = [i for i in ir.images if i.name.startswith("iChannel")] if ir.dialect == "shadertoy" else []
         if not chans or any(p.label for p in ir.programs):    # multi-buffer projects: wiring is in the file
             return
-        ctk.CTkLabel(self.channel_frame, text="Channels", font=("Arial", 13, "bold")).pack(anchor="w")
+        bg = _tk_bg(self.channel_frame)
+        W.label(self.channel_frame, "Channels", bg=bg).pack(anchor="w")
         for im in sorted(chans, key=lambda i: i.name):
-            row = ctk.CTkFrame(self.channel_frame, fg_color="transparent")
+            row = W.frame(self.channel_frame, bg=bg)
             row.pack(fill="x", pady=1)
-            ctk.CTkLabel(row, text=im.name, width=80, anchor="w").pack(side="left")
+            W.label(row, im.name, bg=bg, width=9, anchor="w").pack(side="left")
             val, opts = self._channel_value(im)
             shown = val if val in CHANNEL_CHOICES else os.path.basename(val)
-            menu = ctk.CTkOptionMenu(row, values=CHANNEL_CHOICES, width=130,
-                                     command=lambda c, n=im.name: self._channel_choice(n, c))
+            menu = W.Menu(row, CHANNEL_CHOICES, width=12,
+                          command=lambda c, n=im.name: self._channel_choice(n, c))
             menu.set(shown)
             menu.pack(side="left", padx=4)
             if im.source == "audio":
                 continue
             # Per-channel sampler settings, as on Shadertoy.
             for key, choices in (("filter", FILTER_CHOICES), ("wrap", WRAP_CHOICES)):
-                m = ctk.CTkOptionMenu(row, values=choices, width=80,
-                                      command=lambda c, n=im.name, k=key: self._sampler_choice(n, k, c))
+                m = W.Menu(row, choices, width=6,
+                           command=lambda c, n=im.name, k=key: self._sampler_choice(n, k, c))
                 m.set(opts.get(key, choices[0]))
                 m.pack(side="left", padx=2)
 
@@ -648,27 +684,36 @@ class EditorPanel(ctk.CTkFrame):
         self._store_channel(name, choice, opts)
 
     # ── Parameters ───────────────────────────────────────────────────────────
+    # Built from fast_widgets (plain Tk/ttk): the list is rebuilt on every shader
+    # switch, and CustomTkinter widgets made that take up to half a second.
     def _build_params(self):
-        for w in self.params_frame.winfo_children():
+        """Rebuild the parameter rows: built in a frame that isn't shown yet, which
+        then replaces the old one in one step (so the list lays out once)."""
+        old = self.params_frame.winfo_children()
+        self._params_box = box = W.frame(self.params_frame, bg=self._params_bg)
+        self._fill_params(box)
+        box.pack(fill="x")
+        for w in old:
             w.destroy()
+
+    def _fill_params(self, box):
         ir = self.res.ir
         if not ir.params and not S.excluded_constants(self.settings):
-            ctk.CTkLabel(self.params_frame, text="No parameters.", text_color="gray").pack(pady=10)
+            W.label(box, "No parameters.", fg="gray", bg=self._params_bg).pack(pady=10)
             return
         for i, p in enumerate(ir.params):
             self._param_row(i, p)
         # Constants the user chose to hide: listed so they can be re-exposed.
         present = {S.param_key(p) for p in ir.params}
         for nm in sorted(S.excluded_constants(self.settings) - present):
-            row = ctk.CTkFrame(self.params_frame, fg_color="#1f2430", corner_radius=6)
+            row = W.frame(box)
             row.pack(fill="x", pady=2)
-            var = ctk.BooleanVar(value=False)
-            ctk.CTkCheckBox(row, text="", width=24, variable=var,
-                            command=lambda n=nm: self._set_expose(n, True)).pack(side="left", padx=4)
-            ctk.CTkLabel(row, text=f"{nm}  (kept as constant)", text_color="#6b7280").pack(side="left")
+            var = tk.BooleanVar(row, value=False)
+            W.check(row, var, command=lambda n=nm: self._set_expose(n, True)).pack(side="left", padx=4, pady=4)
+            W.label(row, f"{nm}  (kept as constant)", fg=W.MUTED).pack(side="left")
         for nm in self.res.demoted:
-            ctk.CTkLabel(self.params_frame, text=f"{nm}: can't be a slider (would not compile)",
-                         text_color="#6b7280", anchor="w").pack(fill="x")
+            W.label(box, f"{nm}: can't be a slider (would not compile)", fg=W.MUTED,
+                    bg=self._params_bg, anchor="w").pack(fill="x")
 
     def _set_expose(self, key, on):
         self._pset(key)["expose"] = bool(on)
@@ -684,15 +729,14 @@ class EditorPanel(ctk.CTkFrame):
 
     def _param_row(self, i, p):
         key = S.param_key(p)
-        row = ctk.CTkFrame(self.params_frame, fg_color="#1f2430", corner_radius=6)
+        row = W.frame(self._params_box)
         row.pack(fill="x", pady=2)
-        top = ctk.CTkFrame(row, fg_color="transparent")
-        top.pack(fill="x", padx=4, pady=(3, 0))
+        top = W.frame(row)
+        top.pack(fill="x", padx=6, pady=(4, 2))
         if p.kind != "fft":
-            var = ctk.BooleanVar(value=not p.hidden)
-            ctk.CTkCheckBox(top, text="", width=24, variable=var,
-                            command=lambda: self._set_expose(key, var.get())).pack(side="left")
-        entry = ctk.CTkEntry(top, width=150)
+            var = tk.BooleanVar(row, value=not p.hidden)
+            W.check(top, var, command=lambda: self._set_expose(key, var.get())).pack(side="left", padx=(0, 4))
+        entry = W.entry(top, 18)
         entry.insert(0, p.display())
         entry.pack(side="left", padx=(0, 6))
 
@@ -704,84 +748,83 @@ class EditorPanel(ctk.CTkFrame):
         entry.bind("<Return>", commit_label)
         entry.bind("<FocusOut>", commit_label)
         kind_txt = p.kind + (" (from const)" if p.origin in ("const", "define") else "")
-        ctk.CTkLabel(top, text=kind_txt, text_color="#60a5fa").pack(side="left")
+        W.label(top, kind_txt, fg=W.KIND).pack(side="left")
 
-        body = ctk.CTkFrame(row, fg_color="transparent")
-        body.pack(fill="x", padx=4, pady=(0, 4))
-        state = "disabled" if p.hidden else "normal"
+        body = W.frame(row)
+        body.pack(fill="x", padx=6, pady=(0, 5))
+        enabled = not p.hidden
         if p.kind in ("float", "int", "speed"):
-            self._range_control(body, i, p, key, state)
+            self._range_control(body, i, p, key, enabled)
         elif p.kind in ("bool", "mouseclick"):
-            sw = ctk.CTkSwitch(body, text="", state=state,
-                               command=lambda: self._set_value(i, p, bool(sw.get())))
-            if p.default:
-                sw.select()
+            on = tk.BooleanVar(row, value=bool(p.default))
+            sw = W.check(body, on, command=lambda: self._set_value(i, p, bool(on.get())))
+            if not enabled:
+                sw.state(["disabled"])
             sw.pack(side="left")
         elif p.kind == "event":
-            ctk.CTkButton(body, text="Trigger", width=80, state=state,
-                          command=lambda: self._set_value(i, p, True, save=False)).pack(side="left")
+            W.Button(body, "Trigger", lambda: self._set_value(i, p, True, save=False),
+                     enabled=enabled).pack(side="left")
         elif p.kind == "long":
             def pick(lbl):
                 self._set_value(i, p, p.values[p.labels.index(lbl)])
-            om = ctk.CTkOptionMenu(body, values=list(p.labels), width=160, state=state, command=pick)
-            if p.default in p.values:
-                om.set(p.labels[p.values.index(p.default)])
+            om = W.Menu(body, list(p.labels), command=pick, enabled=enabled)
+            om.set(p.labels[p.values.index(p.default)] if p.default in p.values else "")
             om.pack(side="left")
         elif p.kind == "color":
-            self._color_control(body, i, p, state)
+            self._color_control(body, i, p, enabled)
         elif p.kind in ("point2D", "mouse"):
             mn, mx = (p.min or [0.0, 0.0]), (p.max or [1.0, 1.0])
             if p.pixel_space:
                 mn, mx = [0.0, 0.0], [1920.0, 1080.0]
             vals = list(p.default)
             for axis in (0, 1):
-                line = ctk.CTkFrame(body, fg_color="transparent")
+                line = W.frame(body)
                 line.pack(fill="x")
-                ctk.CTkLabel(line, text="XY"[axis], width=14).pack(side="left")
-                lbl = ctk.CTkLabel(line, text=f"{vals[axis]:.3f}", width=50)
+                W.label(line, "XY"[axis], width=2).pack(side="left")
+                lbl = W.label(line, f"{vals[axis]:.3f}", width=7)
 
                 def move(v, a=axis, l=lbl):
                     vals[a] = float(v)
                     l.configure(text=f"{vals[a]:.3f}")
                     self._set_value(i, p, list(vals))
-                sl = ctk.CTkSlider(line, from_=mn[axis], to=mx[axis], state=state, command=move)
+                sl = W.scale(line, mn[axis], mx[axis], command=move)
                 sl.set(vals[axis])
-                sl.pack(side="left", fill="x", expand=True)
-                if state != "disabled":
+                sl.pack(side="left", fill="x", expand=True, padx=4)
+                if enabled:
                     self._arrow_keys(sl, move)
+                else:
+                    sl.state(["disabled"])
                 lbl.pack(side="left")
         elif p.kind == "fft":
-            ctk.CTkLabel(body, text="Live audio spectrum from the host (preview uses a test spectrum)",
-                         text_color="#9ca3af").pack(side="left")
+            W.label(body, "Live audio spectrum from the host (preview uses a test spectrum)",
+                    fg=W.DIM).pack(side="left")
 
-    def _range_control(self, body, i, p, key, state):
+    def _range_control(self, body, i, p, key, enabled):
         is_int = p.kind == "int"
         fmt = lambda v: str(int(round(v))) if is_int else f"{v:.3f}"
-        line = ctk.CTkFrame(body, fg_color="transparent")
+        line = W.frame(body)
         line.pack(fill="x")
         # Value readout; click it to type a value (Enter applies, Esc cancels).
-        readout = ctk.CTkFrame(line, fg_color="transparent", width=56, height=28)
+        readout = W.frame(line, width=W.px(60), height=W.px(24))
         readout.pack(side="right", padx=(6, 0))
         readout.pack_propagate(False)
-        val_lbl = ctk.CTkLabel(readout, text=fmt(p.default), width=56)
+        val_lbl = W.label(readout, fmt(p.default))
         val_lbl.pack(fill="both", expand=True)
-        val_entry = ctk.CTkEntry(readout, width=56)
-        e_max = ctk.CTkEntry(line, width=50)
+        val_entry = W.entry(readout, 7)
+        e_max = W.entry(line, 6)
         e_max.insert(0, f"{p.max:g}")
         e_max.pack(side="right")
-        e_min = ctk.CTkEntry(line, width=50)
+        e_min = W.entry(line, 6)
         e_min.insert(0, f"{p.min:g}")
         e_min.pack(side="left")
-        steps = lambda lo, hi: int(hi - lo) if is_int and 0 < hi - lo <= 1000 else None
 
         def move(v):
-            v = int(round(v)) if is_int else float(v)
+            v = int(round(float(v))) if is_int else float(v)
             val_lbl.configure(text=fmt(v))
             self._set_value(i, p, v)
-        sl = ctk.CTkSlider(line, from_=p.min, to=p.max, number_of_steps=steps(p.min, p.max),
-                           state=state, command=move)
+        sl = W.scale(line, p.min, p.max, command=move)
         sl.set(p.default)
-        sl.pack(side="left", fill="x", expand=True, padx=4)
+        sl.pack(side="left", fill="x", expand=True, padx=6)
 
         def set_range(lo, hi):
             p.min, p.max = lo, hi
@@ -790,7 +833,7 @@ class EditorPanel(ctk.CTkFrame):
             for e, x in ((e_min, lo), (e_max, hi)):
                 e.delete(0, "end")
                 e.insert(0, f"{x:g}")
-            sl.configure(from_=lo, to=hi, number_of_steps=steps(lo, hi))
+            sl.configure(from_=lo, to=hi)
 
         def set_value(v):
             """Move the slider to v, widening the range first if v is outside it."""
@@ -816,7 +859,8 @@ class EditorPanel(ctk.CTkFrame):
             e.bind("<Return>", commit_range)
             e.bind("<FocusOut>", commit_range)
 
-        if state == "disabled":
+        if not enabled:
+            sl.state(["disabled"])
             return
         self._arrow_keys(sl, move, is_int)
 
@@ -854,49 +898,46 @@ class EditorPanel(ctk.CTkFrame):
         val_entry.bind("<FocusOut>", lambda e: finish(True))
         val_entry.bind("<Escape>", lambda e: finish(False))
 
-    def _color_control(self, body, i, p, state):
+    def _color_control(self, body, i, p, enabled):
         rgba = (list(p.default) + [1.0] * 4)[:4]
 
         def hexcol(c):
             return "#%02x%02x%02x" % tuple(int(max(0, min(1, x)) * 255) for x in c[:3])
-        btn = ctk.CTkButton(body, text="", width=60, height=22, state=state,
-                            fg_color=hexcol(rgba), hover_color=hexcol(rgba))
 
         def pick():
             res = colorchooser.askcolor(color=hexcol(rgba), title=p.display())
             if res and res[0]:
                 rgba[:3] = [c / 255.0 for c in res[0]]
-                btn.configure(fg_color=hexcol(rgba), hover_color=hexcol(rgba))
+                btn.set_colour(hexcol(rgba))
                 self._set_value(i, p, list(rgba))
-        btn.configure(command=pick)
+        btn = W.Button(body, "", pick, width=6, enabled=enabled, bg=hexcol(rgba), hover=hexcol(rgba))
+        btn.configure(highlightthickness=1, highlightbackground=W.BORDER)
         btn.pack(side="left")
         if p.glsl_type == "vec4":
-            ctk.CTkLabel(body, text="alpha").pack(side="left", padx=(8, 2))
-            sl = ctk.CTkSlider(body, from_=0, to=1, width=120, state=state)
+            W.label(body, "alpha").pack(side="left", padx=(8, 2))
 
             def alpha(v):
                 rgba[3] = float(v)
                 self._set_value(i, p, list(rgba))
-            sl.configure(command=alpha)
+            sl = W.scale(body, 0, 1, command=alpha)
+            sl.configure(length=W.px(120))
             sl.set(rgba[3])
             sl.pack(side="left")
-            if state != "disabled":
+            if enabled:
                 self._arrow_keys(sl, alpha)
+            else:
+                sl.state(["disabled"])
 
     def _arrow_keys(self, sl, command, is_int=False):
         """Click a slider to focus it (its handle turns amber); Left/Right then
         step it by 1/100 of its range (1 for integers), within min/max."""
-        canvas = sl._canvas
-        sl.bind("<Button-1>", lambda e: canvas.focus_set(), add=True)
-        normal = sl.cget("button_color")
-        canvas.bind("<FocusIn>", lambda e: sl.configure(button_color="#f59e0b"), add="+")
-        canvas.bind("<FocusOut>", lambda e: sl.configure(button_color=normal), add="+")
+        sl.bind("<Button-1>", lambda e: sl.focus_set(), add=True)
 
         def step(direction):
-            lo, hi = sorted((float(sl.cget("from_")), float(sl.cget("to"))))
+            lo, hi = sorted((float(sl.cget("from")), float(sl.cget("to"))))
             d = 1.0 if is_int else (hi - lo) / 100.0
             sl.set(min(max(sl.get() + direction * d, lo), hi))
             command(sl.get())
             return "break"
-        canvas.bind("<Left>", lambda e: step(-1))
-        canvas.bind("<Right>", lambda e: step(1))
+        sl.bind("<Left>", lambda e: step(-1))
+        sl.bind("<Right>", lambda e: step(1))

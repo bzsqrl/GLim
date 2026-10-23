@@ -106,6 +106,15 @@ Open `dist/FFMaker.app`, or run `venv/bin/python src/main_gui.py`. In the **Queu
 | Double-click | Opens the file in the **Single File** tab. |
 | While building | The window stays responsive during **Build Queue**, and **Cancel Build** stops it. |
 
+**Parameter panel (since the efficiency pass).** In the **Single File** tab, the parameter rows and Shadertoy channel menus now use plain Tk/ttk widgets (`src/fast_widgets.py`), which have flat corners. They were only tested on Windows, so check them here:
+
+| Check | What should happen |
+|---|---|
+| Look | Dark rows, readable text, blue slider handles. The checkboxes and entries are dark, not white. |
+| Sliders | Dragging moves the value. Clicking the track jumps there and can keep dragging. Right-click (or Control-click) resets. After a click, ← / → step the value and the handle turns amber. |
+| Menus | **long** parameters and the channel / filter / wrap menus open a menu on click, and a choice applies. |
+| Output window | With **Output** open, the small preview keeps updating (about 10 fps), and the slideshow (**Auto**) runs without stalling. On macOS the window-event poll still takes the GPU lock (`validate.window_lock`); on Windows it doesn't. |
+
 ## 7. Check the plugins in Resolume
 
 Copy the four `.bundle` folders from `output/test_batch_v4` to `~/Documents/Resolume Arena/Extra Effects`, then restart Resolume.
