@@ -34,6 +34,11 @@ def templates_dir():
     return os.path.join(bundle_dir(), "templates")
 
 
+def icon_dir():
+    """FFMaker's icon files (made by assets/icon/make_icon.py)."""
+    return os.path.join(bundle_dir(), "assets", "icon")
+
+
 def ffgl_sdk_dir():
     return os.path.join(bundle_dir(), "boilerplates", "ffgl")
 

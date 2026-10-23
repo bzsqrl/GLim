@@ -97,9 +97,25 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.configure(bg="#1a1a2e")
 
         self._build_layout()
+        self._set_icon()
+        if isinstance(self, ctk.CTk):        # CTk puts its own icon back shortly after start
+            self.after(300, self._set_icon)
         # Create the GPU validation context now, on the main thread (required on
         # macOS; also makes the first Analyze faster).
         self.after(50, self._init_gpu)
+
+    def _set_icon(self):
+        """FFMaker's icon for its windows (title bar, taskbar, Alt+Tab; the Dock
+        when run from source on macOS)."""
+        d = ffpaths.icon_dir()
+        try:
+            if sys.platform == "win32":
+                self.iconbitmap(default=os.path.join(d, "FFMaker.ico"))
+            self._icon_photos = [tk.PhotoImage(file=os.path.join(d, "png", f"ffmaker_{s}.png"))
+                                 for s in (16, 32, 48, 64, 128, 256)]
+            self.iconphoto(True, *self._icon_photos)
+        except Exception as e:          # icons are cosmetic; never block startup
+            print(f"FFMaker: window icon not set ({e})")
 
     def _init_gpu(self):
         try:
@@ -868,5 +884,12 @@ if __name__ == "__main__":
     if len(sys.argv) >= 4 and sys.argv[1] == "--selftest":
         _selftest(sys.argv[2], sys.argv[3])
         sys.exit(0)
+    if sys.platform == "win32":
+        # Own taskbar entry and icon, also when run from source (not Python's).
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("FFMaker.FFMaker")
+        except Exception:
+            pass
     app = FFMakerApp()
     app.mainloop()

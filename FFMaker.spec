@@ -29,6 +29,7 @@ a = Analysis(
     binaries=collect_dynamic_libs('glfw'),
     datas=collect_data_files('customtkinter') + collect_data_files('tkinterdnd2') + [
         ('templates', 'templates'),
+        ('assets/icon', 'assets/icon'),          # window icons (paths.icon_dir)
     ] + platform_datas + ffgl_sdk,
     hiddenimports=['ffmaker', 'glfw', 'OpenGL.GL'] + platform_imports,
     hookspath=[],
@@ -63,7 +64,7 @@ if MAC:
     app = BUNDLE(
         coll,
         name='FFMaker.app',
-        icon=None,
+        icon='assets/icon/FFMaker.icns',
         bundle_identifier='com.ffmaker.app',
         info_plist={
             'CFBundleShortVersionString': '1.0',
@@ -79,6 +80,7 @@ else:
         a.datas,
         [],
         name='FFMaker',
+        icon='assets/icon/FFMaker.ico',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
