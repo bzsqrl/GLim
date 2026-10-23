@@ -1,6 +1,7 @@
 """Right-hand panel of the Single File tab: live preview, channel sources and
 the parameter editor. Edits are written into a settings dict (the shader's
 .ffmaker.json); changes that alter the GLSL ask the app to recompile."""
+import math
 import os
 import sys
 import threading
@@ -15,6 +16,8 @@ from ffmaker import settings as S
 
 PREVIEW_W, PREVIEW_H = 384, 216
 SMALL_FPS_WITH_OUTPUT = 10      # small preview rate while the output window draws the full one
+AUTO_SECONDS = 10.0             # slideshow: default time each queue shader shows
+AUTO_MIN_SECONDS = 1.0
 CHANNEL_CHOICES = ["input", "noise", "audio", "none", "file…"]
 FILTER_CHOICES = ["filter", "nearest", "linear", "mipmap"]   # first entry = Shadertoy default
 WRAP_CHOICES = ["wrap", "clamp", "repeat"]
@@ -81,8 +84,22 @@ class EditorPanel(ctk.CTkFrame):
         queue_nav.pack(fill="x", padx=8, pady=(4, 0))
         ctk.CTkButton(queue_nav, text="←", width=36, command=lambda: self.step_queue(-1)).pack(side="left")
         ctk.CTkButton(queue_nav, text="→", width=36, command=lambda: self.step_queue(1)).pack(side="left", padx=4)
+        # Slideshow: Auto steps to the next shader every N seconds, looping the queue.
+        self.btn_auto = ctk.CTkButton(queue_nav, text="Auto", width=50, command=self._toggle_auto)
+        self.btn_auto.pack(side="left")
+        self._auto_btn_colors = (self.btn_auto.cget("fg_color"), self.btn_auto.cget("hover_color"))
+        self.auto_seconds = AUTO_SECONDS
+        self.entry_auto = ctk.CTkEntry(queue_nav, width=46, justify="right")
+        self.entry_auto.insert(0, self._fmt_seconds(self.auto_seconds))
+        self.entry_auto.pack(side="left", padx=(4, 0))
+        self.entry_auto.bind("<Return>", self._apply_auto_seconds)
+        self.entry_auto.bind("<KP_Enter>", self._apply_auto_seconds)
+        self.entry_auto.bind("<FocusOut>", self._apply_auto_seconds)
+        ctk.CTkLabel(queue_nav, text="s", text_color="#9ca3af").pack(side="left", padx=(2, 0))
+        self.auto = False
+        self._auto_elapsed = 0.0                # seconds the current shader has shown (while playing)
         self.lbl_queue = ctk.CTkLabel(queue_nav, text="", anchor="w", text_color="#9ca3af")
-        self.lbl_queue.pack(side="left", padx=4)
+        self.lbl_queue.pack(side="left", padx=6)
 
         # ── Channels (Shadertoy) ──
         self.channel_frame = ctk.CTkFrame(left, fg_color="transparent")
@@ -122,6 +139,7 @@ class EditorPanel(ctk.CTkFrame):
             self.input_menu.pack(side="right")
         else:
             self.input_menu.pack_forget()
+        self._auto_elapsed = 0.0            # the slideshow times each shader from its load
         self._update_queue_label()
 
     def _open_previewer(self):
@@ -304,7 +322,63 @@ class EditorPanel(ctk.CTkFrame):
             text = f"{paths.index(self.shader_path) + 1} / {len(paths)} in queue"
         else:
             text = f"not in queue ({len(paths)})"
-        self.lbl_queue.configure(text=text)
+        if self.auto and paths:
+            left = max(0, math.ceil(self.auto_seconds - self._auto_elapsed))
+            text += f" · next in {left}s" if self.playing else " · paused"
+        if text != self.lbl_queue.cget("text"):
+            self.lbl_queue.configure(text=text)
+
+    # ── Slideshow ────────────────────────────────────────────────────────────
+    # Auto: every auto_seconds of playing time, step to the next shader in the
+    # queue (step_queue wraps from the last back to the first). Pausing the
+    # preview holds the countdown; a manual ← / → restarts it.
+
+    def _toggle_auto(self):
+        self._apply_auto_seconds()
+        if not self.auto and not self.get_playlist():
+            self.log("The queue is empty: add shaders on the Queue tab for the slideshow.")
+            return
+        self.auto = not self.auto
+        self._auto_elapsed = 0.0
+        fg, hover = ("#f59e0b", "#d97706") if self.auto else self._auto_btn_colors
+        self.btn_auto.configure(fg_color=fg, hover_color=hover)
+        if self.auto:
+            self.log(f"Slideshow on: next shader every {self._fmt_seconds(self.auto_seconds)} s.")
+        self._update_queue_label()
+
+    @staticmethod
+    def _fmt_seconds(s):
+        return f"{s:g}"
+
+    def _apply_auto_seconds(self, _e=None):
+        """Read the seconds entry; an invalid value reverts to the current one."""
+        try:
+            s = float(self.entry_auto.get().strip().rstrip("s"))
+            if not math.isfinite(s):
+                raise ValueError
+            self.auto_seconds = max(AUTO_MIN_SECONDS, s)
+        except ValueError:
+            pass
+        self.entry_auto.delete(0, "end")
+        self.entry_auto.insert(0, self._fmt_seconds(self.auto_seconds))
+        self._update_queue_label()
+        if _e is not None and _e.keysym in ("Return", "KP_Enter"):
+            self.winfo_toplevel().focus_set()     # done editing: keys go back to the app
+            return "break"
+
+    def _tick_auto(self, dt):
+        if not self.auto:
+            return
+        if not self.get_playlist():
+            self._toggle_auto()                 # queue cleared: stop
+            return
+        if self.playing and self.res:
+            self._auto_elapsed += dt
+        if self._auto_elapsed >= self.auto_seconds:
+            self._auto_elapsed = 0.0           # also if nothing else compiles: try again later
+            if self.get_playlist() != [self.shader_path]:   # a one-shader queue just stays
+                self.step_queue(1)
+        self._update_queue_label()
 
     def _toggle_fullscreen(self, _e=None):
         """⛶, Ctrl+F, double-click: with the output window open, toggle its
@@ -348,6 +422,7 @@ class EditorPanel(ctk.CTkFrame):
         if self._queue_label_tick % 30 == 0:       # the queue can change on the other tab
             self._update_queue_label()
         self._update_output_button()               # the output can also close from its own window
+        self._tick_auto(dt)
         if self._fs:
             # The output draws itself on its own thread (and advances the clock); here:
             # its events and keys, and the small preview at a lower rate so it stays live
