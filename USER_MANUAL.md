@@ -39,7 +39,8 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
 - **Build Selected (n)** / **Export Selected (n)**: with rows selected, the two buttons act on just those rows. Selected rows are rebuilt even if they're already done. Click empty space in the list or press **Esc** to deselect; the buttons then work on the whole queue again (Build skips rows that are already done).
 - **Reset Status** sets built and failed rows back to Pending, so **Build Queue** converts them again (for example after changing settings) without reloading the files. With rows selected it reads **Reset Selected (n)** and resets just those.
 - **Delete** removes the selected rows. Right-click for the same actions plus **Open in Single File**; double-clicking a row also opens it in the editor. On macOS, Control-click also opens the menu.
-- Drag the column header edges to resize columns.
+- Drag the column header edges to resize columns. Click the **Filename**, **Type** or **GPU** heading to sort the queue by it (click again to reverse). The sorted order becomes the queue's order, for builds and for ← / → and the slideshow.
+- **Measure GPU** fills the **GPU @1080p** column with each shader's GPU load (see *GPU load* below), for the selected rows or the whole queue. Press it again to stop. Sorting by GPU puts the heaviest first; ⚠ marks shaders that can't hold 60 fps at 1080p on this computer. The log names the heaviest one.
 
 **Single File tab (editor):** open or paste a shader and click **Analyze Code** (or press Ctrl+Enter; ⌘+Enter on macOS). You get:
 - **Live preview.** Rendered on your GPU the same way the plugin renders it.
@@ -60,6 +61,15 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
   - Type a value: click the number to the right of a slider, type, and press Enter (Esc cancels). If the value is outside the min/max range, the range widens to fit.
   - Reset a slider to the shader's own default: right-click it (on macOS also Control-click).
   - Nudge a slider with the keyboard: click it (its handle turns amber), then press **←** / **→** to step it by 1/100 of its range (1 for whole numbers).
+- **GPU load.** Under the preview, a bar and readout show how hard the shader works your graphics card, e.g. **29% of 60 fps** and *4.81 ms/frame · ~208 fps max · 1920×1080*.
+  - It's the GPU time one frame takes, timed by the graphics card itself (so vsync, the screen and FFMaker's own work don't count), measured at 1920×1080 over about a second.
+  - **Live** (amber while on) measures every shader automatically when it loads, and times the output continuously while it's open. It's **off** by default, so switching shaders (e.g. in a slideshow) costs as little as possible: then nothing is measured unless you press **Measure**, and results already known (from **Measure**, or the queue's **Measure GPU**) still show. Turn it on for diagnostics or when comparing shaders.
+  - **% of 60 fps** is that time as a share of a 60 fps frame (16.7 ms): under 50% (green) leaves plenty of room; 50–100% (amber) is heavy; over 100% (red) means it can't run at 60 fps at 1080p on this computer, even on its own. In Resolume, layers and effects add up: two shaders at 40% each use about 80%.
+  - **ms/frame** is the raw time; **fps max** is the highest frame rate the GPU could draw it at (1000 ÷ ms). The cost scales roughly with the number of pixels: 4K (3840×2160) costs about 4× as much as 1080p.
+  - It's measured with the current slider values; some sliders (iterations, loops, detail) change the cost a lot. Press **Measure** to re-measure after moving them.
+  - While the output window (or fullscreen) is open, measuring times the output itself, at its actual resolution, instead of running a separate 1080p measurement alongside it: continuously with **Live** on ("live in the output"), or for one second when you press **Measure** ("measured in the output").
+  - CPU load isn't shown: shaders run entirely on the GPU, and the plugin's CPU work per frame is tiny.
+  - Results depend on the graphics card (and, on laptops, whether it's plugged in). Measurements from the queue and from this tab are shared for the session.
 - **Save settings.** Writes `<shader>.ffmaker.json` next to the shader. **Compile FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
 
 **Packaged app:** `dist\FFMaker.exe` (build it with `venv\Scripts\python compile.py`) runs without Python installed. Building plugins still needs CMake and Visual Studio's C++ tools.

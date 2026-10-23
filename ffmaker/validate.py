@@ -462,6 +462,118 @@ class Previewer:
             self.samplers = {}
 
 
+# ── GPU load ─────────────────────────────────────────────────────────────────
+# How heavy a shader is: the GPU time one frame takes, measured with OpenGL timer
+# queries (the GPU's own clock, so vsync, the UI and the CPU don't count). Shown
+# as a share of a 60 fps frame (16.7 ms), like a load meter: 100% means the GPU
+# can just keep up at 60 fps, on its own. Reference size: 1920x1080.
+
+BENCH_SIZE = (1920, 1080)
+FRAME_60_MS = 1000.0 / 60.0
+
+
+def _query_ns(gl, q, wait=True):
+    """A timer query's result in ns; None if not ready yet (wait=False)."""
+    if not wait and not gl.glGetQueryObjectiv(q, gl.GL_QUERY_RESULT_AVAILABLE):
+        return None
+    out = ctypes.c_uint64(0)       # (PyOpenGL can't make its own 64-bit result buffer)
+    gl.glGetQueryObjectui64v(q, gl.GL_QUERY_RESULT, ctypes.byref(out))
+    return out.value
+
+
+def benchmark(ir, glsl_list, values=None, size=BENCH_SIZE, seconds=1.0, max_frames=120,
+              cancel=None):
+    """GPU time per frame (ms) of a converted shader at `size`, with param values
+    `values` ({index: value}; else defaults). Renders frames back to back, as the
+    clock runs at 60 fps, for about `seconds` after a short warm-up (first frames
+    upload textures, and the GPU raises its clocks). Each frame takes gpu() on its
+    own, so the output and preview keep drawing in between.
+    Returns {"ms": median, "p90": ms, "frames": n, "size": (w, h)}, or None if
+    cancel() turned true."""
+    import time
+    with gpu() as ctx:
+        gl = ctx.gl
+        pv = Previewer(ir, glsl_list, *size)
+        if values:
+            pv.values = dict(values)
+        q = gl.glGenQueries(1)[0]
+    times, n, sim = [], 0, 0.0
+    t0 = time.perf_counter()
+    try:
+        while True:
+            if cancel and cancel():
+                return None
+            with gpu():
+                gl.glBeginQuery(gl.GL_TIME_ELAPSED, q)
+                pv.render_frame(sim, 1 / 60)
+                gl.glEndQuery(gl.GL_TIME_ELAPSED)
+                ns = _query_ns(gl, q)
+            n, sim = n + 1, sim + 1 / 60
+            elapsed = time.perf_counter() - t0
+            if n <= 3 or (not times and elapsed < 0.2):     # warm-up
+                continue
+            times.append(ns / 1e6)
+            if len(times) >= max_frames or (len(times) >= 3 and elapsed > seconds):
+                break
+    finally:
+        with gpu():
+            pv.close()
+            gl.glDeleteQueries(1, [q])
+    times.sort()
+    return {"ms": times[len(times) // 2], "p90": times[int(len(times) * 0.9)],
+            "frames": len(times), "size": tuple(size)}
+
+
+class GpuTimer:
+    """Live GPU time of what's drawn between begin() and end(), read back a few
+    frames later so it never stalls the drawing thread. Use in one context (the
+    validation context), inside gpu(). ms: a smoothed recent value, or None."""
+
+    def __init__(self, gl, count=4):
+        self.gl = gl
+        self.free = list(gl.glGenQueries(count))
+        self.pending = []
+        self._q = None
+        self.ms = None
+
+    def begin(self):
+        self.poll()
+        if self.free:
+            self._q = self.free.pop()
+            self.gl.glBeginQuery(self.gl.GL_TIME_ELAPSED, self._q)
+
+    def end(self):
+        if self._q is not None:
+            self.gl.glEndQuery(self.gl.GL_TIME_ELAPSED)
+            self.pending.append(self._q)
+            self._q = None
+
+    def poll(self):
+        while self.pending:
+            ns = _query_ns(self.gl, self.pending[0], wait=False)
+            if ns is None:
+                break
+            self.free.append(self.pending.pop(0))
+            ms = ns / 1e6
+            self.ms = ms if self.ms is None else self.ms * 0.85 + ms * 0.15
+
+    def close(self):
+        qs = self.free + self.pending
+        if qs:
+            self.gl.glDeleteQueries(len(qs), qs)
+        self.free, self.pending = [], []
+
+
+def load_text(ms, size=BENCH_SIZE):
+    """('19% of 60 fps', '3.2 ms/frame · ~310 fps max · 1920×1080', level 0-2)."""
+    pct = ms / FRAME_60_MS * 100
+    level = 0 if pct < 50 else 1 if pct < 100 else 2
+    fps = 1000.0 / ms if ms > 0 else float("inf")
+    fps_txt = f"~{fps:,.0f} fps max" if fps < 10000 else "10,000+ fps"
+    return (f"{pct:.0f}% of 60 fps" if pct >= 1 else "<1% of 60 fps",
+            f"{ms:.2f} ms/frame · {fps_txt} · {size[0]}×{size[1]}", level)
+
+
 def _double_click_time():
     """The system's double-click interval in seconds (Windows setting; 0.5 s elsewhere)."""
     if sys.platform == "win32":
