@@ -181,7 +181,7 @@ class EditorPanel(ctk.CTkFrame):
         self.params_frame = ctk.CTkScrollableFrame(right)
         self.params_frame.pack(fill="both", expand=True, padx=8, pady=(4, 8))
         self._params_bg = _tk_bg(self.params_frame)
-        self.lbl_empty = ctk.CTkLabel(self.params_frame, text="Click 'Analyze Code' to load a shader.",
+        self.lbl_empty = ctk.CTkLabel(self.params_frame, text="Click 'Process Code' to load a shader.",
                                       text_color="gray")
         self.lbl_empty.pack(pady=10)
 

@@ -341,7 +341,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         tools.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
         ctk.CTkButton(tools, text="Open File", command=self.open_file, width=100).pack(side="left", padx=(0, 6))
-        ctk.CTkButton(tools, text="Analyze Code", command=self.analyze_code,
+        ctk.CTkButton(tools, text="Process Code", command=self.analyze_code,
                       fg_color="#10b981", hover_color="#059669").pack(side="left", padx=6)
 
         ctk.CTkLabel(tools, text="Output Name:").pack(side="left", padx=(10, 4))
@@ -349,15 +349,17 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.entry_plugin_name.pack(side="left", padx=0)
         self.entry_plugin_name.insert(0, self._source_stem)
 
-        self.btn_build_single = ctk.CTkButton(
-            tools, text="Compile FFGL (.dll)", command=self._build_single,
-            fg_color="#6366f1", hover_color="#4f46e5")
-        self.btn_build_single.pack(side="right", padx=(6, 0))
-
+        # As on the Queue tab: Build FFGL, then Export ISF on the far right.
+        plugin_ext = ".bundle" if sys.platform == "darwin" else ".dll"
         self.btn_export_isf_single = ctk.CTkButton(
-            tools, text="Export ISF (.fs)", command=self._export_isf_single,
+            tools, text="↑ Export ISF (.fs)", command=self._export_isf_single,
             fg_color="#10b981", hover_color="#059669")
-        self.btn_export_isf_single.pack(side="right")
+        self.btn_export_isf_single.pack(side="right", padx=(6, 0))
+
+        self.btn_build_single = ctk.CTkButton(
+            tools, text=f"▶  Build FFGL ({plugin_ext})", command=self._build_single,
+            fg_color="#6366f1", hover_color="#4f46e5")
+        self.btn_build_single.pack(side="right")
 
         # Paned Window (Row 1) - horizontal resizable split
         self.panes = tk.PanedWindow(tab, orient=tk.HORIZONTAL, bg="#1a1a2e",
@@ -833,7 +835,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     def analyze_code(self, keep_time=False, res=None):
         code = self.textbox_code.get("1.0", "end-1c")
         if not keep_time:
-            self.log("Analyzing shader code...")
+            self.log("Processing shader code...")
         if not self.entry_plugin_name.get().strip():
             self.entry_plugin_name.delete(0, "end")
             self.entry_plugin_name.insert(0, "FFMakerPlugin")
