@@ -71,7 +71,7 @@ class QueueItem:
         self.status = "pending"     # pending / building / done / error
         self.error  = ""
         self.iid    = None          # row id in the queue Treeview
-        self.gpu_ms = None          # GPU time per frame at 1080p, once measured (Measure GPU)
+        self.gpu_ms = None          # GPU time per frame at 1080p, once measured (Analyze)
 
 
 # ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._building = False
         self._cancel_event = threading.Event()
         self._gpu_cache = {}                      # GPU measurements, shared with the editor
-        self._measuring = None                    # threading.Event to stop Measure GPU, while running
+        self._measuring = None                    # threading.Event to stop Analyze, while running
         self._sort = (None, False)                # queue sorted by (column, descending)
         self._source_stem = "FFMakerPlugin"   # for single-file tab
         self._source_path = None
@@ -212,16 +212,18 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         toolbar = ctk.CTkFrame(tab, fg_color="transparent")
         toolbar.grid(row=0, column=0, padx=6, pady=(6, 12), sticky="ew")
 
-        ctk.CTkButton(toolbar, text="＋ Add Files", width=110,
+        # Add files (+) / a folder (📁).
+        folder_font = ("Segoe UI Emoji", 15) if sys.platform == "win32" else ctk.CTkFont(size=19)
+        ctk.CTkButton(toolbar, text="+", width=36, height=28, font=ctk.CTkFont(size=20, weight="bold"),
                       command=self._add_files_dialog).pack(side="left", padx=(0, 6))
-        ctk.CTkButton(toolbar, text="📁 Add Folder", width=120,
+        ctk.CTkButton(toolbar, text="📁", width=36, height=28, font=folder_font,
                       command=self._add_folder_dialog).pack(side="left", padx=(0, 6))
         self.btn_reset_queue = ctk.CTkButton(
-            toolbar, text="⟲ Reset Status", width=150,
+            toolbar, text="⟲ Reset", width=80,
             fg_color="#374151", hover_color="#4b5563",
             command=self._reset_status)
         self.btn_reset_queue.pack(side="left", padx=(0, 6))
-        ctk.CTkButton(toolbar, text="✓ Clear Completed", width=140,
+        ctk.CTkButton(toolbar, text="Clear Completed", width=120,
                       fg_color="#374151", hover_color="#4b5563",
                       command=self._clear_completed).pack(side="left", padx=(0, 6))
         ctk.CTkButton(toolbar, text="Clear All", width=90,
@@ -229,19 +231,19 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                       command=self._clear_queue).pack(side="left", padx=(0, 20))
 
         self.btn_export_isf_queue = ctk.CTkButton(
-            toolbar, text="↑ Export ISF", width=170,
+            toolbar, text="↑ Export ISF", width=110,
             fg_color="#10b981", hover_color="#059669",
             command=self._start_export_isf_queue)
         self.btn_export_isf_queue.pack(side="right", padx=(6, 0))
 
         self.btn_build_queue = ctk.CTkButton(
-            toolbar, text="▶  Build Queue", width=170,
+            toolbar, text="▶  Build FFGL", width=110,
             fg_color="#6366f1", hover_color="#4f46e5",
             command=toggle_command(self._start_build_queue))     # Build / Cancel
         self.btn_build_queue.pack(side="right")
 
         self.btn_measure_gpu = ctk.CTkButton(
-            toolbar, text="⏱ Measure GPU", width=150,
+            toolbar, text="Analyze", width=80,
             fg_color="#374151", hover_color="#4b5563",
             command=toggle_command(self._start_measure_gpu))     # Measure / Stop
         self.btn_measure_gpu.pack(side="right", padx=(0, 6))
@@ -299,7 +301,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._queue_menu = tk.Menu(self, tearoff=0)
         self._queue_menu.add_command(label="Build Selected", command=self._start_build_queue)
         self._queue_menu.add_command(label="Export Selected to ISF", command=self._start_export_isf_queue)
-        self._queue_menu.add_command(label="Measure GPU Load", command=self._start_measure_gpu)
+        self._queue_menu.add_command(label="Analyze GPU Load", command=self._start_measure_gpu)
         self._queue_menu.add_separator()
         self._queue_menu.add_command(label="Reset Status", command=self._reset_status)
         self._queue_menu.add_command(label="Open in Single File", command=self._open_selected)
@@ -317,7 +319,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         # Drop-zone label (shown when empty)
         self.lbl_drop = ctk.CTkLabel(
             box,
-            text="Drop .fs or .txt shader files here, or use 'Add Files' / 'Add Folder'",
+            text="Drop .fs or .txt shader files here, or use + (files) / 📁 (a folder)",
             text_color="#4b5563", fg_color="#111827", font=("Arial", 13))
         self._show_drop_hint(True)
 
@@ -519,7 +521,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
     def _reset_status(self):
         """Set done / failed rows back to Pending (the selection, or the whole queue),
-        so Build Queue converts them again without reloading the files."""
+        so Build FFGL converts them again without reloading the files."""
         items = self._selected_items() or self._queue
         items = [i for i in items if i.status in ("done", "error")]
         for item in items:
@@ -578,14 +580,14 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if not self._building:
             self.btn_build_queue.configure(
                 state="normal", fg_color="#6366f1", hover_color="#4f46e5",
-                text=f"▶  Build Selected ({n})" if n else "▶  Build Queue")
+                text=f"▶  Build FFGL ({n})" if n else "▶  Build FFGL")
         self.btn_export_isf_queue.configure(
-            text=f"↑ Export Selected ({n})" if n else "↑ Export ISF")
+            text=f"↑ Export ISF ({n})" if n else "↑ Export ISF")
         self.btn_reset_queue.configure(
-            text=f"⟲ Reset Selected ({n})" if n else "⟲ Reset Status")
+            text=f"⟲ Reset ({n})" if n else "⟲ Reset")
         if not self._measuring:
             self.btn_measure_gpu.configure(
-                text=f"⏱ Measure Selected ({n})" if n else "⏱ Measure GPU")
+                text=f"Analyze ({n})" if n else "Analyze")
 
     def _add_queue_row(self, item: QueueItem):
         """Add one row to the queue list."""
@@ -608,7 +610,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.after(0, _update)
 
     # -----------------------------------------------------------------------
-    # GPU load (Measure GPU): each shader's GPU time per frame at 1920x1080 with
+    # GPU load (Analyze): each shader's GPU time per frame at 1920x1080 with
     # its saved settings, as in the Single File tab (validate.benchmark).
     # -----------------------------------------------------------------------
     def _start_measure_gpu(self):

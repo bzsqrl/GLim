@@ -21,7 +21,8 @@ SMALL_FPS_WITH_OUTPUT = 10      # small preview rate while the output window dra
 AUTO_SECONDS = 10.0             # slideshow: default time each queue shader shows
 AUTO_MIN_SECONDS = 1.0
 GPU_REFRESH_S = 0.25            # live GPU readout update interval (output open)
-GPU_SAMPLE_S = 1.0              # Measure with the output open (Live off): time the output this long
+GPU_SAMPLE_S = 1.0              # Analyze with the output open (Live off): time the output this long
+LIVE_RUN_S = 0.5                # Live, output closed: length of each measuring run (a reading each)
 LOAD_COLOURS = ("#22c55e", "#f59e0b", "#ef4444")   # GPU load: light / heavy / over a 60 fps frame
 CHANNEL_CHOICES = ["input", "noise", "audio", "none", "file…"]
 FILTER_CHOICES = ["filter", "nearest", "linear", "mipmap"]   # first entry = Shadertoy default
@@ -86,7 +87,8 @@ class EditorPanel(ctk.CTkFrame):
         self.gpu_cache = {}                 # gpu_cache_key → benchmark result (shared with the queue)
         self._bench_gen = 0                 # bumped to cancel a running measurement
         self._gpu_shown = 0.0
-        self.gpu_live = False               # Live: measure every shader on load / time the output
+        self.gpu_live = False               # Live: time the preview (at 1080p) or the output, continuously
+        self._live_visible = False          # main thread → Live's measuring thread: the preview is showing
 
         # Two columns: preview + channels on the left, parameters on the right.
         left = ctk.CTkFrame(self, fg_color="transparent")
@@ -102,11 +104,15 @@ class EditorPanel(ctk.CTkFrame):
         self.btn_play = ctk.CTkButton(transport, text="⏸", width=36, command=toggle_command(self._toggle_play))
         self.btn_play.pack(side="left")
         ctk.CTkButton(transport, text="⟲", width=36, command=self.restart).pack(side="left", padx=4)
-        ctk.CTkButton(transport, text="⛶", width=36, command=toggle_command(self._toggle_fullscreen)).pack(side="left")
-        self.btn_output = ctk.CTkButton(transport, text="Output", width=60, command=toggle_command(self.open_output_window))
-        self.btn_output.pack(side="left", padx=(4, 0))
+        # ⧉ (a window over a window): the output window; ⛶: fullscreen.
+        self.btn_output = ctk.CTkButton(transport, text="⧉", width=36, command=toggle_command(self.open_output_window))
+        self.btn_output.pack(side="left")
+        self.btn_fullscreen = ctk.CTkButton(transport, text="⛶", width=36,
+                                            command=toggle_command(self._toggle_fullscreen))
+        self.btn_fullscreen.pack(side="left", padx=(4, 0))
         self._output_btn_colors = (self.btn_output.cget("fg_color"), self.btn_output.cget("hover_color"))
         self._output_btn_open = False
+        self._fullscreen_btn_on = False
         self.preview.bind("<Double-Button-1>", lambda e: self._toggle_fullscreen())
         # Esc in FFMaker also leaves fullscreen (e.g. with the output on another monitor).
         top = self.winfo_toplevel()
@@ -151,8 +157,9 @@ class EditorPanel(ctk.CTkFrame):
         self.gpu_bar.pack(side="left", padx=6)
         self.lbl_gpu = W.label(gpu_row, "", bg=bg, anchor="w")
         self.lbl_gpu.pack(side="left")
-        ctk.CTkButton(gpu_row, text="Measure", width=70, fg_color="#374151", hover_color="#4b5563",
-                      command=self.measure_gpu).pack(side="right")
+        self.btn_measure = ctk.CTkButton(gpu_row, text="Analyze", width=70, fg_color="#374151",
+                                         hover_color="#4b5563", command=self.measure_gpu)
+        self.btn_measure.pack(side="right")
         self._gpu_btn_colors = ("#374151", "#4b5563")
         self.btn_gpu_live = ctk.CTkButton(gpu_row, text="Live", width=50, fg_color=self._gpu_btn_colors[0],
                                           hover_color=self._gpu_btn_colors[1], command=toggle_command(self.toggle_gpu_live))
@@ -232,7 +239,7 @@ class EditorPanel(ctk.CTkFrame):
                 pv = self._fs_previewer(view, self.res)
                 pv.values = self.previewer.values
                 self._fs.update(pv=pv, res=self.res, path=self.shader_path)
-                self._fs["timer"].ms = None    # a new shader: start the average over
+                self._fs["timer"].reset()    # a new shader: start the average over
                 self._fs.pop("gpu", None)
                 old.close()
                 view.reattach()
@@ -334,12 +341,19 @@ class EditorPanel(ctk.CTkFrame):
         self._update_output_button()
 
     def _update_output_button(self):
-        """Highlight the Output button while the output window is open."""
-        is_open = bool(self._fs and self._fs["view"].windowed)
+        """Highlight ⧉ while the output window is open, and ⛶ while something is
+        fullscreen (plain fullscreen, or the output window made fullscreen)."""
+        view = self._fs["view"] if self._fs else None
+        is_open = bool(view and view.windowed)
         if is_open != self._output_btn_open:
             self._output_btn_open = is_open
             fg, hover = ("#f59e0b", "#d97706") if is_open else self._output_btn_colors
             self.btn_output.configure(fg_color=fg, hover_color=hover)
+        full = bool(view and view.fullscreen and not view.closed)
+        if full != self._fullscreen_btn_on:
+            self._fullscreen_btn_on = full
+            fg, hover = ("#f59e0b", "#d97706") if full else self._output_btn_colors
+            self.btn_fullscreen.configure(fg_color=fg, hover_color=hover)
 
     def _escape_output(self):
         """Esc in FFMaker: the output window leaves fullscreen; plain fullscreen closes."""
@@ -384,7 +398,7 @@ class EditorPanel(ctk.CTkFrame):
         if not paths:
             text = "queue empty"
         elif self.shader_path in paths:
-            text = f"{paths.index(self.shader_path) + 1} / {len(paths)} in queue"
+            text = f"{paths.index(self.shader_path) + 1} / {len(paths)}"
         else:
             text = f"not in queue ({len(paths)})"
         if self.auto and paths:
@@ -502,6 +516,7 @@ class EditorPanel(ctk.CTkFrame):
                 self._show_small(px)
             self.after(15, self._tick)
             return
+        self._live_visible = self.winfo_viewable()      # Live measures only while it's seen
         self._draw_small(dt)
         self.after(33, self._tick)
 
@@ -594,7 +609,7 @@ class EditorPanel(ctk.CTkFrame):
             if self.gpu_live:
                 if ms is not None:
                     self._show_gpu({"ms": ms, "size": size}, "live in the output")
-            elif now >= until:                  # Measure's sample is done
+            elif now >= until:                  # Analyze's sample is done
                 self._fs["sample_until"] = 0.0
                 if ms is not None:
                     self._show_gpu({"ms": ms, "size": size}, "measured in the output")
@@ -659,39 +674,76 @@ class EditorPanel(ctk.CTkFrame):
                     time.sleep(due - now)
 
     # ── GPU load ─────────────────────────────────────────────────────────────
-    # How heavy the loaded shader is, as GPU time per frame (validate.benchmark):
-    # measured at 1920x1080 after loading (unless known: gpu_cache, shared with the
-    # queue's GPU column), or live from the output while it's open. Measure
-    # re-measures with the current slider values.
-    # All of that only with Live on. Off, nothing is measured unless asked (Measure),
-    # so shader switches (e.g. a slideshow) cost the least; known results still show.
+    # How heavy the loaded shader is, as GPU time per frame.
+    # Live on: measured continuously, following slider moves and shader switches.
+    # With the output closed, by back-to-back 1920x1080 runs on a worker thread
+    # (validate.benchmark, ~0.5 s each, a new reading after each). Timing the 30 fps
+    # preview itself would read up to 2x high: with so little to do, the GPU lowers
+    # its clocks. While the output is open, its own frames are timed
+    # (validate.GpuTimer) at its own size.
+    # Live off: nothing is measured unless asked, so shader switches (e.g. a
+    # slideshow) cost the least. Analyze: a 1920x1080 run (validate.benchmark) with
+    # the current slider values, or a 1 s sample of the output while it's open.
+    # Results (gpu_cache) are shared with the queue's GPU column and shown again.
 
     def toggle_gpu_live(self):
         self.gpu_live = not self.gpu_live
         fg, hover = ("#f59e0b", "#d97706") if self.gpu_live else self._gpu_btn_colors
         self.btn_gpu_live.configure(fg_color=fg, hover_color=hover)
+        # Live readings are continuous, so Analyze has nothing to add meanwhile.
+        self.btn_measure.configure(state="disabled" if self.gpu_live else "normal")
         if self._fs:
-            self._fs["timer"].ms = None         # start the live average afresh
+            self._fs["timer"].reset()         # start the live average afresh
             self._fs.pop("gpu", None)
         self._gpu_after_load()
+
+    def _measure_live(self):
+        """Live on, output closed: measure the loaded shader again and again on a
+        worker thread, with the slider values at the start of each run, until the
+        shader, Live or the output changes (_bench_gen). Pauses while the preview
+        isn't showing (e.g. the Queue tab), so the GPU isn't kept busy for nothing."""
+        from ffmaker import validate as V
+        gen, res = self._bench_gen, self.res
+        live = lambda: gen == self._bench_gen
+
+        def work():
+            warm = True
+            while live():
+                if not self._live_visible:
+                    time.sleep(0.2)
+                    warm = True                     # the GPU may have clocked down meanwhile
+                    continue
+                values = self._values()
+                try:
+                    r = V.benchmark(res.ir, res.ffgl_glsl, values, seconds=LIVE_RUN_S,
+                                    warmup_s=0.2 if warm else 0.0, cancel=lambda: not live())
+                except Exception as e:
+                    self.after(0, lambda e=e: live() and self._show_gpu(None, f"couldn't measure: {e}"))
+                    return
+                if r is None:
+                    return
+                warm = False
+                self.gpu_cache[gpu_cache_key(res, values)] = r     # still shown after Live is off
+                self.after(0, lambda r=r: live() and self._show_gpu(r, "live"))
+        threading.Thread(target=work, daemon=True).start()
 
     def _gpu_after_load(self):
         self._bench_gen += 1                    # stops a measurement still running
         if not (self.res and self.res.ok and self.res.validated):
             self._show_gpu(None, "—  (the shader doesn't compile)")
             return
-        if self._fs and self.gpu_live:
-            self._show_gpu(None, "measuring live in the output…")
+        if self.gpu_live:
+            if self._fs:
+                self._show_gpu(None, "measuring live in the output…")
+            else:
+                self._show_gpu(None, "measuring live…")
+                self._measure_live()
             return
         hit = self.gpu_cache.get(gpu_cache_key(self.res, self._values()))
         if hit:
             self._show_gpu(hit, "measured")
-        elif self._fs or not self.gpu_live:
-            self._show_gpu(None, "not measured · Measure, or Live to measure every shader")
         else:
-            self._show_gpu(None, "measuring…")
-            gen = self._bench_gen
-            self.after(300, lambda: gen == self._bench_gen and self.measure_gpu())  # let a slideshow move on first
+            self._show_gpu(None, "not measured · Analyze, or Live to measure continuously")
 
     def _values(self):
         return dict(self.previewer.values) if self.previewer else None
@@ -699,12 +751,12 @@ class EditorPanel(ctk.CTkFrame):
     def measure_gpu(self):
         """Measure the loaded shader's GPU time per frame at 1920x1080 with the
         current slider values, on a worker thread."""
-        if not (self.res and self.res.ok and self.res.validated):
+        if self.gpu_live or not (self.res and self.res.ok and self.res.validated):
             return
         if self._fs:
             # A separate 1080p run would compete with the output: time the output
             # itself for a moment instead (at its own resolution).
-            self._fs["timer"].ms = None
+            self._fs["timer"].reset()
             self._fs.pop("gpu", None)
             self._fs["sample_until"] = time.perf_counter() + GPU_SAMPLE_S
             self._show_gpu(None, "measuring in the output…")
