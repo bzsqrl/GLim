@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ffmaker import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: E402
 from ffmaker import convert as ffconvert                               # noqa: E402
 from ffmaker import settings as ffsettings                             # noqa: E402
-from editor_panel import EditorPanel                                   # noqa: E402
+from editor_panel import EditorPanel, gpu_cache_key                    # noqa: E402
 
 
 # --- Drag-and-drop support (optional, graceful fallback) ---
@@ -68,6 +68,7 @@ class QueueItem:
         self.status = "pending"     # pending / building / done / error
         self.error  = ""
         self.iid    = None          # row id in the queue Treeview
+        self.gpu_ms = None          # GPU time per frame at 1080p, once measured (Measure GPU)
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +90,9 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._queue: list[QueueItem] = []
         self._building = False
         self._cancel_event = threading.Event()
+        self._gpu_cache = {}                      # GPU measurements, shared with the editor
+        self._measuring = None                    # threading.Event to stop Measure GPU, while running
+        self._sort = (None, False)                # queue sorted by (column, descending)
         self._source_stem = "FFMakerPlugin"   # for single-file tab
         self._source_path = None
         self.settings = {}                    # single-file tab: the shader's .ffmaker.json
@@ -233,6 +237,12 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             command=self._start_build_queue)
         self.btn_build_queue.pack(side="right")
 
+        self.btn_measure_gpu = ctk.CTkButton(
+            toolbar, text="⏱ Measure GPU", width=150,
+            fg_color="#374151", hover_color="#4b5563",
+            command=self._start_measure_gpu)
+        self.btn_measure_gpu.pack(side="right", padx=(0, 6))
+
         # Queue list: a native Treeview only draws the visible rows, so it stays
         # fast with thousands of files (one widget per row did not).
         box = ctk.CTkFrame(tab, fg_color="#111827")
@@ -254,13 +264,17 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         style.layout("Queue.Treeview", [("Treeview.treearea", {"sticky": "nsew"})])
 
         self.tree = ttk.Treeview(box, style="Queue.Treeview", show="headings",
-                                 columns=("num", "file", "type", "status"))
+                                 columns=("num", "file", "type", "gpu", "status"))
         for col, text, width, anchor, stretch in (
                 ("num", "#", 50, "e", False), ("file", "Filename", 360, "w", True),
-                ("type", "Type", 110, "center", False), ("status", "Status", 260, "w", True)):
+                ("type", "Type", 110, "center", False), ("gpu", "GPU @1080p", 150, "center", False),
+                ("status", "Status", 260, "w", True)):
             self.tree.heading(col, text=text, anchor=anchor)
             self.tree.column(col, width=int(width * scale), minwidth=int(40 * scale),
                              anchor=anchor, stretch=stretch)
+        # Click a heading to sort the queue by it (again to reverse).
+        for col in ("file", "type", "gpu"):
+            self.tree.heading(col, command=lambda c=col: self._sort_queue(c))
         for status, (_, color) in (("pending", STATUS_PENDING), ("building", STATUS_BUILDING),
                                    ("done", STATUS_DONE), ("error", STATUS_ERROR)):
             self.tree.tag_configure(status, foreground=color)
@@ -282,6 +296,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._queue_menu = tk.Menu(self, tearoff=0)
         self._queue_menu.add_command(label="Build Selected", command=self._start_build_queue)
         self._queue_menu.add_command(label="Export Selected to ISF", command=self._start_export_isf_queue)
+        self._queue_menu.add_command(label="Measure GPU Load", command=self._start_measure_gpu)
         self._queue_menu.add_separator()
         self._queue_menu.add_command(label="Reset Status", command=self._reset_status)
         self._queue_menu.add_command(label="Open in Single File", command=self._open_selected)
@@ -360,6 +375,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.editor.get_playlist = lambda: [i.path for i in self._queue]
         self.editor.convert_path = self._convert_for_preview
         self.editor.on_select = lambda path, res: self._load_file_path(path, res=res)
+        self.editor.gpu_cache = self._gpu_cache
         self.textbox_code.bind("<Control-Return>", lambda e: (self.analyze_code(), "break")[1])
         if sys.platform == "darwin":
             self.textbox_code.bind("<Command-Return>", lambda e: (self.analyze_code(), "break")[1])
@@ -564,6 +580,9 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             text=f"↑ Export Selected ({n})" if n else "↑ Export ISF")
         self.btn_reset_queue.configure(
             text=f"⟲ Reset Selected ({n})" if n else "⟲ Reset Status")
+        if not self._measuring:
+            self.btn_measure_gpu.configure(
+                text=f"⏱ Measure Selected ({n})" if n else "⏱ Measure GPU")
 
     def _add_queue_row(self, item: QueueItem):
         """Add one row to the queue list."""
@@ -571,7 +590,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         item.iid = f"q{self._next_iid}"
         self._items_by_iid[item.iid] = item
         self.tree.insert("", "end", iid=item.iid, tags=("pending",),
-                         values=(len(self._queue), item.fname, item.fmt,
+                         values=(len(self._queue), item.fname, item.fmt, "",
                                  f"{STATUS_PENDING[0]}  Pending"))
 
     def _set_item_status(self, item: QueueItem, status: str, text: str = ""):
@@ -584,6 +603,112 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                 self.tree.item(item.iid, tags=(status,))
                 self.tree.set(item.iid, "status", f"{icon_char}  {label}")
         self.after(0, _update)
+
+    # -----------------------------------------------------------------------
+    # GPU load (Measure GPU): each shader's GPU time per frame at 1920x1080 with
+    # its saved settings, as in the Single File tab (validate.benchmark).
+    # -----------------------------------------------------------------------
+    def _start_measure_gpu(self):
+        if self._measuring:
+            self._measuring.set()
+            self.btn_measure_gpu.configure(text="Stopping…")
+            return
+        items = self._selected_items() or list(self._queue)
+        if not items:
+            self.log("Nothing to measure: the queue is empty.")
+            return
+        self._measuring = stop = threading.Event()
+        self.btn_measure_gpu.configure(text="Stop Measuring", fg_color="#ef4444", hover_color="#dc2626")
+        self.log(f"Measuring the GPU load of {len(items)} shader(s) at 1920×1080…")
+        for item in items:
+            if item.iid and self.tree.exists(item.iid):
+                self.tree.set(item.iid, "gpu", "…")
+        threading.Thread(target=self._measure_gpu_thread,
+                         args=(items, self.extract_params_var.get(), stop), daemon=True).start()
+
+    def _measure_gpu_thread(self, items, extract_params, stop):
+        from ffmaker import validate as V
+        done = []
+        for item in items:
+            if stop.is_set():
+                break
+            if item.iid not in self._items_by_iid:      # removed meanwhile
+                continue
+            self.after(0, lambda it=item: self._set_item_gpu(it, "measuring…"))
+            try:
+                code = open(item.path, encoding="utf-8", errors="replace").read()
+                name = ffsettings.load(item.path).get("plugin_name") or item.name
+                res = pipeline.convert_ffgl(code, name=name, path=item.path,
+                                            extract_params=extract_params)
+                if not (res.ok and res.validated):
+                    self.after(0, lambda it=item: self._set_item_gpu(it, "doesn't compile"))
+                    continue
+                key = gpu_cache_key(res)
+                r = self._gpu_cache.get(key) or V.benchmark(res.ir, res.ffgl_glsl, seconds=0.6,
+                                                           cancel=stop.is_set)
+                if r is None:                           # stopped
+                    break
+                self._gpu_cache[key] = r
+                item.gpu_ms = r["ms"]
+                done.append(item)
+                self.after(0, lambda it=item: self._set_item_gpu(it))
+            except Exception as e:
+                self.after(0, lambda it=item, e=e: self._set_item_gpu(it, "error"))
+                self._gui_log(f"[{item.fname}] GPU measurement failed: {e}")
+        self.after(0, lambda: self._measure_gpu_done(items, done, stop))
+
+    def _set_item_gpu(self, item, text=None):
+        if not (item.iid and self.tree.exists(item.iid)):
+            return
+        if text is None:
+            from ffmaker import validate as V
+            load = V.load_text(item.gpu_ms)[0].replace(" of 60 fps", "")
+            ms = f"{item.gpu_ms:.1f}" if item.gpu_ms >= 1 else f"{item.gpu_ms:.2f}"
+            text = f"{load}  ·  {ms} ms" +("  ⚠" if item.gpu_ms > V.FRAME_60_MS else "")
+        self.tree.set(item.iid, "gpu", text)
+
+    def _measure_gpu_done(self, items, done, stop):
+        self._measuring = None
+        self.btn_measure_gpu.configure(fg_color="#374151", hover_color="#4b5563")
+        self._update_queue_buttons()
+        for item in items:                              # not reached (stopped): as before
+            if item.iid and self.tree.exists(item.iid) \
+                    and self.tree.set(item.iid, "gpu") in ("…", "measuring…"):
+                if item.gpu_ms is None:
+                    self.tree.set(item.iid, "gpu", "")
+                else:
+                    self._set_item_gpu(item)
+        msg = f"Measured {len(done)} shader(s)" + (" (stopped)" if stop.is_set() else "")
+        if done:
+            from ffmaker import validate as V
+            heavy = max(done, key=lambda i: i.gpu_ms)
+            over = sum(i.gpu_ms > V.FRAME_60_MS for i in done)
+            msg += (f". Heaviest: {heavy.fname} ({V.load_text(heavy.gpu_ms)[0]}, "
+                    f"{heavy.gpu_ms:.1f} ms/frame). {over} can't hold 60 fps at 1080p on this GPU.")
+            if self._sort[0] == "gpu":
+                self._sort_queue("gpu", keep=True)
+        self.log(msg)
+
+    def _sort_queue(self, col, keep=False):
+        """Sort the queue by a column (Filename, Type, GPU); again reverses. Unmeasured
+        shaders sort last by GPU. The new order is the queue's order (builds, ← / →)."""
+        last, desc = self._sort
+        if not keep:
+            desc = (not desc) if last == col else (col == "gpu")   # GPU: heaviest first
+        self._sort = (col, desc)
+        if col == "gpu":
+            measured = sorted((i for i in self._queue if i.gpu_ms is not None),
+                              key=lambda i: i.gpu_ms, reverse=desc)
+            self._queue = measured + [i for i in self._queue if i.gpu_ms is None]
+        else:
+            key = (lambda i: i.fname.lower()) if col == "file" else (lambda i: (i.fmt, i.fname.lower()))
+            self._queue.sort(key=key, reverse=desc)
+        for n, item in enumerate(self._queue, 1):
+            self.tree.move(item.iid, "", n - 1)
+            self.tree.set(item.iid, "num", n)
+        arrow = " ▼" if desc else " ▲"
+        for c, text in (("file", "Filename"), ("type", "Type"), ("gpu", "GPU @1080p")):
+            self.tree.heading(c, text=text + (arrow if c == col else ""))
 
     # -----------------------------------------------------------------------
     # Batch build
