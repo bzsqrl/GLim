@@ -145,6 +145,21 @@ def gpu():
             glfw.make_context_current(None)
 
 
+@contextmanager
+def window_lock():
+    """For OutputView window work on the main thread (poll, toggle) while the
+    output thread draws. On macOS that mustn't overlap a frame (it aborts in
+    Metal), so it takes gpu()'s lock, without making the context current (no GL
+    calls; switching costs ~0.3 ms each way). Elsewhere it needs nothing: GLFW
+    allows events on the main thread while another thread draws and swaps, and
+    waiting there would stall the UI for up to a frame (the swap waits for vsync)."""
+    if sys.platform == "darwin":
+        with _lock:
+            yield
+    else:
+        yield
+
+
 def parse_errors(log):
     errs = []
     for line in (log or "").splitlines():
