@@ -1,6 +1,6 @@
 """Scope-aware GLSL tokenizer and light structural analysis.
 
-All source rewriting in FFMaker goes through this module instead of ad-hoc
+All source rewriting in FFStudio goes through this module instead of ad-hoc
 regexes. Edits replace token text in place and always preserve newlines, so
 line numbers in compiler errors still match the user's original file.
 """

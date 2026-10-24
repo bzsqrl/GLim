@@ -1,5 +1,5 @@
 """
-FFMaker – Shader to FFGL Converter
+FFStudio – Shader to FFGL Converter
 main_gui.py – Queue-first layout with drag-and-drop batch processing.
 """
 import customtkinter as ctk
@@ -30,6 +30,12 @@ except ImportError:
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
+STUDIO_TAB = "Studio"          # the single-shader tab (editor, preview, output)
+# Constants and #defines always become sliders (there used to be a checkbox to turn
+# that off); unwanted ones can be unticked one by one in the Studio tab. Queue
+# builds keep their "-p" name suffix, so plugin names / IDs don't change.
+EXTRACT_PARAMS = True
+
 # Status icons / colours
 STATUS_PENDING  = ("—",  "#6b7280")   # grey
 STATUS_BUILDING = ("⟳",  "#f59e0b")   # amber
@@ -59,6 +65,15 @@ def detect_format(path: str = None, code: str = None) -> str:
     return base
 
 
+def _size_text(n):
+    """File size for the queue's Size column: 812 B, 4.2 KB, 1.3 MB."""
+    if n < 1024:
+        return f"{n} B"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.1f} KB"
+    return f"{n / (1024 * 1024):.1f} MB"
+
+
 # ---------------------------------------------------------------------------
 # Small data class for queue items
 # ---------------------------------------------------------------------------
@@ -72,18 +87,22 @@ class QueueItem:
         self.error  = ""
         self.iid    = None          # row id in the queue Treeview
         self.gpu_ms = None          # GPU time per frame at 1080p, once measured (Analyze)
+        try:
+            self.size = os.path.getsize(path)   # bytes (the Size column)
+        except OSError:
+            self.size = 0
 
 
 # ---------------------------------------------------------------------------
 # Main application window
 # ---------------------------------------------------------------------------
-class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
+class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
         if _DND_AVAILABLE:
             ctk.set_appearance_mode("Dark")
 
-        self.title("FFMaker – Shader to FFGL Converter")
+        self.title("FFStudio – Shader to FFGL Converter")
         # Fit the screen (minus taskbar), up to 1440x900.
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
         w, h = min(1440, sw - 60), min(900, sh - 110)
@@ -96,10 +115,9 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._gpu_cache = {}                      # GPU measurements, shared with the editor
         self._measuring = None                    # threading.Event to stop Analyze, while running
         self._sort = (None, False)                # queue sorted by (column, descending)
-        self._source_stem = "FFMakerPlugin"   # for single-file tab
+        self._source_stem = "FFStudioPlugin"   # for single-file tab
         self._source_path = None
         self.settings = {}                    # single-file tab: the shader's .ffmaker.json
-        self.extract_params_var = ctk.BooleanVar(value=True)
 
         # Force dark background regardless of TkinterDnD vs CTk base class
         self.configure(bg="#1a1a2e")
@@ -127,17 +145,17 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.after(50, self._collect_garbage)
 
     def _set_icon(self):
-        """FFMaker's icon for its windows (title bar, taskbar, Alt+Tab; the Dock
+        """FFStudio's icon for its windows (title bar, taskbar, Alt+Tab; the Dock
         when run from source on macOS)."""
         d = ffpaths.icon_dir()
         try:
             if sys.platform == "win32":
-                self.iconbitmap(default=os.path.join(d, "FFMaker.ico"))
-            self._icon_photos = [tk.PhotoImage(file=os.path.join(d, "png", f"ffmaker_{s}.png"))
+                self.iconbitmap(default=os.path.join(d, "FFStudio.ico"))
+            self._icon_photos = [tk.PhotoImage(file=os.path.join(d, "png", f"ffstudio_{s}.png"))
                                  for s in (16, 32, 48, 64, 128, 256)]
             self.iconphoto(True, *self._icon_photos)
         except Exception as e:          # icons are cosmetic; never block startup
-            print(f"FFMaker: window icon not set ({e})")
+            print(f"FFStudio: window icon not set ({e})")
 
     def _init_gpu(self):
         try:
@@ -162,31 +180,17 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.grid_rowconfigure(1, weight=1)
         self.grid_rowconfigure(2, weight=0)
 
-        # ── Title row ──
-        frame_title = ctk.CTkFrame(self, fg_color="transparent")
-        frame_title.grid(row=0, column=0, padx=20, pady=(12, 4), sticky="ew")
-        ctk.CTkLabel(frame_title, text="FFMaker",
-                     font=("Arial", 24, "bold"),
-                     text_color="#ffffff").pack(side="left")
-
-        # Global extraction toggle
-        self.cb_extract = ctk.CTkCheckBox(frame_title, text="Extract User Parameters",
-                                         variable=self.extract_params_var,
-                                         onvalue=True, offvalue=False,
-                                         font=("Arial", 12))
-        self.cb_extract.pack(side="right", padx=(10, 0))
-
-        # ── Tab view ──
+        # ── Tab view ── (no title row: the window title names the app)
         self.tabs = ctk.CTkTabview(self)
-        self.tabs.grid(row=1, column=0, padx=20, pady=(0, 8), sticky="nsew")
+        self.tabs.grid(row=1, column=0, padx=20, pady=(6, 8), sticky="nsew")
         self.tabs.add("Queue")
-        self.tabs.add("Single File")
+        self.tabs.add(STUDIO_TAB)
         self.tabs.tab("Queue").grid_columnconfigure(0, weight=1)
         self.tabs.tab("Queue").grid_rowconfigure(0, weight=0)  # toolbar
         self.tabs.tab("Queue").grid_rowconfigure(1, weight=0)  # column headers
         self.tabs.tab("Queue").grid_rowconfigure(2, weight=1)  # queue list
-        self.tabs.tab("Single File").grid_columnconfigure(0, weight=1)
-        self.tabs.tab("Single File").grid_rowconfigure(1, weight=1)
+        self.tabs.tab(STUDIO_TAB).grid_columnconfigure(0, weight=1)
+        self.tabs.tab(STUDIO_TAB).grid_rowconfigure(1, weight=1)
 
         self._build_queue_tab()
         self._build_singlefile_tab()
@@ -269,16 +273,17 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         style.layout("Queue.Treeview", [("Treeview.treearea", {"sticky": "nsew"})])
 
         self.tree = ttk.Treeview(box, style="Queue.Treeview", show="headings",
-                                 columns=("num", "file", "type", "gpu", "status"))
+                                 columns=("num", "file", "type", "size", "gpu", "status"))
         for col, text, width, anchor, stretch in (
                 ("num", "#", 50, "e", False), ("file", "Filename", 360, "w", True),
-                ("type", "Type", 110, "center", False), ("gpu", "GPU @1080p", 150, "center", False),
+                ("type", "Type", 110, "center", False), ("size", "Size", 90, "e", False),
+                ("gpu", "GPU @1080p", 150, "center", False),
                 ("status", "Status", 260, "w", True)):
             self.tree.heading(col, text=text, anchor=anchor)
             self.tree.column(col, width=int(width * scale), minwidth=int(40 * scale),
                              anchor=anchor, stretch=stretch)
         # Click a heading to sort the queue by it (again to reverse).
-        for col in ("file", "type", "gpu"):
+        for col in ("file", "type", "size", "gpu"):
             self.tree.heading(col, command=lambda c=col: self._sort_queue(c))
         for status, (_, color) in (("pending", STATUS_PENDING), ("building", STATUS_BUILDING),
                                    ("done", STATUS_DONE), ("error", STATUS_ERROR)):
@@ -304,7 +309,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._queue_menu.add_command(label="Analyze GPU Load", command=self._start_measure_gpu)
         self._queue_menu.add_separator()
         self._queue_menu.add_command(label="Reset Status", command=self._reset_status)
-        self._queue_menu.add_command(label="Open in Single File", command=self._open_selected)
+        self._queue_menu.add_command(label="Open in Studio", command=self._open_selected)
         self._queue_menu.add_command(label="Remove", command=self._remove_selected)
         self.tree.bind("<Button-3>", self._on_queue_right_click)
         if sys.platform == "darwin":    # older Tk on macOS reports right-click as button 2 (elsewhere it's the middle button)
@@ -334,7 +339,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # Single-file tab (existing workflow, preserved)
     # -----------------------------------------------------------------------
     def _build_singlefile_tab(self):
-        tab = self.tabs.tab("Single File")
+        tab = self.tabs.tab(STUDIO_TAB)
 
         # Tools row
         tools = ctk.CTkFrame(tab, fg_color="transparent")
@@ -390,7 +395,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.after(200, self._set_initial_sash)
 
     def _set_initial_sash(self):
-        """Initial split for the Single File tab: code on the left, editor panel on the right.
+        """Initial split for the Studio tab: code on the left, editor panel on the right.
         Retries until the tab has been shown and laid out."""
         try:
             w = self.panes.winfo_width()
@@ -496,8 +501,8 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                 all_files.append(p)
         self._add_paths(all_files)
 
-        # If dropping while the Single File tab is active, load the first file into the editor.
-        if all_files and self.tabs.get() == "Single File":
+        # If dropping while the Studio tab is active, load the first file into the editor.
+        if all_files and self.tabs.get() == STUDIO_TAB:
             self._load_file_path(all_files[0])
 
     def _remove_items(self, items: list[QueueItem]):
@@ -545,7 +550,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     def _open_selected(self):
         items = self._selected_items()
         if items:
-            self.tabs.set("Single File")
+            self.tabs.set(STUDIO_TAB)
             self._load_file_path(items[0].path)
 
     def _on_queue_double_click(self, event):
@@ -597,7 +602,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         item.iid = f"q{self._next_iid}"
         self._items_by_iid[item.iid] = item
         self.tree.insert("", "end", iid=item.iid, tags=("pending",),
-                         values=(len(self._queue), item.fname, item.fmt, "",
+                         values=(len(self._queue), item.fname, item.fmt, _size_text(item.size), "",
                                  f"{STATUS_PENDING[0]}  Pending"))
 
     def _set_item_status(self, item: QueueItem, status: str, text: str = ""):
@@ -613,7 +618,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
     # -----------------------------------------------------------------------
     # GPU load (Analyze): each shader's GPU time per frame at 1920x1080 with
-    # its saved settings, as in the Single File tab (validate.benchmark).
+    # its saved settings, as in the Studio tab (validate.benchmark).
     # -----------------------------------------------------------------------
     def _start_measure_gpu(self):
         if self._measuring:
@@ -625,13 +630,13 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.log("Nothing to measure: the queue is empty.")
             return
         self._measuring = stop = threading.Event()
-        self.btn_measure_gpu.configure(text="Stop Measuring", fg_color="#ef4444", hover_color="#dc2626")
+        self.btn_measure_gpu.configure(text="Stop Analysis", fg_color="#ef4444", hover_color="#dc2626")
         self.log(f"Measuring the GPU load of {len(items)} shader(s) at 1920×1080…")
         for item in items:
             if item.iid and self.tree.exists(item.iid):
                 self.tree.set(item.iid, "gpu", "…")
         threading.Thread(target=self._measure_gpu_thread,
-                         args=(items, self.extract_params_var.get(), stop), daemon=True).start()
+                         args=(items, EXTRACT_PARAMS, stop), daemon=True).start()
 
     def _measure_gpu_thread(self, items, extract_params, stop):
         from ffmaker import validate as V
@@ -697,24 +702,27 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.log(msg)
 
     def _sort_queue(self, col, keep=False):
-        """Sort the queue by a column (Filename, Type, GPU); again reverses. Unmeasured
-        shaders sort last by GPU. The new order is the queue's order (builds, ← / →)."""
+        """Sort the queue by a column (Filename, Type, Size, GPU); again reverses.
+        Unmeasured shaders sort last by GPU. The new order is the queue's order
+        (builds, ← / →)."""
         last, desc = self._sort
         if not keep:
-            desc = (not desc) if last == col else (col == "gpu")   # GPU: heaviest first
+            desc = (not desc) if last == col else (col in ("size", "gpu"))   # largest / heaviest first
         self._sort = (col, desc)
         if col == "gpu":
             measured = sorted((i for i in self._queue if i.gpu_ms is not None),
                               key=lambda i: i.gpu_ms, reverse=desc)
             self._queue = measured + [i for i in self._queue if i.gpu_ms is None]
         else:
-            key = (lambda i: i.fname.lower()) if col == "file" else (lambda i: (i.fmt, i.fname.lower()))
+            key = {"file": lambda i: i.fname.lower(),
+                   "type": lambda i: (i.fmt, i.fname.lower()),
+                   "size": lambda i: (i.size, i.fname.lower())}[col]
             self._queue.sort(key=key, reverse=desc)
         for n, item in enumerate(self._queue, 1):
             self.tree.move(item.iid, "", n - 1)
             self.tree.set(item.iid, "num", n)
         arrow = " ▼" if desc else " ▲"
-        for c, text in (("file", "Filename"), ("type", "Type"), ("gpu", "GPU @1080p")):
+        for c, text in (("file", "Filename"), ("type", "Type"), ("size", "Size"), ("gpu", "GPU @1080p")):
             self.tree.heading(c, text=text + (arrow if c == col else ""))
 
     # -----------------------------------------------------------------------
@@ -742,7 +750,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._cancel_event.clear()
         self.btn_build_queue.configure(text="Cancel Build", fg_color="#ef4444", hover_color="#dc2626")
         t = threading.Thread(target=self._build_queue_thread,
-                             args=(pending, self.extract_params_var.get()), daemon=True)
+                             args=(pending, EXTRACT_PARAMS), daemon=True)
         t.start()
 
     def _build_queue_thread(self, items: list[QueueItem], extract_params: bool):
@@ -802,7 +810,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     def _convert_and_build(self, code, name, path, output_dir, settings=None, extract_params=False):
         """Shared by queue and single-file builds. Returns (status, label).
         settings=None uses the shader's saved .ffmaker.json. Runs on worker
-        threads, so callers read extract_params from the checkbox beforehand."""
+        threads, so callers pass extract_params (EXTRACT_PARAMS)."""
         log = self._gui_log
         try:
             res = pipeline.convert_ffgl(code, name=name, path=path, settings=settings,
@@ -838,13 +846,13 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.log("Processing shader code...")
         if not self.entry_plugin_name.get().strip():
             self.entry_plugin_name.delete(0, "end")
-            self.entry_plugin_name.insert(0, "FFMakerPlugin")
+            self.entry_plugin_name.insert(0, "FFStudioPlugin")
 
         try:
             if res is None:
                 res = pipeline.convert_ffgl(code, name=self.entry_plugin_name.get().strip(),
                                             path=self._source_path, settings=self.settings,
-                                            extract_params=self.extract_params_var.get())
+                                            extract_params=EXTRACT_PARAMS)
         except ffconvert.ConvertError as e:
             self.log(f"ERROR: {e}")
             return
@@ -870,13 +878,13 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.log("Starting build…")
         self.btn_build_single.configure(state="disabled")
         code = self.textbox_code.get("1.0", "end-1c")
-        name = self.entry_plugin_name.get().strip() or "FFMakerPlugin"
+        name = self.entry_plugin_name.get().strip() or "FFStudioPlugin"
         path = self._source_path
         self._remember_plugin_name(name)
         if path:
             ffsettings.save(path, self.settings)     # queue builds of this file use the same settings
         settings = dict(self.settings)
-        extract = self.extract_params_var.get()
+        extract = EXTRACT_PARAMS
 
         def run():
             try:
@@ -902,14 +910,14 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.settings.pop("plugin_name", None)
 
     def _convert_for_preview(self, path):
-        """Convert a queue file (with its saved settings) for ← / → in Single File."""
+        """Convert a queue file (with its saved settings) for ← / → in Studio."""
         code = open(path, encoding="utf-8", errors="replace").read()
         name = ffsettings.load(path).get("plugin_name") or Path(path).stem
         return pipeline.convert_ffgl(code, name=name, path=path,
-                                     extract_params=self.extract_params_var.get())
+                                     extract_params=EXTRACT_PARAMS)
 
     def _load_file_path(self, path: str, res=None):
-        """Helper to load a file into the Single File editor and analyze it.
+        """Helper to load a file into the Studio editor and analyze it.
         res: an existing conversion of the file (with its saved settings) to reuse."""
         try:
             code = open(path, encoding="utf-8").read()
@@ -935,9 +943,9 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     def _isf_export(self, code, name, path, out_dir, settings=None, extract_params=None):
         """Write <name>.fs (plus texture files) into out_dir. Returns (fs_path, note).
-        Worker threads pass extract_params; None reads the checkbox."""
+        Worker threads pass extract_params; None means EXTRACT_PARAMS."""
         if extract_params is None:
-            extract_params = self.extract_params_var.get()
+            extract_params = EXTRACT_PARAMS
         res = pipeline.convert_ffgl(code, name=name, path=path, settings=settings,
                                     extract_params=extract_params)
         if res.ir.dialect == "isf":
@@ -962,7 +970,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             return
 
         name = self.entry_plugin_name.get().strip() or "ExportedISF"
-        suffix = "-p" if self.extract_params_var.get() else ""
+        suffix = "-p" if EXTRACT_PARAMS else ""
         save_path = ctk.filedialog.asksaveasfilename(
             title="Export ISF Shader",
             initialfile=f"{name}{suffix}.fs",
@@ -989,7 +997,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             return
 
         self.log(f"Exporting {len(items)} items to ISF...")
-        extract = self.extract_params_var.get()
+        extract = EXTRACT_PARAMS
         suffix = "-p" if extract else ""
         self.btn_export_isf_queue.configure(state="disabled")
 
@@ -1011,7 +1019,7 @@ class FFMakerApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
 def _selftest(shader, out_dir):
     """Headless check of a (packaged) build: convert, GPU-validate and build one
-    shader. Writes selftest.log into out_dir. Usage: FFMaker.exe --selftest <shader> <out_dir>"""
+    shader. Writes selftest.log into out_dir. Usage: FFStudio.exe --selftest <shader> <out_dir>"""
     import traceback
     os.makedirs(out_dir, exist_ok=True)
     lines = []
@@ -1035,8 +1043,8 @@ if __name__ == "__main__":
         # Own taskbar entry and icon, also when run from source (not Python's).
         try:
             import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("FFMaker.FFMaker")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("FFStudio.FFStudio")
         except Exception:
             pass
-    app = FFMakerApp()
+    app = FFStudioApp()
     app.mainloop()

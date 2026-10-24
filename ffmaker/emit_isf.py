@@ -132,7 +132,7 @@ def emit(ir, source_code=None):
     header = {
         "ISFVSN": "2",
         "DESCRIPTION": ir.meta.get("description") or ir.name,
-        "CREDIT": ir.meta.get("credit") or "Converted with FFMaker",
+        "CREDIT": ir.meta.get("credit") or "Converted with FFStudio",
         "CATEGORIES": cats,
         "INPUTS": inputs,
     }
@@ -228,10 +228,10 @@ def emit(ir, source_code=None):
                 hoisted.append(line)
 
     out = ["/*" + json.dumps(header, indent=4) + "*/", ""]
-    out += ["// ── FFMaker compatibility layer ──"] + defines + globals_ + [""]
+    out += ["// ── FFStudio compatibility layer ──"] + defines + globals_ + [""]
     out.append(code.rstrip("\n"))
     out.append("")
-    out.append("// ── FFMaker entry ──")
+    out.append("// ── FFStudio entry ──")
     out.append("void ffm_init() {")
     out += [f"    {h}" for h in hoisted]
     out.append("}")
@@ -360,5 +360,5 @@ def apply_settings_to_isf(source, ir):
     body = source[hdr[2]:]
     out = "/*" + json.dumps(header, indent=4) + "*/\n"
     if consts:
-        out += "\n// ── constants set in FFMaker ──\n" + "\n".join(consts) + "\n"
+        out += "\n// ── constants set in FFStudio ──\n" + "\n".join(consts) + "\n"
     return out + body

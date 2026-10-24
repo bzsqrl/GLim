@@ -434,7 +434,7 @@ def _normalize(toks, ir):
 
     declared = G.declared_names(toks)
     renames = {}
-    # FFMaker reserves the ffm_ prefix for its host layer (e.g. re-imported exports).
+    # FFStudio reserves the ffm_ prefix for its host layer (e.g. re-imported exports).
     for nm in declared:
         if nm.startswith("ffm_"):
             renames[nm] = "user_" + nm
@@ -546,7 +546,7 @@ def _map_varyings(toks, ir, skip=()):
         for x in q:
             G.blank(toks, it.qual_idx[x], it.qual_idx[x])
         ir.warnings.append(
-            f"Varying(s) {', '.join(names)} came from a vertex shader that FFMaker cannot run; "
+            f"Varying(s) {', '.join(names)} came from a vertex shader that FFStudio cannot run; "
             f"they will be zero.")
 
 
@@ -568,7 +568,8 @@ def _map_distinctive_names(toks, ir, aliases):
             aliases[nm] = sym
 
 
-_CHANNEL_DIRECTIVE = re.compile(r"//\s*@?ffmaker\s*:?\s*(iChannel[0-3])\s*=\s*(.+?)\s*$", re.I | re.M)
+# `ffmaker:` (FFStudio's former name) or `ffstudio:`.
+_CHANNEL_DIRECTIVE = re.compile(r"//\s*@?ff(?:maker|studio)\s*:?\s*(iChannel[0-3])\s*=\s*(.+?)\s*$", re.I | re.M)
 
 
 def channel_directives(code):
@@ -589,7 +590,7 @@ def split_channel_options(value):
 
 def sampler_options(sampler):
     """Shadertoy sampler dict ({"filter": "nearest", "wrap": "repeat", "vflip": "false"})
-    -> the subset FFMaker supports, normalised."""
+    -> the subset FFStudio supports, normalised."""
     out = {}
     f = str(sampler.get("filter", "")).lower().strip("\"'")
     w = str(sampler.get("wrap", "")).lower().strip("\"'")

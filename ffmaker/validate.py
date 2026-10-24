@@ -46,7 +46,7 @@ class _Context:
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 1)
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, True)
-        self.win = glfw.create_window(64, 64, "ffmaker-validate", None, None)
+        self.win = glfw.create_window(64, 64, "ffstudio-validate", None, None)
         if not self.win:
             raise ValidatorUnavailable("Could not create an OpenGL 4.1 core context")
         glfw.make_context_current(self.win)
@@ -662,7 +662,7 @@ class OutputView:
     """A window that shows a Previewer's output. It shares textures with the
     validation context, so frames go to the screen without a CPU copy.
 
-    windowed=False: fullscreen on the monitor nearest `near` (FFMaker's), closed
+    windowed=False: fullscreen on the monitor nearest `near` (FFStudio's), closed
     by Esc, Ctrl+F (⌘F) or a double-click.
     windowed=True: a normal window ("output window"), on another monitor when
     there is one, that can be moved and resized. Double-click or Ctrl+F toggles
@@ -671,7 +671,7 @@ class OutputView:
     Left / Right set `nav` (playlist). Create, use and close inside gpu(), on
     the main thread."""
 
-    TITLE = "FFMaker output  (double-click or Ctrl+F: fullscreen, ←/→: queue)"
+    TITLE = "FFStudio output  (double-click or Ctrl+F: fullscreen, ←/→: queue)"
 
     def __init__(self, near=None, windowed=False, max_width=1920):
         import glfw
@@ -689,7 +689,7 @@ class OutputView:
                             (glfw.OPENGL_FORWARD_COMPAT, True), (glfw.AUTO_ICONIFY, False)):
             glfw.window_hint(hint, value)
         if windowed:
-            # On another monitor when there is one, else next to FFMaker.
+            # On another monitor when there is one, else next to FFStudio.
             # Compare by address: each GLFW call returns new ctypes pointer objects.
             addr = lambda m: ctypes.cast(m, ctypes.c_void_p).value
             others = [m for m in glfw.get_monitors() if addr(m) != addr(home)]
@@ -771,8 +771,8 @@ class OutputView:
             glfw.set_window_attrib(self.win, glfw.FLOATING, True)    # above the taskbar
             glfw.set_window_pos(self.win, *glfw.get_monitor_pos(mon))
             glfw.set_window_size(self.win, w, h + 1)
-        # No focus change here: going fullscreen from FFMaker (Ctrl+F there) leaves
-        # the keyboard with FFMaker. A newly opened view takes focus in __init__.
+        # No focus change here: going fullscreen from FFStudio (Ctrl+F there) leaves
+        # the keyboard with FFStudio. A newly opened view takes focus in __init__.
 
     def set_fullscreen(self, on):
         """Output window only: fullscreen on the monitor it's on, or back to the window."""
@@ -843,7 +843,7 @@ class OutputView:
         # Not on macOS: there GLFW and Tk share one event queue, and Tk's loop already
         # delivers this window's events. glfwPollEvents would also take Tk's events off
         # the queue and send them on itself, past Tk's own handling, so clicks on
-        # FFMaker's buttons (Output, fullscreen) were sometimes lost.
+        # FFStudio's buttons (Output, fullscreen) were sometimes lost.
         if sys.platform != "darwin":
             self.glfw.poll_events()
         # Act outside the callbacks: changing the window from inside them isn't safe.
@@ -914,7 +914,7 @@ class OutputView:
         gl.glDeleteFramebuffers(1, [self.fbo])
         glfw.make_context_current(self.ctx.win)
         # Show the cursor before destroying the window: on macOS the hidden cursor
-        # otherwise stays hidden over FFMaker afterwards.
+        # otherwise stays hidden over FFStudio afterwards.
         glfw.set_input_mode(self.win, glfw.CURSOR, glfw.CURSOR_NORMAL)
         glfw.poll_events()
         glfw.destroy_window(self.win)
@@ -922,7 +922,7 @@ class OutputView:
 
 
 def _set_window_icon(glfw, win):
-    """FFMaker's icon on the output window (title bar, taskbar). macOS windows
+    """FFStudio's icon on the output window (title bar, taskbar). macOS windows
     have no icons; the app's Dock icon is used there."""
     if sys.platform == "darwin":
         return
@@ -931,7 +931,7 @@ def _set_window_icon(glfw, win):
         from PIL import Image
         from . import paths
         d = os.path.join(paths.icon_dir(), "png")
-        glfw.set_window_icon(win, 3, [Image.open(os.path.join(d, f"ffmaker_{s}.png")).convert("RGBA")
+        glfw.set_window_icon(win, 3, [Image.open(os.path.join(d, f"ffstudio_{s}.png")).convert("RGBA")
                                       for s in (16, 32, 48)])
     except Exception:
         pass                                       # cosmetic

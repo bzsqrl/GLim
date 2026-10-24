@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Build with:  venv\Scripts\python compile.py   (Windows: dist\FFMaker.exe)
-#              venv/bin/python compile.py       (macOS: dist/FFMaker.app)
+# Build with:  venv\Scripts\python compile.py   (Windows: dist\FFStudio.exe)
+#              venv/bin/python compile.py       (macOS: dist/FFStudio.app)
 import os
 import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
@@ -48,7 +48,7 @@ if MAC:
         a.scripts,
         [],
         exclude_binaries=True,
-        name='FFMaker',
+        name='FFStudio',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -60,12 +60,12 @@ if MAC:
         codesign_identity=None,
         entitlements_file=None,
     )
-    coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='FFMaker')
+    coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='FFStudio')
     app = BUNDLE(
         coll,
-        name='FFMaker.app',
-        icon='assets/icon/FFMaker.icns',
-        bundle_identifier='com.ffmaker.app',
+        name='FFStudio.app',
+        icon='assets/icon/FFStudio.icns',
+        bundle_identifier='com.ffstudio.app',
         info_plist={
             'CFBundleShortVersionString': '1.0',
             'NSHighResolutionCapable': True,
@@ -79,8 +79,8 @@ else:
         a.binaries,
         a.datas,
         [],
-        name='FFMaker',
-        icon='assets/icon/FFMaker.ico',
+        name='FFStudio',
+        icon='assets/icon/FFStudio.ico',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,

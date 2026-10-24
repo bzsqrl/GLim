@@ -25,7 +25,7 @@ def cache_dir():
         base = os.path.expanduser("~/Library/Caches")
     else:
         base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    d = os.path.join(base, "FFMaker")
+    d = os.path.join(base, "FFMaker")      # (FFStudio's former name; kept so the workspace is reused)
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -35,7 +35,7 @@ def templates_dir():
 
 
 def icon_dir():
-    """FFMaker's icon files (made by assets/icon/make_icon.py)."""
+    """FFStudio's icon files (made by assets/icon/make_icon.py)."""
     return os.path.join(bundle_dir(), "assets", "icon")
 
 
@@ -44,8 +44,8 @@ def ffgl_sdk_dir():
 
 
 def default_output_dir():
-    # A packaged Mac app can't write inside FFMaker.app (that breaks its
+    # A packaged Mac app can't write inside FFStudio.app (that breaks its
     # signature, and /Applications is read-only), so use Documents instead.
     if getattr(sys, "frozen", False) and sys.platform == "darwin":
-        return os.path.join(os.path.expanduser("~/Documents"), "FFMaker", "output")
+        return os.path.join(os.path.expanduser("~/Documents"), "FFStudio", "output")
     return os.path.join(app_dir(), "output")

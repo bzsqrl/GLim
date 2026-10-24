@@ -1,6 +1,6 @@
 # Updating the Windows build after the Mac port
 
-These steps bring a Windows checkout up to date with the work done on macOS, check the new features on Windows and rebuild `FFMaker.exe`. Run the commands in PowerShell from the FFMaker folder. If you're Claude on the Windows machine helping with this, read "Context" first.
+These steps bring a Windows checkout up to date with the work done on macOS, check the new features on Windows and rebuild `FFStudio.exe`. Run the commands in PowerShell from the FFMaker folder (the git checkout). If you're Claude on the Windows machine helping with this, read "Context" first.
 
 ## Context
 
@@ -13,7 +13,7 @@ Commits since the Windows build was last updated:
 | `8fa3cea` | Mac plugin builds (Makefiles generator, universal binary, bundle naming and signing) | Mac-only branches in `ffmaker/build_ffgl.py` and `templates/ffgl/CMakeLists.txt`. The `CMAKE_OSX_*` settings are ignored on Windows. |
 | `6adeaff` | ISF export uses `ffm_FragCoord` derived from `isf_FragNormCoord`, so output is upright in hosts with a top-left `gl_FragCoord` | Shared. Changes ISF output on every platform. |
 | `8fbc698` | `tests/run_corpus.py --isf` reports `FLIP` when ISF output depends on `gl_FragCoord` origin | Shared test code. |
-| `6c9ba10` | Platform-aware `FFMaker.spec` (Mac `.app`, Windows one-file `.exe` as before); `compile.py` runs `python -m PyInstaller`; Ctrl/⌘+Enter binding | `compile.py` now needs PyInstaller in the venv. |
+| `6c9ba10` | Platform-aware `FFStudio.spec` (Mac `.app`, Windows one-file `.exe` as before); `compile.py` runs `python -m PyInstaller`; Ctrl/⌘+Enter binding | `compile.py` now needs PyInstaller in the venv. |
 | `20a83a3` | Deleted the old `FFMaker-Mac` folder | The pull deletes it. |
 | `8317f96` | Per-channel sampler settings (filter / wrap / vflip) and tempo uniforms (`iBPM`, `iBeat`, `iBarPhase`) | **New C++ in `templates/ffgl/Plugin.cpp` and `FFMakerPlugin.h`, never compiled with MSVC.** |
 | `6f724f2` | `.DS_Store` ignored | None. |
@@ -54,7 +54,7 @@ venv\Scripts\python -m pip install --upgrade -r requirements.txt pyinstaller
 
 ## 3. Make sure GLEW is in `deps\`
 
-Packaging the exe needs `deps\glew-2.2.0` inside the FFMaker folder. It isn't in git, so it should still be there from earlier builds.
+Packaging the exe needs `deps\glew-2.2.0` inside the FFMaker folder (the git checkout). It isn't in git, so it should still be there from earlier builds.
 
 ```powershell
 Test-Path deps\glew-2.2.0\lib\Release\x64
@@ -76,7 +76,7 @@ venv\Scripts\python tests\run_corpus.py --isf
 venv\Scripts\python tests\run_corpus.py --isf --dir tests\fixtures
 ```
 
-The first command runs the 79 sample shaders and the second the fixtures, including the new `shadertoy_sampler`, `shadertoy_buffer_sampler` and `shadertoy_tempo`. These render in FFMaker's preview; they don't build plugins.
+The first command runs the 79 sample shaders and the second the fixtures, including the new `shadertoy_sampler`, `shadertoy_buffer_sampler` and `shadertoy_tempo`. These render in FFStudio's preview; they don't build plugins.
 
 **Expected:** every row is `OK`, and the ISF column has no `FAIL` or `FLIP`. On the Mac the result was 79/79, with 40/40 ISF exports OK.
 
@@ -97,17 +97,17 @@ foreach ($s in "shadertoy_sampler", "shadertoy_buffer_sampler", "shadertoy_tempo
 
 If CMake complains about the existing workspace, delete `%LOCALAPPDATA%\FFMaker\ffgl_workspace` and run the loop again.
 
-## 6. Package FFMaker.exe
+## 6. Package FFStudio.exe
 
 ```powershell
 venv\Scripts\python compile.py
-dist\FFMaker.exe --selftest tests\fixtures\shadertoy_tempo.txt output\exe_selftest
+dist\FFStudio.exe --selftest tests\fixtures\shadertoy_tempo.txt output\exe_selftest
 Get-Content output\exe_selftest\selftest.log
 ```
 
-**Expected:** `dist\FFMaker.exe` exists, and the log ends with `built …shadertoy_tempo.dll`.
+**Expected:** `dist\FFStudio.exe` exists, and the log ends with `built …shadertoy_tempo.dll`.
 
-Then open `dist\FFMaker.exe` normally and check that the window appears. Each single-pass Shadertoy channel in the editor should now have **filter** and **wrap** menus next to its source menu.
+Then open `dist\FFStudio.exe` normally and check that the window appears. Each single-pass Shadertoy channel in the editor should now have **filter** and **wrap** menus next to its source menu.
 
 ## 7. Check the plugins in Resolume
 

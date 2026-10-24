@@ -48,7 +48,7 @@ def main(argv=None):
     ap.add_argument("inputs", nargs="+")
     ap.add_argument("--to", choices=["ffgl", "isf", "both", "check"], default="ffgl",
                     help="'check' only validates (no files written)")
-    ap.add_argument("--out", default=None, help="output folder (default: FFMaker/output)")
+    ap.add_argument("--out", default=None, help="output folder (default: the output folder next to FFStudio)")
     ap.add_argument("--no-params", action="store_true", help="don't turn constants into sliders")
     ap.add_argument("--prefix", default="", help="prefix for plugin names (e.g. 'FFM ')")
     ap.add_argument("--test", action="store_true", help="load each built plugin in a test host")

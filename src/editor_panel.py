@@ -1,4 +1,4 @@
-"""Right-hand panel of the Single File tab: live preview, channel sources and
+"""Right-hand panel of the Studio tab: live preview, channel sources and
 the parameter editor. Edits are written into a settings dict (the shader's
 .ffmaker.json); changes that alter the GLSL ask the app to recompile."""
 import math
@@ -32,7 +32,7 @@ WRAP_CHOICES = ["wrap", "clamp", "repeat"]
 def gpu_cache_key(res, values=None):
     """Key for a GPU measurement: the converted GLSL plus the param values it ran
     with (the defaults when values is None), so the queue's measurements and the
-    Single File tab's share results."""
+    Studio tab's share results."""
     if values is None:
         values = {i: p.default for i, p in enumerate(res.ir.params)}
     return (tuple(res.ffgl_glsl), repr(sorted(values.items())))
@@ -78,7 +78,7 @@ class EditorPanel(ctk.CTkFrame):
         self._fs = None                       # fullscreen state, see "Fullscreen" below
         # Set by the app: the queue's file paths, a function converting one for
         # preview, and on_select(path, res), which loads a converted queue file
-        # into the Single File tab (the output then follows, see load()).
+        # into the Studio tab (the output then follows, see load()).
         self.get_playlist = lambda: []
         self.convert_path = None
         self.on_select = None
@@ -114,10 +114,10 @@ class EditorPanel(ctk.CTkFrame):
         self._output_btn_open = False
         self._fullscreen_btn_on = False
         self.preview.bind("<Double-Button-1>", lambda e: self._toggle_fullscreen())
-        # Esc in FFMaker also leaves fullscreen (e.g. with the output on another monitor).
+        # Esc in FFStudio also leaves fullscreen (e.g. with the output on another monitor).
         top = self.winfo_toplevel()
         top.bind("<Escape>", lambda e: self._escape_output(), add="+")
-        # Ctrl+F (⌘F on macOS) toggles fullscreen while the Single File tab is showing.
+        # Ctrl+F (⌘F on macOS) toggles fullscreen while the Studio tab is showing.
         mod = "Command" if sys.platform == "darwin" else "Control"
         for key in ("f", "F"):
             top.bind(f"<{mod}-{key}>", self._toggle_fullscreen, add="+")
@@ -300,7 +300,7 @@ class EditorPanel(ctk.CTkFrame):
         return pv
 
     def enter_fullscreen(self, windowed=False):
-        """Show the preview fullscreen on FFMaker's monitor (Esc returns), or with
+        """Show the preview fullscreen on FFStudio's monitor (Esc returns), or with
         windowed=True in an output window that can go fullscreen on another monitor."""
         if self._fs or not self.previewer:
             return
@@ -356,7 +356,7 @@ class EditorPanel(ctk.CTkFrame):
             self.btn_fullscreen.configure(fg_color=fg, hover_color=hover)
 
     def _escape_output(self):
-        """Esc in FFMaker: the output window leaves fullscreen; plain fullscreen closes."""
+        """Esc in FFStudio: the output window leaves fullscreen; plain fullscreen closes."""
         if self._fs:
             from ffmaker import validate as V
             with V.window_lock():
@@ -461,12 +461,12 @@ class EditorPanel(ctk.CTkFrame):
 
     def _toggle_fullscreen(self, _e=None):
         """⛶, Ctrl+F, double-click: with the output window open, toggle its
-        fullscreen; otherwise open / close fullscreen on FFMaker's monitor."""
+        fullscreen; otherwise open / close fullscreen on FFStudio's monitor."""
         if self._fs:
             from ffmaker import validate as V
             with V.window_lock():
                 self._fs["view"].toggle()      # plain fullscreen: marks it closed
-        elif self.winfo_viewable():         # only from the Single File tab
+        elif self.winfo_viewable():         # only from the Studio tab
             self.enter_fullscreen()
         else:
             return None

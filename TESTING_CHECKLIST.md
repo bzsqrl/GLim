@@ -75,7 +75,7 @@ Location: `output/test_batch_v3/` (rebuild with `venv/bin/python -m ffmaker --to
 
 # Test batch v4: smooth sliders and `#define` channels
 
-Location: `output/test_batch_v4/`. Rebuild it with the command in [MAC_UPDATE.md](MAC_UPDATE.md), step 4. It has 4 FFGL plugins and the matching ISF files. Windows: all four pass FFMaker's test host. macOS: all four pass the test host, and the user confirmed them in Resolume and MadMapper (2026-10-21).
+Location: `output/test_batch_v4/`. Rebuild it with the command in [MAC_UPDATE.md](MAC_UPDATE.md), step 4. It has 4 FFGL plugins and the matching ISF files. Windows: all four pass FFStudio's test host. macOS: all four pass the test host, and the user confirmed them in Resolume and MadMapper (2026-10-21).
 
 | Plugin | What to check |
 | :-- | :-- |

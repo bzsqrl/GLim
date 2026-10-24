@@ -1,4 +1,4 @@
-"""Lightweight Tk/ttk widgets in FFMaker's dark CustomTkinter colours.
+"""Lightweight Tk/ttk widgets in FFStudio's dark CustomTkinter colours.
 
 Every CustomTkinter widget is a canvas that draws its own rounded shapes, so
 building many is slow: a 13-slider parameter list took about half a second,
