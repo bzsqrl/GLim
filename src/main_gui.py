@@ -1034,7 +1034,8 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self._source_path = path
             if self.settings:
                 self.log(f"Loaded saved settings: {ffsettings.existing_path(path)}")
-            self.log(f"Loaded: {Path(path).name} (will export as {self.entry_plugin_name.get()}.dll)")
+            plugin_ext = ".bundle" if sys.platform == "darwin" else ".dll"
+            self.log(f"Loaded: {Path(path).name} (will export as {self.entry_plugin_name.get()}{plugin_ext})")
             self.analyze_code(res=res)
         except Exception as e:
             self.log(f"Error reading file: {e}")
