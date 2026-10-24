@@ -1,6 +1,6 @@
 # Updating the Windows build after the Mac port
 
-These steps bring a Windows checkout up to date with the work done on macOS, check the new features on Windows and rebuild `FFStudio.exe`. Run the commands in PowerShell from the FFMaker folder (the git checkout). If you're Claude on the Windows machine helping with this, read "Context" first.
+These steps bring a Windows checkout up to date with the work done on macOS, check the new features on Windows and rebuild `FFStudio.exe`. Run the commands in PowerShell from the FFStudio folder (the git checkout). If you're Claude on the Windows machine helping with this, read "Context" first.
 
 ## Context
 
@@ -10,12 +10,12 @@ Commits since the Windows build was last updated:
 
 | Commit | What changed | Windows impact |
 |---|---|---|
-| `8fa3cea` | Mac plugin builds (Makefiles generator, universal binary, bundle naming and signing) | Mac-only branches in `ffmaker/build_ffgl.py` and `templates/ffgl/CMakeLists.txt`. The `CMAKE_OSX_*` settings are ignored on Windows. |
+| `8fa3cea` | Mac plugin builds (Makefiles generator, universal binary, bundle naming and signing) | Mac-only branches in `ffstudio/build_ffgl.py` and `templates/ffgl/CMakeLists.txt`. The `CMAKE_OSX_*` settings are ignored on Windows. |
 | `6adeaff` | ISF export uses `ffm_FragCoord` derived from `isf_FragNormCoord`, so output is upright in hosts with a top-left `gl_FragCoord` | Shared. Changes ISF output on every platform. |
 | `8fbc698` | `tests/run_corpus.py --isf` reports `FLIP` when ISF output depends on `gl_FragCoord` origin | Shared test code. |
 | `6c9ba10` | Platform-aware `FFStudio.spec` (Mac `.app`, Windows one-file `.exe` as before); `compile.py` runs `python -m PyInstaller`; Ctrl/⌘+Enter binding | `compile.py` now needs PyInstaller in the venv. |
-| `20a83a3` | Deleted the old `FFMaker-Mac` folder | The pull deletes it. |
-| `8317f96` | Per-channel sampler settings (filter / wrap / vflip) and tempo uniforms (`iBPM`, `iBeat`, `iBarPhase`) | **New C++ in `templates/ffgl/Plugin.cpp` and `FFMakerPlugin.h`, never compiled with MSVC.** |
+| `20a83a3` | Deleted the old separate Mac folder | The pull deletes it. |
+| `8317f96` | Per-channel sampler settings (filter / wrap / vflip) and tempo uniforms (`iBPM`, `iBeat`, `iBarPhase`) | **New C++ in `templates/ffgl/Plugin.cpp` and `FFStudioPlugin.h`, never compiled with MSVC.** |
 | `6f724f2` | `.DS_Store` ignored | None. |
 
 The new C++ is most likely to need a fix:
@@ -33,7 +33,7 @@ These are probably still installed from earlier Windows builds:
 
 ## 1. Pull
 
-Before pulling, check `git status` and commit or `git stash` any local changes. The pull deletes `FFMaker-Mac`; copy out anything of your own that's in it first.
+Before pulling, check `git status` and commit or `git stash` any local changes. The pull deletes the old Mac folder; copy out anything of your own that's in it first.
 
 ```powershell
 git checkout main
@@ -54,7 +54,7 @@ venv\Scripts\python -m pip install --upgrade -r requirements.txt pyinstaller
 
 ## 3. Make sure GLEW is in `deps\`
 
-Packaging the exe needs `deps\glew-2.2.0` inside the FFMaker folder (the git checkout). It isn't in git, so it should still be there from earlier builds.
+Packaging the exe needs `deps\glew-2.2.0` inside the FFStudio folder (the git checkout). It isn't in git, so it should still be there from earlier builds.
 
 ```powershell
 Test-Path deps\glew-2.2.0\lib\Release\x64
