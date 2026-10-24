@@ -164,7 +164,7 @@ The **Spout** button on Windows is **Syphon** on macOS (next to ⛶ in the Studi
 
 **Checked on the Mac (2026-10-24, M1 Max, macOS 14.8, syphon-python 0.2.0), from source, with no code changes:** the GUI was driven by a script and a separate Syphon client received the frames. Every row above passed: 1920×1080, the right way up (`is_flipped` stays False), 60 fps sent and received; sending carries on from the Queue tab, across shader switches and while the output window opens, closes and reopens; Syphon off with the window open keeps the window, and the server is gone within about 2 s. Creating the server on GLFW's context works.
 
-**FFStudio.app:** builds with the Syphon framework, passes `--selftest`, and its Syphon output works in Resolume (checked 2026-10-24). Known packaging flaw: PyInstaller copies `Syphon.framework` with a top-level `Modules/` folder and no resource seal, so `codesign --verify --deep --strict dist/FFStudio.app` fails. The framework still loads (the app isn't built with the hardened runtime); it only matters if the app is copied to another Mac.
+**FFStudio.app:** builds with the Syphon framework, passes `--selftest`, and its Syphon output works in Resolume (checked 2026-10-24). `compile.py` then repairs the app's ad-hoc signature (`seal_mac_app`): PyInstaller left the app without a resource seal, and `Syphon.framework` (from a wheel, which can't hold symlinks) with real folders where a framework has symlinks. Now `codesign --verify --deep --strict dist/FFStudio.app` passes.
 
 If creating the server fails, the log says `Syphon unavailable: …` and the button turns off. The likely spot is the context: `syphon.SyphonOpenGLServer(name)` uses the current NSOpenGLContext, which GLFW should have made current inside `gpu()`.
 
