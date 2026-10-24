@@ -153,7 +153,7 @@ The **Spout** button on Windows is **Syphon** on macOS (next to ⛶ in the Studi
 
 If creating the server fails, the log says `Syphon unavailable: …` and the button turns off. The likely spot is the context: `syphon.SyphonOpenGLServer(name)` uses the current NSOpenGLContext, which GLFW should have made current inside `gpu()`.
 
-## 10. NDI output (new, untested on the Mac)
+## 10. NDI output
 
 The Studio tab's controls for sending now sit in a **Send** row under the preview: **Syphon**, **NDI**, and the NDI size menu (**1080p** / **720p**). NDI sends the shader as "<Mac name> (FFStudio)" at 30 fps over the network (`validate.NdiSender`: the frame is flipped and scaled on the GPU, read back asynchronously through two pixel buffers, and sent with cyndilib). On Windows every check passed (30 fps, no dropped frames, the right way up, at both sizes, alongside Spout, with and without the output window); the Mac needs:
 
@@ -168,6 +168,8 @@ The Studio tab's controls for sending now sit in a **Send** row under the previe
 | Off | The NDI source disappears from the receiver. |
 | Self-test | `FFStudio --selftest <shader> <dir>` writes `sender Syphon: ok` and `sender NDI: ok` to `selftest.log`. |
 | FFStudio.app | The same works in the packaged app. The first time, macOS asks for **Local Network** access (the spec's `NSLocalNetworkUsageDescription` / `NSBonjourServices`); allow it. If NDI sends from source but not from the app, that permission is the first suspect (System Settings → Privacy & Security → Local Network). `compile.py`'s signing step must still verify with cyndilib's `libndi` included. |
+
+**Checked on the Mac (2026-10-24, M1 Max, macOS 14.8, cyndilib 0.1.3), with no code changes:** every row passed. From source, a script drove the GUI while separate NDI and Syphon receivers watched: the right way up at 1920×1080, and 1280×720 after choosing **720p** while sending; 30 fps with no dropped frames by NDI's own counters (each send about 0.5 ms); alongside Syphon at 60 fps, and turning Syphon off left NDI sending; sending carried on from the Queue tab, across a shader switch and while the output window opened and closed; the source was gone about 2 s after NDI was turned off. The self-test reports both senders `ok`, in the packaged app too. `FFStudio.app` bundles `libndi` and its licence files, still passes `codesign --verify --deep --strict`, and sends to Resolume (after allowing Local Network access), where the source is listed as "<Mac name> (FFStudio)". The app is now 71 MB (was 52 MB), mostly for numpy.
 
 ## If something fails
 
