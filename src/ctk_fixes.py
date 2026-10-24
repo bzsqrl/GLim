@@ -6,7 +6,7 @@ set, but that flag is unreliable, so clicks were silently ignored:
   so the second of two quick clicks did nothing;
 - it's only set by an <Enter> event, so when the pointer is already over the
   button without having entered it (a window over it just closed or opened,
-  e.g. fullscreen / the output window, or focus came back to FFMaker), clicks did
+  e.g. fullscreen / the output window, or focus came back to FFStudio), clicks did
   nothing until the mouse left the button and came back.
 The fix asks where the pointer is at release instead: inside the button runs the
 command (dragging off a button before letting go still cancels, as before).

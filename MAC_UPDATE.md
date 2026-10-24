@@ -1,6 +1,10 @@
 # Updating the Mac build after the Windows work
 
-These steps bring a Mac checkout up to date with the work done on Windows, check the new features on macOS and rebuild `FFMaker.app`. Run the commands in Terminal from the FFMaker folder. If you're Claude on the Mac helping with this, read "Context" first.
+These steps bring a Mac checkout up to date with the work done on Windows, check the new features on macOS and rebuild `FFStudio.app`. Run the commands in Terminal from the FFMaker folder (the git checkout). If you're Claude on the Mac helping with this, read "Context" first.
+
+## The app is now FFStudio
+
+FFMaker was renamed **FFStudio**, and its **Single File** tab is now **Studio**. After the pull, `compile.py` builds `dist/FFStudio.app` (bundle id `com.ffstudio.app`), and plugins are written to `~/Documents/FFStudio/output` (plugins built earlier stay in `~/Documents/FFMaker/output`). The old `dist/FFMaker.app` and any copy in Applications can be deleted. Unchanged, so existing work keeps working: `<shader>.ffmaker.json` settings, `// ffmaker:` channel directives (`// ffstudio:` works too), plugin IDs, the `ffmaker` Python package (`python -m ffmaker`), the `~/Library/Caches/FFMaker` build workspace and the repo / folder name.
 
 ## Context
 
@@ -67,7 +71,7 @@ Two fixtures are new:
 
 ## 4. Build test batch v4
 
-This compiles the new plugin C++ with clang, then loads each plugin in FFMaker's test host. The first build reconfigures the cached workspace (`~/Library/Caches/FFMaker`), because the runtime template changed. That takes about a minute.
+This compiles the new plugin C++ with clang, then loads each plugin in FFStudio's test host. The first build reconfigures the cached workspace (`~/Library/Caches/FFMaker`), because the runtime template changed. That takes about a minute.
 
 ```bash
 venv/bin/python -m ffmaker --to both --test --out output/test_batch_v4 \
@@ -81,11 +85,11 @@ If `sample-shaders/` on this Mac no longer has the two `bare_` files, take them 
 
 If CMake complains about the existing workspace, delete `~/Library/Caches/FFMaker` and run the command again.
 
-## 5. Package FFMaker.app
+## 5. Package FFStudio.app
 
 ```bash
 venv/bin/python compile.py
-dist/FFMaker.app/Contents/MacOS/FFMaker --selftest tests/fixtures/shadertoy_rate_params.txt /tmp/ffm_selftest
+dist/FFStudio.app/Contents/MacOS/FFStudio --selftest tests/fixtures/shadertoy_rate_params.txt /tmp/ffm_selftest
 cat /tmp/ffm_selftest/selftest.log
 ```
 
@@ -93,7 +97,7 @@ cat /tmp/ffm_selftest/selftest.log
 
 ## 6. Check the GUI (the new queue)
 
-Open `dist/FFMaker.app`, or run `venv/bin/python src/main_gui.py`. In the **Queue** tab:
+Open `dist/FFStudio.app`, or run `venv/bin/python src/main_gui.py`. In the **Queue** tab:
 
 | Check | What should happen |
 |---|---|
@@ -102,11 +106,11 @@ Open `dist/FFMaker.app`, or run `venv/bin/python src/main_gui.py`. In the **Queu
 | Select | Click a row, Shift-click a range, ⌘-click to add single rows. *(Not verified on macOS: Tk may use Control-click for this instead.)* |
 | Buttons | With rows selected, the buttons read e.g. **Build FFGL (n)** and **Export ISF (n)** and act on just those rows. Esc, or clicking empty space below the rows, deselects; the buttons go back to **Build FFGL** / **Export ISF**. |
 | Remove | The **delete** key (Backspace) removes the selected rows. |
-| Right-click | A two-finger click (or right mouse button) opens Build Selected / Export Selected to ISF / Open in Single File / Remove. **Control-click is not bound**; if that's the habit, it's a one-line addition (`<Control-Button-1>`) next to the `<Button-2>` binding in `src/main_gui.py`. |
-| Double-click | Opens the file in the **Single File** tab. |
+| Right-click | A two-finger click (or right mouse button) opens Build Selected / Export Selected to ISF / Open in Studio / Remove. **Control-click is not bound**; if that's the habit, it's a one-line addition (`<Control-Button-1>`) next to the `<Button-2>` binding in `src/main_gui.py`. |
+| Double-click | Opens the file in the **Studio** tab. |
 | While building | The window stays responsive during **Build FFGL**, and **Cancel Build** stops it. |
 
-**Parameter panel (since the efficiency pass).** In the **Single File** tab, the parameter rows and Shadertoy channel menus now use plain Tk/ttk widgets (`src/fast_widgets.py`), which have flat corners. They were only tested on Windows, so check them here:
+**Parameter panel (since the efficiency pass).** In the **Studio** tab, the parameter rows and Shadertoy channel menus now use plain Tk/ttk widgets (`src/fast_widgets.py`), which have flat corners. They were only tested on Windows, so check them here:
 
 | Check | What should happen |
 |---|---|

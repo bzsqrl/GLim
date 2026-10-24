@@ -1,11 +1,11 @@
-"""Draw the FFMaker icon and write every format the app needs:
+"""Draw the FFStudio icon and write every format the app needs:
 
-    assets/icon/FFMaker.png         1024 px logo
-    assets/icon/FFMaker.ico         Windows (16-256 px; small sizes drawn separately)
-    assets/icon/FFMaker.icns        macOS (Apple's icon grid: the tile has a margin)
-    assets/icon/png/ffmaker_N.png   window icons for Tk / GLFW
+    assets/icon/FFStudio.png         1024 px logo
+    assets/icon/FFStudio.ico         Windows (16-256 px; small sizes drawn separately)
+    assets/icon/FFStudio.icns        macOS (Apple's icon grid: the tile has a margin)
+    assets/icon/png/ffstudio_N.png   window icons for Tk / GLFW
 
-Design: a dark rounded tile (FFMaker's own background) with "FF" split into
+Design: a dark rounded tile (FFStudio's own background) with "FF" split into
 cyan and magenta copies that add up to white where they overlap, like an RGB
 split in a VJ mix. Only Pillow is needed:  python assets/icon/make_icon.py
 """
@@ -87,21 +87,21 @@ def render(size, margin=0.06):
 def main():
     os.makedirs(os.path.join(HERE, "png"), exist_ok=True)
     logo = render(1024)
-    logo.save(os.path.join(HERE, "FFMaker.png"))
+    logo.save(os.path.join(HERE, "FFStudio.png"))
 
     ico_sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
     imgs = [render(s) for s in ico_sizes]
-    imgs[-1].save(os.path.join(HERE, "FFMaker.ico"), sizes=[(s, s) for s in ico_sizes],
+    imgs[-1].save(os.path.join(HERE, "FFStudio.ico"), sizes=[(s, s) for s in ico_sizes],
                   append_images=imgs[:-1])
     for s, im in zip(ico_sizes, imgs):
         if s in (16, 24, 32, 48, 64, 128, 256):
-            im.save(os.path.join(HERE, "png", f"ffmaker_{s}.png"))
+            im.save(os.path.join(HERE, "png", f"ffstudio_{s}.png"))
 
     # macOS: on Apple's grid the tile is 824 of 1024 px, so a ~10% margin.
     mac = render(1024, margin=0.0977)
-    mac.save(os.path.join(HERE, "FFMaker.icns"),
+    mac.save(os.path.join(HERE, "FFStudio.icns"),
              append_images=[render(s, margin=0.0977) for s in (16, 32, 64, 128, 256, 512)])
-    print("wrote FFMaker.png, FFMaker.ico, FFMaker.icns and png/")
+    print("wrote FFStudio.png, FFStudio.ico, FFStudio.icns and png/")
 
 
 if __name__ == "__main__":

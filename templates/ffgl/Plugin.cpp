@@ -1,4 +1,4 @@
-// FFMaker FFGL runtime. This file is fixed; everything shader-specific lives
+// FFStudio FFGL runtime. This file is fixed; everything shader-specific lives
 // in the generated ShaderData.h.
 #include "FFMakerPlugin.h"
 #include "ShaderData.h"
@@ -148,7 +148,7 @@ FFResult FFMakerPlugin::InitGL( const FFGLViewportStruct* vp )
 		shaders.emplace_back( new FFGLShader() );
 		if( !shaders.back()->Compile( kVertexShader, frag.c_str() ) )
 		{
-			FFGLLog::LogToHost( "FFMaker: shader failed to compile" );
+			FFGLLog::LogToHost( "FFStudio: shader failed to compile" );
 			DeInitGL();
 			return FF_FAIL;
 		}

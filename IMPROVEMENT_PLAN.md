@@ -1,4 +1,4 @@
-# FFMaker Improvement Plan
+# FFStudio Improvement Plan
 
 *Written 2026-10-20 from a code review plus a compile audit of the 79 files in `sample-shaders/`.*
 
@@ -6,7 +6,7 @@
 
 **Phase 0 and most of Phase 1 are done.** Results on the 79 samples:
 - **All 79** convert, compile on the GPU, and render. The old pipeline managed 18.
-- **All 79** build into DLLs that load and render in FFMaker's test host.
+- **All 79** build into DLLs that load and render in FFStudio's test host.
 - **All 40** non-ISF samples export ISF that compiles in an ISF host emulator.
 
 Not yet checked inside Resolume or MadMapper.
@@ -36,7 +36,7 @@ Not yet checked inside Resolume or MadMapper.
 - **Multi-buffer Shadertoy:** Common plus Buffers A–D from sectioned text or Shadertoy JSON. These export to ISF `PASSES`.
 - **ISF `.vs` vertex shaders.**
 - **ISF round-trip regression test:** each export is re-imported and its render compared with the original. It found and fixed:
-  - uninitialised variables (FFMaker now zero-initialises them, as browsers do);
+  - uninitialised variables (FFStudio now zero-initialises them, as browsers do);
   - the ISF entry point when a file defines both `main()` and `mainImage()`;
   - user macros shadowing ISF built-ins;
   - `gl_FragColor` inside `#define` lines.
@@ -48,7 +48,7 @@ Not yet checked inside Resolume or MadMapper.
 - **Shadertoy channel pickers.**
 - **Per-shader settings** in `<shader>.ffmaker.json`, used by queue, CLI and ISF export. ISF sources get their headers rewritten from these settings.
 - **Packaged `.exe` verified:**
-  - builds plugins headlessly (`FFMaker.exe --selftest <shader> <dir>`);
+  - builds plugins headlessly (`FFStudio.exe --selftest <shader> <dir>`);
   - GLEW is bundled;
   - the SDK is copied to a stable cache path so the workspace isn't reconfigured every launch.
 **macOS port done** (M1 Max, macOS 14, Resolume 7.21.3, MadMapper 6.0.1):
@@ -56,7 +56,7 @@ Not yet checked inside Resolume or MadMapper.
 - Plugins are universal (arm64 + x86_64) `.bundle`s, macOS 10.15+, each with its own bundle identifier, signed ad hoc. The binary is named after the bundle, because Resolume opens `Contents/MacOS/<bundle name>`.
 - Corpus: all 79 convert, compile and render on the Apple GPU. Plugins load in Resolume for Mac.
 - ISF exports no longer use `gl_FragCoord` (MadMapper on macOS puts its origin at the top). The corpus `--isf` run now fails an export with `FLIP` if its output depends on `gl_FragCoord`'s origin.
-- `FFMaker.spec` builds `dist/FFMaker.app` on macOS. It writes output to `~/Documents/FFMaker/output` and finds Homebrew's CMake when opened from Finder. Verified with `--selftest`.
+- `FFStudio.spec` builds `dist/FFStudio.app` on macOS. It writes output to `~/Documents/FFStudio/output` and finds Homebrew's CMake when opened from Finder. Verified with `--selftest`.
 - Not done: a universal or Intel build of the app itself (Homebrew Python is arm64 only), and Developer ID signing/notarization for distribution.
 
 **Done since the Mac port:**
