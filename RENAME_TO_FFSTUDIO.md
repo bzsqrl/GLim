@@ -3,7 +3,7 @@
 FFMaker became **FFStudio** on 2026-10-23. The app, its windows, the built `FFStudio.exe` / `FFStudio.app` and the GitHub repo (`bzsqrl/FFStudio`) already use the new name. Two things still say FFMaker:
 
 - **Part 1: legacy names in the code.** **Done on 2026-10-23** (on Windows, pushed; see the notes at the end of Part 1). The Mac got it with `git pull`, and the Resolume check of the plugin bundle IDs passed there (2026-10-23).
-- **Part 2: the local folders.** The git checkout is still in a folder called `FFMaker` on each machine. Each machine renames its own folder.
+- **Part 2: the local folders.** **Done** on the Mac (2026-10-23/24) and on Windows (2026-10-24, with `finish_rename_windows.ps1`): the Windows checkout is now `C:\Users\beatf\Documents\ClaudeCode\FFStudio`, with a fresh venv and build workspace, passing tests and a rebuilt, self-tested `FFStudio.exe`.
 
 The two parts are independent, so you can do either first, or only one. The smoothest order is Part 1 on Windows (commit and push), then Part 2 on Windows, then Part 2 on the Mac, where the pull picks up Part 1.
 

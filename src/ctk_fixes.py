@@ -1,4 +1,4 @@
-"""Fixes for CustomTkinter (5.2.2) behaviour. Call apply() once at startup.
+"""Fixes for CustomTkinter (6.0.0) behaviour. Call apply() once at startup.
 
 CTkButton runs its command on mouse release only if its _mouse_inside flag is
 set, but that flag is unreliable, so clicks were silently ignored:
