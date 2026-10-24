@@ -121,14 +121,14 @@ Open `dist/FFStudio.app`, or run `venv/bin/python src/main_gui.py`. In the **Que
 | Double-click | Opens the file in the **Studio** tab. |
 | While building | The window stays responsive during **Build FFGL**, and **Cancel Build** stops it. |
 
-**Parameter panel (since the efficiency pass).** In the **Studio** tab, the parameter rows and Shadertoy channel menus now use plain Tk/ttk widgets (`src/fast_widgets.py`), which have flat corners. They were only tested on Windows, so check them here:
+**Parameter panel (since the efficiency pass).** In the **Studio** tab, the parameter rows and Shadertoy channel menus now use plain Tk/ttk widgets (`src/fast_widgets.py`), which have flat corners. **Checked on the Mac (2026-10-24):** everything in this table works on macOS (M1 Max), including GPU load (timer queries give e.g. 9.6 ms/frame for `bare_fractalSymetry` at 1080p) and the preview with the output window open. The checks:
 
 | Check | What should happen |
 |---|---|
 | Look | Dark rows, readable text, blue slider handles. The checkboxes and entries are dark, not white. |
 | Sliders | Dragging moves the value. Clicking the track jumps there and can keep dragging. Right-click (or Control-click) resets. After a click, ← / → step the value and the handle turns amber. |
 | Menus | **long** parameters and the channel / filter / wrap menus open a menu on click, and a choice applies. |
-| GPU load | **Analyze** (or **Live** on, then loading a shader) shows "measuring…", then e.g. **29% of 60 fps** with ms/frame under the preview. With Live off, switching shaders measures nothing. **Analyze** on the Queue tab fills the GPU @1080p column; clicking that heading sorts by it. With the output window (**⧉**) open the readout says "live in the output". (OpenGL timer queries; untested on macOS.) |
+| GPU load | **Analyze** (or **Live** on, then loading a shader) shows "measuring…", then e.g. **29% of 60 fps** with ms/frame under the preview. With Live off, switching shaders measures nothing. **Analyze** on the Queue tab fills the GPU @1080p column; clicking that heading sorts by it. With the output window (**⧉**) open the readout says "live in the output". (OpenGL timer queries.) |
 | Buttons | Every click on a button works, also right after the output window or fullscreen closes, without moving the mouse first (`src/ctk_fixes.py`). A quick double click on a toggle (⛶, **⧉** (output window), **Auto**, **Live**, play/pause, **Build FFGL**, **Analyze**) acts once; on ← / → it steps twice. |
 | Output window | With the output window (**⧉**) open, the small preview keeps updating (about 10 fps), and the slideshow (**Auto**) runs without stalling. On macOS the window-event poll still takes the GPU lock (`validate.window_lock`); on Windows it doesn't. |
 
