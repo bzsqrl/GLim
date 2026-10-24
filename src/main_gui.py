@@ -1078,8 +1078,11 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
 def _selftest(shader, out_dir):
     """Headless check of a (packaged) build: convert, GPU-validate and build one
-    shader. Writes selftest.log into out_dir. Usage: FFStudio.exe --selftest <shader> <out_dir>"""
+    shader, then start and stop each way of sending to other apps (the packaged
+    libraries load). Writes selftest.log into out_dir.
+    Usage: FFStudio.exe --selftest <shader> <out_dir>"""
     import traceback
+    from ffstudio import validate as V
     os.makedirs(out_dir, exist_ok=True)
     lines = []
     try:
@@ -1090,6 +1093,15 @@ def _selftest(shader, out_dir):
         lines.append(f"built {dst}")
     except Exception:
         lines.append(traceback.format_exc())
+    for kind, make in ((V.SENDER_KIND, V.FrameSender), ("NDI", V.NdiSender)):
+        if not kind:
+            continue
+        try:
+            with V.gpu():
+                make().close()
+            lines.append(f"sender {kind}: ok")
+        except Exception as e:
+            lines.append(f"sender {kind}: {e}")
     with open(os.path.join(out_dir, "selftest.log"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 
