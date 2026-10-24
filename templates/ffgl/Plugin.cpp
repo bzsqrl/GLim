@@ -1,6 +1,6 @@
 // FFStudio FFGL runtime. This file is fixed; everything shader-specific lives
 // in the generated ShaderData.h.
-#include "FFMakerPlugin.h"
+#include "FFStudioPlugin.h"
 #include "ShaderData.h"
 #include <algorithm>
 #include <cmath>
@@ -19,7 +19,7 @@
 using namespace ffglex;
 
 static CFFGLPluginInfo PluginInfo(
-	PluginFactory< FFMakerPlugin >,
+	PluginFactory< FFStudioPlugin >,
 	FFM_PLUGIN_ID,
 	FFM_PLUGIN_NAME,
 	2, 1,// FFGL API version
@@ -64,7 +64,7 @@ static void FFM_HSVtoRGB( float h, float s, float v, float& r, float& g, float& 
 	}
 }
 
-FFMakerPlugin::FFMakerPlugin()
+FFStudioPlugin::FFStudioPlugin()
 {
 	SetMinInputs( FFM_NUM_INPUTS );
 	SetMaxInputs( FFM_NUM_INPUTS );
@@ -135,11 +135,11 @@ FFMakerPlugin::FFMakerPlugin()
 	targets.resize( FFM_NUM_TARGETS > 0 ? FFM_NUM_TARGETS : 0 );
 }
 
-FFMakerPlugin::~FFMakerPlugin()
+FFStudioPlugin::~FFStudioPlugin()
 {
 }
 
-FFResult FFMakerPlugin::InitGL( const FFGLViewportStruct* vp )
+FFResult FFStudioPlugin::InitGL( const FFGLViewportStruct* vp )
 {
 	shaders.clear();
 	for( int i = 0; i < FFM_NUM_PROGRAMS; ++i )
@@ -222,7 +222,7 @@ FFResult FFMakerPlugin::InitGL( const FFGLViewportStruct* vp )
 	return CFFGLPlugin::InitGL( vp );
 }
 
-FFResult FFMakerPlugin::DeInitGL()
+FFResult FFStudioPlugin::DeInitGL()
 {
 	for( auto& s : shaders )
 		s->FreeGLResources();
@@ -249,7 +249,7 @@ FFResult FFMakerPlugin::DeInitGL()
 	return FF_SUCCESS;
 }
 
-void FFMakerPlugin::AllocTarget( Target& t, int w, int h, bool isFloat )
+void FFStudioPlugin::AllocTarget( Target& t, int w, int h, bool isFloat )
 {
 	FreeTarget( t );
 	t.w = w;
@@ -276,7 +276,7 @@ void FFMakerPlugin::AllocTarget( Target& t, int w, int h, bool isFloat )
 	glClearColor( prevClear[ 0 ], prevClear[ 1 ], prevClear[ 2 ], prevClear[ 3 ] );
 }
 
-void FFMakerPlugin::FreeTarget( Target& t )
+void FFStudioPlugin::FreeTarget( Target& t )
 {
 	for( int i = 0; i < 2; ++i )
 	{
@@ -289,7 +289,7 @@ void FFMakerPlugin::FreeTarget( Target& t )
 	t.w = t.h = 0;
 }
 
-void FFMakerPlugin::UpdateAudio()
+void FFStudioPlugin::UpdateAudio()
 {
 	if( fftParam < 0 )
 		return;
@@ -328,12 +328,12 @@ void FFMakerPlugin::UpdateAudio()
 	}
 }
 
-float FFMakerPlugin::Value( int def, int sub ) const
+float FFStudioPlugin::Value( int def, int sub ) const
 {
 	return values[ firstHostParam[ def ] + sub ];
 }
 
-float FFMakerPlugin::P( const char* uniform ) const
+float FFStudioPlugin::P( const char* uniform ) const
 {
 	for( int d = 0; d < FFM_NUM_PARAMS; ++d )
 		if( FFM_PARAMS[ d ].uniform[ 0 ] && strcmp( FFM_PARAMS[ d ].uniform, uniform ) == 0 )
@@ -341,7 +341,7 @@ float FFMakerPlugin::P( const char* uniform ) const
 	return 0.0f;
 }
 
-void FFMakerPlugin::SendParams( GLuint program )
+void FFStudioPlugin::SendParams( GLuint program )
 {
 	const float W = (float)currentViewport.width, H = (float)currentViewport.height;
 	for( int d = 0; d < FFM_NUM_PARAMS; ++d )
@@ -393,7 +393,7 @@ void FFMakerPlugin::SendParams( GLuint program )
 	}
 }
 
-FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
+FFResult FFStudioPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 {
 	if( shaders.empty() )
 		return FF_FAIL;
@@ -560,7 +560,7 @@ FFResult FFMakerPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	return FF_SUCCESS;
 }
 
-void FFMakerPlugin::SetBeatInfo( float bpm, float barPhase )
+void FFStudioPlugin::SetBeatInfo( float bpm, float barPhase )
 {
 	if( hasBeatInfo && barPhase < hostBarPhase - 0.5f )
 		++hostBars;// the bar wrapped
@@ -571,7 +571,7 @@ void FFMakerPlugin::SetBeatInfo( float bpm, float barPhase )
 	CFFGLPlugin::SetBeatInfo( bpm, barPhase );
 }
 
-FFResult FFMakerPlugin::SetFloatParameter( unsigned int index, float value )
+FFResult FFStudioPlugin::SetFloatParameter( unsigned int index, float value )
 {
 	if( index >= values.size() )
 		return FF_FAIL;
@@ -579,12 +579,12 @@ FFResult FFMakerPlugin::SetFloatParameter( unsigned int index, float value )
 	return FF_SUCCESS;
 }
 
-float FFMakerPlugin::GetFloatParameter( unsigned int index )
+float FFStudioPlugin::GetFloatParameter( unsigned int index )
 {
 	return index < values.size() ? values[ index ] : 0.0f;
 }
 
-char* FFMakerPlugin::GetParameterDisplay( unsigned int index )
+char* FFStudioPlugin::GetParameterDisplay( unsigned int index )
 {
 	static char buf[ 32 ];
 	if( index >= values.size() )

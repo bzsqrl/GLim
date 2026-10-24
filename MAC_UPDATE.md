@@ -4,7 +4,15 @@ These steps bring a Mac checkout up to date with the work done on Windows, check
 
 ## The app is now FFStudio
 
-FFMaker was renamed **FFStudio**, and its **Single File** tab is now **Studio**. After the pull, `compile.py` builds `dist/FFStudio.app` (bundle id `com.ffstudio.app`), and plugins are written to `~/Documents/FFStudio/output` (plugins built earlier stay in `~/Documents/FFMaker/output`). The old `dist/FFMaker.app` and any copy in Applications can be deleted. Unchanged, so existing work keeps working: `<shader>.ffmaker.json` settings, `// ffmaker:` channel directives (`// ffstudio:` works too), plugin IDs, the `ffmaker` Python package (`python -m ffmaker`), the `~/Library/Caches/FFMaker` build workspace and the local folder name (the GitHub repo itself is now `bzsqrl/FFStudio`; see step 1).
+FFMaker was renamed **FFStudio**, and its **Single File** tab is now **Studio**. After the pull, `compile.py` builds `dist/FFStudio.app` (bundle id `com.ffstudio.app`), and plugins are written to `~/Documents/FFStudio/output` (plugins built earlier stay in `~/Documents/FFMaker/output`). The old `dist/FFMaker.app` and any copy in Applications can be deleted. Unchanged, so existing work keeps working: `<shader>.ffmaker.json` settings, `// ffmaker:` channel directives (`// ffstudio:` works too), plugin IDs, the `ffmaker` Python package (`python -m ffmaker`), and the local folder name (the GitHub repo itself is now `bzsqrl/FFStudio`; see step 1).
+
+**Then the legacy names in the code went too** ([RENAME_TO_FFSTUDIO.md](RENAME_TO_FFSTUDIO.md), Part 1):
+- The Python package is `ffstudio/`: the command line is `venv/bin/python -m ffstudio …`.
+- The build workspace is `~/Library/Caches/FFStudio` (the first plugin build sets it up, about a minute). Delete the old `~/Library/Caches/FFMaker`.
+- Settings save as `<shader>.ffstudio.json`. Existing `.ffmaker.json` files still load, and are replaced by the new name on the next save.
+- `// ffstudio:` is the channel directive in the docs and fixtures; `// ffmaker:` still works.
+- The plugin runtime class is `FFStudioPlugin` (`templates/ffgl/FFStudioPlugin.h`). Plugin IDs are unchanged.
+- **Check this on the Mac:** plugin bundles are now identified as `com.ffstudio.plugin.<name>.<id>` (they were `com.ffmaker.plugin.…`). Resolume should find plugins by their FFGL plugin ID, which hasn't changed, but before rebuilding everything, rebuild one plugin you use in a saved Resolume set, replace it in Extra Effects, and check the set still loads it. If it doesn't, change `ident` in `ffstudio/build_ffgl.py` back to `com.ffmaker.plugin.` and tell Claude.
 
 ## Context
 
@@ -74,10 +82,10 @@ Two fixtures are new:
 
 ## 4. Build test batch v4
 
-This compiles the new plugin C++ with clang, then loads each plugin in FFStudio's test host. The first build reconfigures the cached workspace (`~/Library/Caches/FFMaker`), because the runtime template changed. That takes about a minute.
+This compiles the new plugin C++ with clang, then loads each plugin in FFStudio's test host. The first build reconfigures the cached workspace (`~/Library/Caches/FFStudio`), because the runtime template changed. That takes about a minute.
 
 ```bash
-venv/bin/python -m ffmaker --to both --test --out output/test_batch_v4 \
+venv/bin/python -m ffstudio --to both --test --out output/test_batch_v4 \
   tests/fixtures/shadertoy_rate_params.txt tests/fixtures/shadertoy_define_channel.txt \
   sample-shaders/bare_fractalSymetry.txt sample-shaders/bare_lopyfrac3dOrthofractalEvolution.txt
 ```
@@ -86,7 +94,7 @@ venv/bin/python -m ffmaker --to both --test --out output/test_batch_v4 \
 
 If `sample-shaders/` on this Mac no longer has the two `bare_` files, take them from git: `git checkout -- sample-shaders/bare_fractalSymetry.txt sample-shaders/bare_lopyfrac3dOrthofractalEvolution.txt`.
 
-If CMake complains about the existing workspace, delete `~/Library/Caches/FFMaker` and run the command again.
+If CMake complains about the existing workspace, delete `~/Library/Caches/FFStudio` and run the command again.
 
 ## 5. Package FFStudio.app
 
@@ -141,7 +149,7 @@ Load the four `.fs` files from `output/test_batch_v4`. They should render like t
 
 ## If something fails
 
-- **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFMakerPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.
+- **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.
 - **GUI problems (step 6):** these are in `src/main_gui.py`, in `_build_queue_tab` (styling and bindings) and the queue methods below it. Keep Mac-only changes behind `sys.platform == "darwin"`, as the `<Button-2>` binding is.
 
 Commit fixes on a branch, then merge into `main` and push, so they can be pulled back on Windows. Update `IMPROVEMENT_PLAN.md` and `TESTING_CHECKLIST.md` with the results.

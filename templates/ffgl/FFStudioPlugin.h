@@ -95,11 +95,11 @@ struct FFMPassDef
 
 // ── Plugin ──────────────────────────────────────────────────────────────────
 
-class FFMakerPlugin : public CFFGLPlugin
+class FFStudioPlugin : public CFFGLPlugin
 {
 public:
-	FFMakerPlugin();
-	~FFMakerPlugin();
+	FFStudioPlugin();
+	~FFStudioPlugin();
 
 	FFResult InitGL( const FFGLViewportStruct* vp ) override;
 	FFResult ProcessOpenGL( ProcessOpenGLStruct* pGL ) override;

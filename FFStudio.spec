@@ -31,7 +31,7 @@ a = Analysis(
         ('templates', 'templates'),
         ('assets/icon', 'assets/icon'),          # window icons (paths.icon_dir)
     ] + platform_datas + ffgl_sdk,
-    hiddenimports=['ffmaker', 'glfw', 'OpenGL.GL'] + platform_imports,
+    hiddenimports=['ffstudio', 'glfw', 'OpenGL.GL'] + platform_imports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

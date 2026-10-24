@@ -23,7 +23,7 @@ It accepts ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.
 
 Plugins are universal `.bundle`s that run on Apple Silicon and Intel Macs (macOS 10.15+).
 
-The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFMaker` (macOS: `~/Library/Caches/FFMaker`) and compiles the FFGL SDK. This takes about a minute. After that, each plugin builds in about 2 seconds.
+The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFStudio` (macOS: `~/Library/Caches/FFStudio`) and compiles the FFGL SDK. This takes about a minute. After that, each plugin builds in about 2 seconds.
 
 ---
 
@@ -71,7 +71,7 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
   - While the output window (or fullscreen) is open, measuring times the output itself, at its actual resolution, instead of running a separate 1080p measurement alongside it: continuously with **Live** on ("live in the output"), or for one second when you press **Analyze** ("measured in the output"). These are the output's real frame times, so a light shader can read higher here than measured at 1080p: at 60 fps with little to do, the card lowers its clocks.
   - CPU load isn't shown: shaders run entirely on the GPU, and the plugin's CPU work per frame is tiny.
   - Results depend on the graphics card (and, on laptops, whether it's plugged in). Measurements from the queue and from this tab are shared for the session.
-- **Save settings.** Writes `<shader>.ffmaker.json` next to the shader. **Build FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
+- **Save settings.** Writes `<shader>.ffstudio.json` next to the shader (a `<shader>.ffmaker.json` from before the rename is still read, and replaced by the new name on the next save). **Build FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
 
 **Packaged app:** `dist\FFStudio.exe` (build it with `venv\Scripts\python compile.py`) runs without Python installed. Building plugins still needs CMake and Visual Studio's C++ tools.
 
@@ -80,7 +80,7 @@ On macOS, `venv/bin/python compile.py` builds `dist/FFStudio.app` (Apple Silicon
 **Command line:**
 
 ```
-venv\Scripts\python -m ffmaker <files or folders> --to ffgl|isf|both|check [--out DIR] [--no-params] [--test]
+venv\Scripts\python -m ffstudio <files or folders> --to ffgl|isf|both|check [--out DIR] [--no-params] [--test]
 ```
 
 - `--to check` validates shaders without building anything.
@@ -111,13 +111,13 @@ Supported features:
 By default every `iChannel` reads the clip, which makes the plugin an effect. Choose a different source with a comment line anywhere in the shader:
 
 ```glsl
-// ffmaker: iChannel1 = textures/rock.jpg   (image file, relative to the shader; embedded in the plugin)
-// ffmaker: iChannel2 = noise                (generated RGBA noise texture)
-// ffmaker: iChannel3 = audio                (live audio spectrum from the host)
-// ffmaker: iChannel0 = input                (the clip; the default)
+// ffstudio: iChannel1 = textures/rock.jpg   (image file, relative to the shader; embedded in the plugin)
+// ffstudio: iChannel2 = noise                (generated RGBA noise texture)
+// ffstudio: iChannel3 = audio                (live audio spectrum from the host)
+// ffstudio: iChannel0 = input                (the clip; the default)
 ```
 
-`// ffstudio:` works the same as `// ffmaker:` (FFStudio's former name), so existing shaders keep working. Likewise, per-shader settings are still saved as `<shader>.ffmaker.json`.
+`// ffmaker:` (FFStudio's former name) still works the same, so existing shaders don't need changing.
 
 If an image file is missing, a noise texture is used and FFStudio warns you.
 
@@ -125,8 +125,8 @@ If an image file is missing, a noise texture is used and FFStudio warns you.
 Like Shadertoy's per-channel settings, add `filter`, `wrap` and `vflip` after the source:
 
 ```glsl
-// ffmaker: iChannel1 = textures/pixels.png filter=nearest wrap=clamp
-// ffmaker: iChannel2 = textures/rock.jpg vflip=false
+// ffstudio: iChannel1 = textures/pixels.png filter=nearest wrap=clamp
+// ffstudio: iChannel2 = textures/rock.jpg vflip=false
 ```
 
 | Setting | Values | Default |
@@ -148,10 +148,10 @@ Either:
 // ==== Common ====
 ...
 // ==== Buffer A ====
-// ffmaker: iChannel0 = Buffer A     (feedback: reads its own previous frame)
+// ffstudio: iChannel0 = Buffer A     (feedback: reads its own previous frame)
 void mainImage(...) { ... }
 // ==== Image ====
-// ffmaker: iChannel0 = Buffer A
+// ffstudio: iChannel0 = Buffer A
 void mainImage(...) { ... }
 ```
 

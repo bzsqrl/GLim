@@ -9,7 +9,6 @@ __pycache__/
 boilerplates/build_temp*/
 boilerplates/ffgl/build/windows/x64/
 boilerplates/ffgl/build/windows/.vs/
-.ffmaker_cache/
 tests/out/
 
 # Upstream FFGL clone metadata (SDK files are vendored in boilerplates/ffgl)

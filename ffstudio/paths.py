@@ -25,7 +25,7 @@ def cache_dir():
         base = os.path.expanduser("~/Library/Caches")
     else:
         base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    d = os.path.join(base, "FFMaker")      # (FFStudio's former name; kept so the workspace is reused)
+    d = os.path.join(base, "FFStudio")
     os.makedirs(d, exist_ok=True)
     return d
 

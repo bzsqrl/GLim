@@ -11,9 +11,9 @@ import tkinter as tk
 from tkinter import ttk
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from ffmaker import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: E402
-from ffmaker import convert as ffconvert                               # noqa: E402
-from ffmaker import settings as ffsettings                             # noqa: E402
+from ffstudio import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: E402
+from ffstudio import convert as ffconvert                               # noqa: E402
+from ffstudio import settings as ffsettings                             # noqa: E402
 from editor_panel import EditorPanel, gpu_cache_key, toggle_command    # noqa: E402
 import ctk_fixes                                                       # noqa: E402
 
@@ -117,7 +117,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._sort = (None, False)                # queue sorted by (column, descending)
         self._source_stem = "FFStudioPlugin"   # for single-file tab
         self._source_path = None
-        self.settings = {}                    # single-file tab: the shader's .ffmaker.json
+        self.settings = {}                    # single-file tab: the shader's .ffstudio.json
 
         # Force dark background regardless of TkinterDnD vs CTk base class
         self.configure(bg="#1a1a2e")
@@ -159,7 +159,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
     def _init_gpu(self):
         try:
-            from ffmaker import validate as V
+            from ffstudio import validate as V
             with V.gpu() as ctx:
                 self.log(f"GPU: {ctx.renderer}")
         except Exception as e:
@@ -639,7 +639,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                          args=(items, EXTRACT_PARAMS, stop), daemon=True).start()
 
     def _measure_gpu_thread(self, items, extract_params, stop):
-        from ffmaker import validate as V
+        from ffstudio import validate as V
         done = []
         for item in items:
             if stop.is_set():
@@ -673,7 +673,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if not (item.iid and self.tree.exists(item.iid)):
             return
         if text is None:
-            from ffmaker import validate as V
+            from ffstudio import validate as V
             load = V.load_text(item.gpu_ms)[0].replace(" of 60 fps", "")
             ms = f"{item.gpu_ms:.1f}" if item.gpu_ms >= 1 else f"{item.gpu_ms:.2f}"
             text = f"{load}  ·  {ms} ms" +("  ⚠" if item.gpu_ms > V.FRAME_60_MS else "")
@@ -692,7 +692,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                     self._set_item_gpu(item)
         msg = f"Measured {len(done)} shader(s)" + (" (stopped)" if stop.is_set() else "")
         if done:
-            from ffmaker import validate as V
+            from ffstudio import validate as V
             heavy = max(done, key=lambda i: i.gpu_ms)
             over = sum(i.gpu_ms > V.FRAME_60_MS for i in done)
             msg += (f". Heaviest: {heavy.fname} ({V.load_text(heavy.gpu_ms)[0]}, "
@@ -809,7 +809,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     def _convert_and_build(self, code, name, path, output_dir, settings=None, extract_params=False):
         """Shared by queue and single-file builds. Returns (status, label).
-        settings=None uses the shader's saved .ffmaker.json. Runs on worker
+        settings=None uses the shader's saved .ffstudio.json. Runs on worker
         threads, so callers pass extract_params (EXTRACT_PARAMS)."""
         log = self._gui_log
         try:
@@ -931,7 +931,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self._source_stem = Path(path).stem
             self._source_path = path
             if self.settings:
-                self.log(f"Loaded saved settings: {ffsettings.path_for(path)}")
+                self.log(f"Loaded saved settings: {ffsettings.existing_path(path)}")
             self.log(f"Loaded: {Path(path).name} (will export as {self.entry_plugin_name.get()}.dll)")
             self.analyze_code(res=res)
         except Exception as e:

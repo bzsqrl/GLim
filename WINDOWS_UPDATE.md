@@ -95,7 +95,7 @@ foreach ($s in "shadertoy_sampler", "shadertoy_buffer_sampler", "shadertoy_tempo
 
 **Expected:** each log ends with a line starting `built` and a `.dll` path.
 
-If CMake complains about the existing workspace, delete `%LOCALAPPDATA%\FFMaker\ffgl_workspace` and run the loop again.
+If CMake complains about the existing workspace, delete `%LOCALAPPDATA%\FFStudio\ffgl_workspace` and run the loop again.
 
 ## 6. Package FFStudio.exe
 
@@ -123,6 +123,6 @@ ISF export has no Windows-specific code and was already checked in MadMapper, so
 
 ## If something fails
 
-Most failures would show up in step 5, as MSVC compile errors in `Plugin.cpp` or `FFMakerPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Mac build must keep working too: if the fix can't be portable, use `#ifdef _WIN32`, as `Plugin.cpp` already does elsewhere.
+Most failures would show up in step 5, as MSVC compile errors in `Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Mac build must keep working too: if the fix can't be portable, use `#ifdef _WIN32`, as `Plugin.cpp` already does elsewhere.
 
 Commit fixes on a branch, then merge into `main` and push, so they can be pulled back on the Mac.

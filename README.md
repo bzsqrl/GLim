@@ -5,13 +5,13 @@ Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for
 - `USER_MANUAL.md`: how to use it
 - `IMPROVEMENT_PLAN.md`: architecture, status and roadmap
 - `TESTING_CHECKLIST.md`: what to check when testing builds in the VJ hosts
-- `RENAME_TO_FFSTUDIO.md`: finishing the rename from FFMaker (legacy names in the code, and renaming the local folders on Windows and the Mac)
+- `RENAME_TO_FFSTUDIO.md`: finishing the rename from FFMaker (Part 1, the legacy names in the code, is done; Part 2 renames the local folders on Windows and the Mac)
 
 ## Layout
 
 | Path | What |
 | :-- | :-- |
-| `ffmaker/` | Core library: conversion, GLSL/ISF emitters, GPU validation and preview, plugin builder, CLI (`python -m ffmaker`) |
+| `ffstudio/` | Core library: conversion, GLSL/ISF emitters, GPU validation and preview, plugin builder, CLI (`python -m ffstudio`) |
 | `templates/ffgl/` | The fixed C++ FFGL plugin runtime, driven by a generated `ShaderData.h` |
 | `boilerplates/ffgl/` | Vendored Resolume FFGL SDK (BSD-style license, see its `LICENSE.md`) |
 | `src/` | GUI (`main_gui.py`, `editor_panel.py`) |
