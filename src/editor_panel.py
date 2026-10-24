@@ -7,7 +7,7 @@ import sys
 import threading
 import time
 import tkinter as tk
-from tkinter import colorchooser
+from tkinter import colorchooser, ttk
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -15,6 +15,7 @@ from PIL import Image, ImageTk
 from ffstudio import settings as S
 
 import fast_widgets as W
+import theme as T
 
 PREVIEW_W, PREVIEW_H = 384, 216
 SMALL_FPS_WITH_OUTPUT = 10      # small preview rate while the output window draws the full one
@@ -24,7 +25,7 @@ AUTO_MIN_SECONDS = 1.0
 GPU_REFRESH_S = 0.25            # live GPU readout update interval (output open)
 GPU_SAMPLE_S = 1.0              # Analyze with the output open (Live off): time the output this long
 LIVE_RUN_S = 0.5                # Live, output closed: length of each measuring run (a reading each)
-LOAD_COLOURS = ("#22c55e", "#f59e0b", "#ef4444")   # GPU load: light / heavy / over a 60 fps frame
+LOAD_COLOURS = (T.GREEN, T.AMBER, T.RED)   # GPU load: light / heavy / over a 60 fps frame
 CHANNEL_CHOICES = ["input", "noise", "audio", "none", "file…"]
 FILTER_CHOICES = ["filter", "nearest", "linear", "mipmap"]   # first entry = Shadertoy default
 WRAP_CHOICES = ["wrap", "clamp", "repeat"]
@@ -68,7 +69,7 @@ def _tk_bg(widget):
 
 class EditorPanel(ctk.CTkFrame):
     def __init__(self, master, on_recompile, log):
-        super().__init__(master)
+        super().__init__(master, border_width=1)
         W.setup(self)
         self.on_recompile = on_recompile      # callback: settings changed in a way that needs a rebuild
         self.log = log
@@ -102,13 +103,19 @@ class EditorPanel(ctk.CTkFrame):
 
         # Two columns: preview + channels on the left, parameters on the right.
         left = ctk.CTkFrame(self, fg_color="transparent")
-        left.pack(side="left", fill="y", padx=(0, 4))
+        left.pack(side="left", fill="y", padx=(6, 4), pady=4)
         right = ctk.CTkFrame(self, fg_color="transparent")
-        right.pack(side="left", fill="both", expand=True)
+        right.pack(side="left", fill="both", expand=True, padx=(0, 6), pady=4)
 
         # ── Preview ──
-        self.preview = tk.Label(left, bg="#000000", width=PREVIEW_W, height=PREVIEW_H)
-        self.preview.pack(padx=8, pady=(8, 4))
+        preview_hdr = ctk.CTkFrame(left, fg_color="transparent")
+        preview_hdr.pack(fill="x", padx=8, pady=(8, 2))
+        T.section(preview_hdr, "Preview").pack(side="left")
+        self.lbl_name = ctk.CTkLabel(preview_hdr, text="", font=T.ui(12), text_color=T.DIM)
+        self.lbl_name.pack(side="right")
+        self.preview = tk.Label(left, bg="#000000", width=PREVIEW_W, height=PREVIEW_H,
+                                highlightthickness=1, highlightbackground=T.BORDER)
+        self.preview.pack(padx=8, pady=(0, 6))
         transport = ctk.CTkFrame(left, fg_color="transparent")
         transport.pack(fill="x", padx=8)
         self.btn_play = ctk.CTkButton(transport, text="⏸", width=36, command=toggle_command(self._toggle_play))
@@ -131,12 +138,19 @@ class EditorPanel(ctk.CTkFrame):
         mod = "Command" if sys.platform == "darwin" else "Control"
         for key in ("f", "F"):
             top.bind(f"<{mod}-{key}>", self._toggle_fullscreen, add="+")
-        self.lbl_time = ctk.CTkLabel(transport, text="", width=70, anchor="w", text_color="#9ca3af")
+        # ← / → step through the queue anywhere in the Studio tab (see _arrow_key),
+        # and a click outside the focused slider, code box or text field takes the
+        # focus off it (see _release_focus).
+        top.bind("<Left>", lambda e: self._arrow_key(-1), add="+")
+        top.bind("<Right>", lambda e: self._arrow_key(1), add="+")
+        top.bind_all("<Button-1>", self._release_focus, add="+")
+        self.lbl_time = ctk.CTkLabel(transport, text="", width=70, anchor="w", font=T.mono(12),
+                                     text_color=T.DIM)
         self.lbl_time.pack(side="left", padx=4)
         # Sending to other apps (see "Spout / Syphon / NDI" below): all off at start.
         from ffstudio import validate as V
         send_row = ctk.CTkFrame(left, fg_color="transparent")
-        send_row.pack(fill="x", padx=8, pady=(4, 0))
+        send_row.pack(fill="x", padx=8, pady=(6, 0))
         self.send_buttons = {}
         if V.SENDER_KIND:
             self.send_buttons["spout"] = ctk.CTkButton(
@@ -145,14 +159,15 @@ class EditorPanel(ctk.CTkFrame):
             self.send_buttons["spout"].pack(side="left", padx=(0, 12))
         # NDI and its size menu share an outline, apart from Spout / Syphon: the
         # size is NDI's alone (Spout / Syphon always send 1920x1080).
-        ndi_group = ctk.CTkFrame(send_row, fg_color="transparent", border_width=1,
-                                 border_color="#4b5563", corner_radius=8)
+        ndi_group = ctk.CTkFrame(send_row, fg_color=T.ROW, border_width=1,
+                                 border_color=T.BORDER_STRONG, corner_radius=8)
         ndi_group.pack(side="left")
         self.send_buttons["ndi"] = ctk.CTkButton(
             ndi_group, text=self._send_label("ndi"), width=50,
             command=toggle_command(lambda: self.toggle_sending("ndi")))
         self.send_buttons["ndi"].pack(side="left", padx=(3, 2), pady=3)
         self.ndi_size_menu = ctk.CTkOptionMenu(ndi_group, values=list(V.NDI_SIZES), width=80,
+                                               fg_color=T.ROW, button_color=T.ROW,
                                                command=self._ndi_size_choice)
         self.ndi_size_menu.set(self.ndi_size)
         self.ndi_size_menu.pack(side="left", padx=(0, 3), pady=3)
@@ -161,7 +176,7 @@ class EditorPanel(ctk.CTkFrame):
         self.input_menu.pack(side="right")
         # Previous / next shader in the queue (also ← / → in the output window).
         queue_nav = ctk.CTkFrame(left, fg_color="transparent")
-        queue_nav.pack(fill="x", padx=8, pady=(4, 0))
+        queue_nav.pack(fill="x", padx=8, pady=(6, 0))
         ctk.CTkButton(queue_nav, text="←", width=36, command=lambda: self.step_queue(-1)).pack(side="left")
         ctk.CTkButton(queue_nav, text="→", width=36, command=lambda: self.step_queue(1)).pack(side="left", padx=4)
         # Slideshow: Auto steps to the next shader every N seconds, looping the queue.
@@ -175,28 +190,26 @@ class EditorPanel(ctk.CTkFrame):
         self.entry_auto.bind("<Return>", self._apply_auto_seconds)
         self.entry_auto.bind("<KP_Enter>", self._apply_auto_seconds)
         self.entry_auto.bind("<FocusOut>", self._apply_auto_seconds)
-        ctk.CTkLabel(queue_nav, text="s", text_color="#9ca3af").pack(side="left", padx=(2, 0))
+        ctk.CTkLabel(queue_nav, text="s", text_color=T.DIM).pack(side="left", padx=(2, 0))
         self.auto = False
         self._auto_elapsed = 0.0                # seconds the current shader has shown (while playing)
-        self.lbl_queue = ctk.CTkLabel(queue_nav, text="", anchor="w", text_color="#9ca3af")
+        self.lbl_queue = ctk.CTkLabel(queue_nav, text="", anchor="w", font=T.ui(12), text_color=T.DIM)
         self.lbl_queue.pack(side="left", padx=6)
         # GPU load of the loaded shader (see "GPU load" below).
+        W.frame(left, bg=T.LINE, height=1).pack(fill="x", padx=8, pady=(12, 0))
         gpu_row = ctk.CTkFrame(left, fg_color="transparent")
         gpu_row.pack(fill="x", padx=8, pady=(8, 0))
         bg = _tk_bg(gpu_row)
-        W.label(gpu_row, "GPU", fg=W.DIM, bg=bg).pack(side="left")
-        self.gpu_bar = tk.Canvas(gpu_row, width=W.px(100), height=W.px(10), bg="#111827",
+        T.section(gpu_row, "GPU").pack(side="left")
+        self.gpu_bar = tk.Canvas(gpu_row, width=W.px(100), height=W.px(8), bg=T.LINE,
                                  highlightthickness=0, bd=0)
         self.gpu_bar.pack(side="left", padx=6)
         self.lbl_gpu = W.label(gpu_row, "", bg=bg, anchor="w")
         self.lbl_gpu.pack(side="left")
-        self.btn_measure = ctk.CTkButton(gpu_row, text="Analyze", width=70, fg_color="#374151",
-                                         hover_color="#4b5563", command=self.measure_gpu)
-        self.btn_measure.pack(side="right")
-        self._gpu_btn_colors = ("#374151", "#4b5563")
+        self._gpu_btn_colors = (T.BUTTON, T.BUTTON_HOVER)
         self.btn_gpu_live = ctk.CTkButton(gpu_row, text="Live", width=50, fg_color=self._gpu_btn_colors[0],
                                           hover_color=self._gpu_btn_colors[1], command=toggle_command(self.toggle_gpu_live))
-        self.btn_gpu_live.pack(side="right", padx=(0, 4))
+        self.btn_gpu_live.pack(side="right")
         self.lbl_gpu_detail = W.label(left, "", fg=W.DIM, bg=bg, anchor="w")
         self.lbl_gpu_detail.pack(fill="x", padx=8)
 
@@ -207,15 +220,15 @@ class EditorPanel(ctk.CTkFrame):
         # ── Parameters ──
         hdr = ctk.CTkFrame(right, fg_color="transparent")
         hdr.pack(fill="x", padx=8, pady=(8, 0))
-        ctk.CTkLabel(hdr, text="Parameters", font=("Arial", 13, "bold")).pack(side="left")
-        ctk.CTkButton(hdr, text="Save settings", width=110, command=self.save).pack(side="right")
-        ctk.CTkButton(hdr, text="Reset", width=60, fg_color="#374151", hover_color="#4b5563",
-                      command=self.reset_settings).pack(side="right", padx=4)
-        self.params_frame = ctk.CTkScrollableFrame(right)
+        T.section(hdr, "Parameters").pack(side="left")
+        ctk.CTkButton(hdr, text="Save settings", width=110, fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER,
+                      command=self.save).pack(side="right")
+        ctk.CTkButton(hdr, text="Reset", width=60, command=self.reset_settings).pack(side="right", padx=6)
+        self.params_frame = ctk.CTkScrollableFrame(right, fg_color=T.INSET)
         self.params_frame.pack(fill="both", expand=True, padx=8, pady=(4, 8))
         self._params_bg = _tk_bg(self.params_frame)
-        self.lbl_empty = ctk.CTkLabel(self.params_frame, text="Click 'Process Code' to load a shader.",
-                                      text_color="gray")
+        self.lbl_empty = ctk.CTkLabel(self.params_frame, text="Open a shader with +, or paste one and click Analyze.",
+                                      text_color=T.DIM)
         self.lbl_empty.pack(pady=10)
 
         self.after(100, self._tick)
@@ -226,6 +239,8 @@ class EditorPanel(ctk.CTkFrame):
         self.res = res
         self.settings = settings
         self.shader_path = shader_path
+        self.lbl_name.configure(text=os.path.splitext(os.path.basename(shader_path))[0]
+                                if shader_path else "")
         self._close_previewer()
         if not keep_time:
             self.sim_time = 0.0
@@ -406,12 +421,12 @@ class EditorPanel(ctk.CTkFrame):
         is_open = bool(view and view.windowed)
         if is_open != self._output_btn_open:
             self._output_btn_open = is_open
-            fg, hover = ("#f59e0b", "#d97706") if is_open else self._output_btn_colors
+            fg, hover = (T.ACCENT, T.ACCENT_HOVER) if is_open else self._output_btn_colors
             self.btn_output.configure(fg_color=fg, hover_color=hover)
         full = bool(view and view.fullscreen and not view.closed)
         if full != self._fullscreen_btn_on:
             self._fullscreen_btn_on = full
-            fg, hover = ("#f59e0b", "#d97706") if full else self._output_btn_colors
+            fg, hover = (T.ACCENT, T.ACCENT_HOVER) if full else self._output_btn_colors
             self.btn_fullscreen.configure(fg_color=fg, hover_color=hover)
 
     def _escape_output(self):
@@ -466,7 +481,7 @@ class EditorPanel(ctk.CTkFrame):
     def _show_send_state(self, kind):
         btn = self.send_buttons.get(kind)
         if btn:
-            fg, hover = ("#f59e0b", "#d97706") if self.send_on[kind] else self._output_btn_colors
+            fg, hover = (T.ACCENT, T.ACCENT_HOVER) if self.send_on[kind] else self._output_btn_colors
             btn.configure(fg_color=fg, hover_color=hover)
 
     def _close_sender(self, kind):
@@ -508,10 +523,51 @@ class EditorPanel(ctk.CTkFrame):
             self._open_sender("ndi")
 
     # ── Queue playlist ───────────────────────────────────────────────────────
+    # Widgets that use ← / → themselves: text fields, the code box, sliders, lists.
+    _ARROW_KEY_WIDGETS = (tk.Text, tk.Entry, tk.Spinbox, tk.Listbox, ttk.Entry, ttk.Scale, ttk.Treeview)
+
+    def _focus(self):
+        try:
+            return self.focus_get()
+        except KeyError:            # Tk: the focus is in a popup menu
+            return None
+
+    def _arrow_key(self, direction):
+        """← / → in FFStudio: the previous / next queue shader, while the Studio tab
+        is showing, unless the focus is on a widget that uses the arrows itself (a
+        focused slider steps its value instead; its own binding stops this one).
+        A hidden widget with the focus (the queue list, after a tab switch) doesn't count."""
+        focus = self._focus()
+        if not self.winfo_viewable() or (isinstance(focus, self._ARROW_KEY_WIDGETS)
+                                         and focus.winfo_viewable()):
+            return
+        self.step_queue(direction)
+        return "break"
+
+    # Widgets a click elsewhere takes the focus from: sliders, the code box, the
+    # log and text fields (whose edits commit as they lose it).
+    _RELEASED_ON_CLICK_AWAY = (ttk.Scale, tk.Text, tk.Entry, ttk.Entry)
+
+    def _release_focus(self, e):
+        """A click outside the focused slider, code box or text field gives the
+        focus back to the window, so ← / → step the queue again (and a slider's
+        handle is no longer amber). A click on the frame or scrollbars of the
+        code box / a CustomTkinter field counts as inside it."""
+        focus = self._focus()
+        if not isinstance(focus, self._RELEASED_ON_CLICK_AWAY):
+            return
+        inside = focus.master if isinstance(focus.master, (ctk.CTkTextbox, ctk.CTkEntry)) else focus
+        w = e.widget
+        while isinstance(w, tk.Misc):
+            if w is inside:
+                return
+            w = w.master
+        self.winfo_toplevel().focus_set()
+
     def step_queue(self, direction):
         """Load the previous / next shader in the queue that compiles into this tab
         (the output follows). Wraps around; starts at either end if the current
-        shader isn't in the queue. The ← / → buttons and the output's arrow keys."""
+        shader isn't in the queue. The ← / → buttons and keys (in FFStudio and the output)."""
         paths = self.get_playlist()
         self._update_queue_label()
         if not paths:
@@ -564,7 +620,7 @@ class EditorPanel(ctk.CTkFrame):
             return
         self.auto = not self.auto
         self._auto_elapsed = 0.0
-        fg, hover = ("#f59e0b", "#d97706") if self.auto else self._auto_btn_colors
+        fg, hover = (T.ACCENT, T.ACCENT_HOVER) if self.auto else self._auto_btn_colors
         self.btn_auto.configure(fg_color=fg, hover_color=hover)
         if self.auto:
             self.log(f"Slideshow on: next shader every {self._fmt_seconds(self.auto_seconds)} s.")
@@ -889,10 +945,8 @@ class EditorPanel(ctk.CTkFrame):
 
     def toggle_gpu_live(self):
         self.gpu_live = not self.gpu_live
-        fg, hover = ("#f59e0b", "#d97706") if self.gpu_live else self._gpu_btn_colors
+        fg, hover = (T.ACCENT, T.ACCENT_HOVER) if self.gpu_live else self._gpu_btn_colors
         self.btn_gpu_live.configure(fg_color=fg, hover_color=hover)
-        # Live readings are continuous, so Analyze has nothing to add meanwhile.
-        self.btn_measure.configure(state="disabled" if self.gpu_live else "normal")
         if self._fs:
             self._fs["timer"].reset()         # start the live average afresh
             self._fs.pop("gpu", None)
@@ -951,7 +1005,8 @@ class EditorPanel(ctk.CTkFrame):
 
     def measure_gpu(self):
         """Measure the loaded shader's GPU time per frame at 1920x1080 with the
-        current slider values, on a worker thread."""
+        current slider values, on a worker thread (the app's Analyze button).
+        Live on: nothing to add, its readings are continuous."""
         if self.gpu_live or not (self.res and self.res.ok and self.res.validated):
             return
         if self._fs:
@@ -1030,7 +1085,7 @@ class EditorPanel(ctk.CTkFrame):
         if not chans or any(p.label for p in ir.programs):    # multi-buffer projects: wiring is in the file
             return
         bg = _tk_bg(self.channel_frame)
-        W.label(self.channel_frame, "Channels", bg=bg).pack(anchor="w")
+        T.section(self.channel_frame, "Channels").pack(anchor="w")
         for im in sorted(chans, key=lambda i: i.name):
             row = W.frame(self.channel_frame, bg=bg)
             row.pack(fill="x", pady=1)
@@ -1124,7 +1179,7 @@ class EditorPanel(ctk.CTkFrame):
     def _fill_params(self, box):
         ir = self.res.ir
         if not ir.params and not S.excluded_constants(self.settings):
-            W.label(box, "No parameters.", fg="gray", bg=self._params_bg).pack(pady=10)
+            W.label(box, "No parameters.", fg=W.DIM, bg=self._params_bg).pack(pady=10)
             return
         for i, p in enumerate(ir.params):
             self._param_row(i, p)

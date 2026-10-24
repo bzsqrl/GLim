@@ -16,6 +16,7 @@ from ffstudio import convert as ffconvert                               # noqa: 
 from ffstudio import settings as ffsettings                             # noqa: E402
 from editor_panel import EditorPanel, gpu_cache_key, toggle_command    # noqa: E402
 import ctk_fixes                                                       # noqa: E402
+import theme as T                                                      # noqa: E402
 
 ctk_fixes.apply()       # before any widget exists: buttons that ignored some clicks
 
@@ -31,16 +32,34 @@ ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
 STUDIO_TAB = "Studio"          # the single-shader tab (editor, preview, output)
+
+
+class _Tabs(ctk.CTkTabview):
+    _button_height = 34         # room for the larger Queue / Studio labels (CTk: 26)
+
+    def set(self, name):
+        """Switch tabs at once, as a click on the tab buttons does. CTk's set()
+        shows the new tab under the current one and hides the others 100 ms later:
+        on macOS, where Tk draws every widget into one view, the uncovered Queue tab
+        was never repainted (a frozen Studio tab), and switching back within those
+        100 ms (Shift+Tab twice) hid the tab just shown, leaving it blank."""
+        if name not in self._tab_dict:
+            raise ValueError(f"CTkTabview has no tab named '{name}'")
+        if name != self._current_name and self._current_name in self._tab_dict:
+            self._tab_dict[self._current_name].grid_forget()
+        self._current_name = name
+        self._segmented_button.set(name)
+        self._set_grid_current_tab()
 # Constants and #defines always become sliders (there used to be a checkbox to turn
 # that off); unwanted ones can be unticked one by one in the Studio tab. Queue
 # builds keep their "-p" name suffix, so plugin names / IDs don't change.
 EXTRACT_PARAMS = True
 
 # Status icons / colours
-STATUS_PENDING  = ("—",  "#6b7280")   # grey
-STATUS_BUILDING = ("⟳",  "#f59e0b")   # amber
-STATUS_DONE     = ("✓",  "#10b981")   # green
-STATUS_ERROR    = ("✗",  "#ef4444")   # red
+STATUS_PENDING  = ("—",  T.DIM)
+STATUS_BUILDING = ("⟳",  T.AMBER_TEXT)
+STATUS_DONE     = ("✓",  T.GREEN_TEXT)
+STATUS_ERROR    = ("✗",  T.RED_TEXT)
 
 VALID_EXTENSIONS = {".fs", ".txt", ".glsl", ".frag", ".shader"}
 LOG_MAX_LINES = 5000    # older build-log lines are dropped so long batches stay fast
@@ -101,6 +120,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         super().__init__()
         if _DND_AVAILABLE:
             ctk.set_appearance_mode("Dark")
+        T.apply(self)                       # colours and fonts, before any widget
 
         self.title("FFStudio – Shader to FFGL Converter")
         # Fit the screen (minus taskbar), up to 1440x900.
@@ -120,9 +140,11 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._source_stem = "FFStudioPlugin"   # for single-file tab
         self._source_path = None
         self.settings = {}                    # single-file tab: the shader's .ffstudio.json
+        self._processed_code = None           # the code box text last loaded into the editor
 
-        # Force dark background regardless of TkinterDnD vs CTk base class
-        self.configure(bg="#1a1a2e")
+        # The window colour, whether this is a CTk or a TkinterDnD window
+        self.configure(bg=T.WINDOW)
+        self.after(10, lambda: T.colour_title_bar(self))
 
         self._build_layout()
         self._set_icon()
@@ -183,10 +205,14 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.grid_rowconfigure(2, weight=0)
 
         # ── Tab view ── (no title row: the window title names the app)
-        self.tabs = ctk.CTkTabview(self, command=self._on_tab_changed)
+        self.tabs = _Tabs(self, fg_color=T.WINDOW, segmented_button_font=T.ui(15, "bold"),
+                          segmented_button_selected_color=T.TAB_SELECTED,
+                          segmented_button_selected_hover_color=T.TAB_SELECTED,
+                          command=self._on_tab_changed)
         self.tabs.grid(row=1, column=0, padx=20, pady=(6, 8), sticky="nsew")
         self.tabs.add("Queue")
         self.tabs.add(STUDIO_TAB)
+        self._style_tabs()
         self.tabs.tab("Queue").grid_columnconfigure(0, weight=1)
         self.tabs.tab("Queue").grid_rowconfigure(0, weight=0)  # toolbar
         self.tabs.tab("Queue").grid_rowconfigure(1, weight=0)  # column headers
@@ -198,14 +224,15 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._build_singlefile_tab()
 
         # ── Shared log ──
-        frame_log = ctk.CTkFrame(self)
+        frame_log = ctk.CTkFrame(self, border_width=1)
         frame_log.grid(row=2, column=0, padx=20, pady=(0, 14), sticky="ew")
         frame_log.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(frame_log, text="Build Log", font=("Arial", 11, "bold"),
-                     anchor="w").grid(row=0, column=0, padx=10, pady=(6, 0), sticky="w")
-        self.textbox_log = ctk.CTkTextbox(frame_log, font=("Consolas", 11),
-                                          text_color="#10b981", height=110)
-        self.textbox_log.grid(row=1, column=0, padx=10, pady=(2, 8), sticky="ew")
+        T.section(frame_log, "Log", anchor="w").grid(row=0, column=0, padx=14, pady=(6, 0), sticky="w")
+        self.textbox_log = ctk.CTkTextbox(frame_log, font=T.mono(12), fg_color=T.PANEL,
+                                          text_color=T.LOG, height=110)
+        self.textbox_log.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="ew")
+        for tag, colour in (("ok", T.GREEN_TEXT), ("warn", T.AMBER_TEXT), ("error", T.RED_TEXT)):
+            self.textbox_log.tag_config(tag, foreground=colour)
         self.log("System ready.")
 
     # -----------------------------------------------------------------------
@@ -226,37 +253,32 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                       command=self._add_folder_dialog).pack(side="left", padx=(0, 6))
         self.btn_reset_queue = ctk.CTkButton(
             toolbar, text="⟲ Reset", width=80,
-            fg_color="#374151", hover_color="#4b5563",
             command=self._reset_status)
         self.btn_reset_queue.pack(side="left", padx=(0, 6))
         ctk.CTkButton(toolbar, text="Clear Completed", width=120,
-                      fg_color="#374151", hover_color="#4b5563",
                       command=self._clear_completed).pack(side="left", padx=(0, 6))
         ctk.CTkButton(toolbar, text="Clear All", width=90,
-                      fg_color="#374151", hover_color="#4b5563",
                       command=self._clear_queue).pack(side="left", padx=(0, 20))
 
         self.btn_export_isf_queue = ctk.CTkButton(
-            toolbar, text="↑ Export ISF", width=110,
-            fg_color="#10b981", hover_color="#059669",
+            toolbar, text="Export ISF", width=110,
             command=self._start_export_isf_queue)
         self.btn_export_isf_queue.pack(side="right", padx=(6, 0))
 
         self.btn_build_queue = ctk.CTkButton(
             toolbar, text="▶  Build FFGL", width=110,
-            fg_color="#6366f1", hover_color="#4f46e5",
+            fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER,
             command=toggle_command(self._start_build_queue))     # Build / Cancel
         self.btn_build_queue.pack(side="right")
 
         self.btn_measure_gpu = ctk.CTkButton(
             toolbar, text="Analyze", width=80,
-            fg_color="#374151", hover_color="#4b5563",
             command=toggle_command(self._start_measure_gpu))     # Measure / Stop
         self.btn_measure_gpu.pack(side="right", padx=(0, 6))
 
         # Queue list: a native Treeview only draws the visible rows, so it stays
         # fast with thousands of files (one widget per row did not).
-        box = ctk.CTkFrame(tab, fg_color="#111827")
+        box = ctk.CTkFrame(tab, fg_color=T.INSET, border_width=1)
         box.grid(row=2, column=0, padx=6, pady=(0, 6), sticky="nsew")
         box.grid_columnconfigure(0, weight=1)
         box.grid_rowconfigure(0, weight=1)
@@ -264,14 +286,14 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         scale = ctk.ScalingTracker.get_widget_scaling(box)
         style = ttk.Style(self)
         style.theme_use("clam")      # the native Windows/macOS themes ignore these colours
-        style.configure("Queue.Treeview", background="#111827", fieldbackground="#111827",
-                        foreground="#e5e7eb", bordercolor="#111827", borderwidth=0,
-                        rowheight=int(28 * scale), font=("Segoe UI", 12))
-        style.map("Queue.Treeview", background=[("selected", "#374151")],
+        style.configure("Queue.Treeview", background=T.INSET, fieldbackground=T.INSET,
+                        foreground=T.FG, bordercolor=T.INSET, borderwidth=0,
+                        rowheight=int(28 * scale), font=(T.UI_FAMILY, 12))
+        style.map("Queue.Treeview", background=[("selected", T.SELECTED)],
                   foreground=[("selected", "#ffffff")])
-        style.configure("Queue.Treeview.Heading", background="#1e2230", foreground="#9ca3af",
-                        bordercolor="#111827", relief="flat", font=("Segoe UI", 12, "bold"))
-        style.map("Queue.Treeview.Heading", background=[("active", "#2a3040")])
+        style.configure("Queue.Treeview.Heading", background=T.PANEL, foreground=T.DIM,
+                        bordercolor=T.INSET, relief="flat", font=(T.UI_FAMILY, 11, "bold"))
+        style.map("Queue.Treeview.Heading", background=[("active", T.ROW)])
         style.layout("Queue.Treeview", [("Treeview.treearea", {"sticky": "nsew"})])
 
         self.tree = ttk.Treeview(box, style="Queue.Treeview", show="headings",
@@ -290,9 +312,9 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         for status, (_, color) in (("pending", STATUS_PENDING), ("building", STATUS_BUILDING),
                                    ("done", STATUS_DONE), ("error", STATUS_ERROR)):
             self.tree.tag_configure(status, foreground=color)
-        self.tree.grid(row=0, column=0, sticky="nsew", padx=(4, 0), pady=4)
+        self.tree.grid(row=0, column=0, sticky="nsew", padx=(5, 0), pady=5)
         sb = ctk.CTkScrollbar(box, command=self.tree.yview)
-        sb.grid(row=0, column=1, sticky="ns", pady=4)
+        sb.grid(row=0, column=1, sticky="ns", padx=(0, 1), pady=5)
         self.tree.configure(yscrollcommand=sb.set)
         self._items_by_iid: dict[str, QueueItem] = {}
         self._next_iid = 0
@@ -332,7 +354,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.lbl_drop = ctk.CTkLabel(
             box,
             text="Drop .fs or .txt shader files here, or use + (files) / 📁 (a folder)",
-            text_color="#4b5563", fg_color="#111827", font=("Arial", 13))
+            text_color=T.DIM, fg_color=T.INSET, font=T.ui(13))
         self._show_drop_hint(True)
 
         # Wire up drag-and-drop
@@ -352,11 +374,10 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         tools = ctk.CTkFrame(tab, fg_color="transparent")
         tools.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
-        ctk.CTkButton(tools, text="Open File", command=self.open_file, width=100).pack(side="left", padx=(0, 6))
-        ctk.CTkButton(tools, text="Process Code", command=self.analyze_code,
-                      fg_color="#10b981", hover_color="#059669").pack(side="left", padx=6)
+        ctk.CTkButton(tools, text="+", width=36, height=28, font=ctk.CTkFont(size=20, weight="bold"),
+                      command=self.open_file).pack(side="left", padx=(0, 6))
 
-        ctk.CTkLabel(tools, text="Output Name:").pack(side="left", padx=(10, 4))
+        ctk.CTkLabel(tools, text="Output name", font=T.ui(12), text_color=T.DIM).pack(side="left", padx=(8, 8))
         self.entry_plugin_name = ctk.CTkEntry(tools, width=200, placeholder_text="PluginName")
         self.entry_plugin_name.pack(side="left", padx=0)
         self.entry_plugin_name.insert(0, self._source_stem)
@@ -364,23 +385,27 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         # As on the Queue tab: Build FFGL, then Export ISF on the far right.
         plugin_ext = ".bundle" if sys.platform == "darwin" else ".dll"
         self.btn_export_isf_single = ctk.CTkButton(
-            tools, text="↑ Export ISF (.fs)", command=self._export_isf_single,
-            fg_color="#10b981", hover_color="#059669")
+            tools, text="Export ISF (.fs)", command=self._export_isf_single)
         self.btn_export_isf_single.pack(side="right", padx=(6, 0))
 
         self.btn_build_single = ctk.CTkButton(
             tools, text=f"▶  Build FFGL ({plugin_ext})", command=self._build_single,
-            fg_color="#6366f1", hover_color="#4f46e5")
+            fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER)
         self.btn_build_single.pack(side="right")
 
+        # Analyze: process the code (when it changed) and measure its GPU load.
+        self.btn_analyze_single = ctk.CTkButton(tools, text="Analyze", width=80,
+                                                command=self._analyze_single)
+        self.btn_analyze_single.pack(side="right", padx=(0, 6))
+
         # Paned Window (Row 1) - horizontal resizable split
-        self.panes = tk.PanedWindow(tab, orient=tk.HORIZONTAL, bg="#1a1a2e",
-                                    bd=0, sashwidth=4, sashpad=0,
+        self.panes = tk.PanedWindow(tab, orient=tk.HORIZONTAL, bg=T.WINDOW,
+                                    bd=0, sashwidth=12, sashpad=0,
                                     showhandle=False, opaqueresize=True)
         self.panes.grid(row=1, column=0, padx=10, pady=(0, 6), sticky="nsew")
 
         # Left Pane: Code editor
-        self.textbox_code = ctk.CTkTextbox(self.panes, font=("Consolas", 13), wrap="none")
+        self.textbox_code = ctk.CTkTextbox(self.panes, font=T.mono(13), wrap="none", border_width=1)
         self.textbox_code.insert("1.0", "// Paste your shader code here...")
         self.textbox_code.bind("<FocusIn>", self._on_code_focus)
         self.panes.add(self.textbox_code, stretch="always")
@@ -395,9 +420,9 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.editor.convert_path = self._convert_for_preview
         self.editor.on_select = lambda path, res: self._load_file_path(path, res=res)
         self.editor.gpu_cache = self._gpu_cache
-        self.textbox_code.bind("<Control-Return>", lambda e: (self.analyze_code(), "break")[1])
+        self.textbox_code.bind("<Control-Return>", lambda e: (self._analyze_single(), "break")[1])
         if sys.platform == "darwin":
-            self.textbox_code.bind("<Command-Return>", lambda e: (self.analyze_code(), "break")[1])
+            self.textbox_code.bind("<Command-Return>", lambda e: (self._analyze_single(), "break")[1])
 
         self.after(200, self._set_initial_sash)
 
@@ -421,7 +446,8 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # Shared log helper
     # -----------------------------------------------------------------------
     def log(self, text: str):
-        self.textbox_log.insert("end", f"> {text}\n")
+        tag = T.log_tag(text)
+        self.textbox_log.insert("end", f"> {text}\n", tag)
         lines = int(self.textbox_log.index("end-1c").split(".")[0])
         if lines > LOG_MAX_LINES + 500:
             self.textbox_log.delete("1.0", f"{lines - LOG_MAX_LINES}.0")
@@ -568,6 +594,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
     def _on_tab_changed(self):
         """A click on the Queue / Studio buttons (tabs.set() doesn't call this)."""
+        self._style_tabs()
         if self.tabs.get() == STUDIO_TAB:
             self._enter_studio()
         else:
@@ -579,14 +606,15 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         return "break"
 
     def _show_tab(self, name):
-        """Switch tabs from code as a click on the tab buttons does: hide the
-        current tab, then show the new one. tabs.set() shows the new tab under
-        the current one and hides that 100 ms later; on macOS, where Tk draws
-        every widget into one view, the uncovered Queue tab was never repainted,
-        so the window kept showing a frozen Studio tab."""
-        if name != self.tabs.get():
-            self.tabs.tab(self.tabs.get()).grid_forget()
+        """Switch tabs from code (see _Tabs.set)."""
         self.tabs.set(name)
+        self._style_tabs()
+
+    def _style_tabs(self):
+        """The label of the tab showing in full white, the other dimmed."""
+        current = self.tabs.get()
+        for name, button in self.tabs._segmented_button._buttons_dict.items():
+            button.configure(text_color=T.FG if name == current else T.DIM)
 
     def _playlist(self) -> list[str]:
         """What Studio's ← / → and the slideshow step through, in queue order."""
@@ -602,6 +630,9 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         If the queue and its selection haven't changed since Studio was last
         entered, it keeps the shader it's on (so Shift+Tab can peek at the queue
         mid-playlist); force (double-click) always loads."""
+        # The queue list, now hidden, kept the keyboard focus: give it to the
+        # window, so ← / → step through the queue (EditorPanel._arrow_key).
+        self.focus_set()
         selected = self._selected_items()
         entry = (tuple(i.path for i in self._queue), tuple(i.path for i in selected))
         unchanged, self._studio_entry = entry == self._studio_entry, entry
@@ -645,10 +676,10 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         n = len(self.tree.selection())
         if not self._building:
             self.btn_build_queue.configure(
-                state="normal", fg_color="#6366f1", hover_color="#4f46e5",
+                state="normal", fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER,
                 text=f"▶  Build FFGL ({n})" if n else "▶  Build FFGL")
         self.btn_export_isf_queue.configure(
-            text=f"↑ Export ISF ({n})" if n else "↑ Export ISF")
+            text=f"Export ISF ({n})" if n else "Export ISF")
         self.btn_reset_queue.configure(
             text=f"⟲ Reset ({n})" if n else "⟲ Reset")
         if not self._measuring:
@@ -689,7 +720,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.log("Nothing to measure: the queue is empty.")
             return
         self._measuring = stop = threading.Event()
-        self.btn_measure_gpu.configure(text="Stop Analysis", fg_color="#ef4444", hover_color="#dc2626")
+        self.btn_measure_gpu.configure(text="Stop Analysis", fg_color=T.RED, hover_color=T.RED_HOVER)
         self.log(f"Measuring the GPU load of {len(items)} shader(s) at 1920×1080…")
         for item in items:
             if item.iid and self.tree.exists(item.iid):
@@ -740,7 +771,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
     def _measure_gpu_done(self, items, done, stop):
         self._measuring = None
-        self.btn_measure_gpu.configure(fg_color="#374151", hover_color="#4b5563")
+        self.btn_measure_gpu.configure(fg_color=T.BUTTON, hover_color=T.BUTTON_HOVER)
         self._update_queue_buttons()
         for item in items:                              # not reached (stopped): as before
             if item.iid and self.tree.exists(item.iid) \
@@ -807,7 +838,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
         self._building = True
         self._cancel_event.clear()
-        self.btn_build_queue.configure(text="Cancel Build", fg_color="#ef4444", hover_color="#dc2626")
+        self.btn_build_queue.configure(text="Cancel Build", fg_color=T.RED, hover_color=T.RED_HOVER)
         t = threading.Thread(target=self._build_queue_thread,
                              args=(pending, EXTRACT_PARAMS), daemon=True)
         t.start()
@@ -899,7 +930,17 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         log(f"[{name}] ✓ {res.ir.kind}, {len(res.ir.params)} params → {dst}")
         return "done", os.path.basename(dst)
 
+    def _analyze_single(self):
+        """Analyze (or Ctrl+Enter): process the code if it changed since it was last
+        processed, or nothing is loaded yet, then measure its GPU load."""
+        code = self.textbox_code.get("1.0", "end-1c")
+        if code != self._processed_code or self.editor.res is None:
+            if not self.analyze_code():
+                return
+        self.editor.measure_gpu()
+
     def analyze_code(self, keep_time=False, res=None):
+        """Convert the code box and load it into the editor. True if it loaded."""
         code = self.textbox_code.get("1.0", "end-1c")
         if not keep_time:
             self.log("Processing shader code...")
@@ -932,6 +973,8 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.log(f"✓ Compiles on this GPU. {len(ir.params)} parameter(s)"
                      + (f", {len(promoted)} from constants." if promoted else "."))
         self.editor.load(res, self.settings, self._source_path, keep_time=keep_time)
+        self._processed_code = code
+        return True
 
     def _build_single(self):
         self.log("Starting build…")

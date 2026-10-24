@@ -158,7 +158,7 @@ If creating the server fails, the log says `Syphon unavailable: …` and the but
 The Studio tab's controls for sending now sit in a **Send** row under the preview: **Syphon**, **NDI**, and the NDI size menu (**1080p** / **720p**). NDI sends the shader as "<Mac name> (FFStudio)" at 30 fps over the network (`validate.NdiSender`: the frame is flipped and scaled on the GPU, read back asynchronously through two pixel buffers, and sent with cyndilib). On Windows every check passed (30 fps, no dropped frames, the right way up, at both sizes, alongside Spout, with and without the output window); the Mac needs:
 
 1. `venv/bin/pip install -r requirements.txt` (adds `cyndilib`, which bundles the NDI runtime, and numpy).
-2. From source: load a shader, click **NDI** (amber; the log says `NDI: sending "FFStudio" at 1920x1080, 30 fps.`). Receive it in Resolume (**Sources → NDI**) or NDI Video Monitor.
+2. From source: load a shader, click **NDI** (highlighted; the log says `NDI: sending "FFStudio" at 1920x1080, 30 fps.`). Receive it in Resolume (**Sources → NDI**) or NDI Video Monitor.
 
 | Check | What should happen |
 |---|---|
@@ -170,6 +170,26 @@ The Studio tab's controls for sending now sit in a **Send** row under the previe
 | FFStudio.app | The same works in the packaged app. The first time, macOS asks for **Local Network** access (the spec's `NSLocalNetworkUsageDescription` / `NSBonjourServices`); allow it. If NDI sends from source but not from the app, that permission is the first suspect (System Settings → Privacy & Security → Local Network). `compile.py`'s signing step must still verify with cyndilib's `libndi` included. |
 
 **Checked on the Mac (2026-10-24, M1 Max, macOS 14.8, cyndilib 0.1.3), with no code changes:** every row passed. From source, a script drove the GUI while separate NDI and Syphon receivers watched: the right way up at 1920×1080, and 1280×720 after choosing **720p** while sending; 30 fps with no dropped frames by NDI's own counters (each send about 0.5 ms); alongside Syphon at 60 fps, and turning Syphon off left NDI sending; sending carried on from the Queue tab, across a shader switch and while the output window opened and closed; the source was gone about 2 s after NDI was turned off. The self-test reports both senders `ok`, in the packaged app too. `FFStudio.app` bundles `libndi` and its licence files, still passes `codesign --verify --deep --strict`, and sends to Resolume (after allowing Local Network access), where the source is listed as "<Mac name> (FFStudio)". The app is now 71 MB (was 52 MB), mostly for numpy.
+
+## 11. New look, Analyze, ← / →
+
+The colours and fonts now come from one place, `src/theme.py`: dark surfaces in five steps from the window to a button, one accent (indigo, `#5b5bd6`) for the main actions (Build FFGL, Save settings) and for toggles that are on (output window, fullscreen, Syphon, NDI, Auto, Live; they were amber), and green / amber / red only for done / busy or warning / error, as in the build log's lines. `theme.apply()` patches CustomTkinter's theme before any widget exists, so most widgets take the colours without being told. On Windows the title bar is coloured to match (`colour_title_bar`, a no-op on macOS). No behaviour changed; every Windows GUI test still passes.
+
+Fonts are the first one installed from a list per platform. On macOS the UI uses the system font (`.AppleSystemUIFont`) and code uses SF Mono, else Menlo. Check from source:
+
+| Check | What should happen |
+|---|---|
+| Start-up | No errors; the window is a near-black blue-grey, not the old grey. |
+| Fonts | The UI text is the system font (San Francisco), at the usual size. The code box and the log use a monospaced font. Section labels (PREVIEW, PARAMETERS, GPU, LOG) are small bold capitals. |
+| Toggles | Syphon, NDI, Auto, Live and the output-window button turn indigo while on and grey when off. |
+| Queue | The list's text, headings and selected row (dark indigo) are readable. |
+| Tabs | The Queue / Studio labels are larger (15 px bold); the tab showing has a lighter fill and white text, the other dim text. Shift+Tab updates them too. |
+| Studio top row | **+** (open a file) on the left; **Analyze**, **Build FFGL**, **Export ISF** on the right. There is no Process Code button: **Analyze** (and ⌘+Enter) processes the code when it changed, then measures the GPU load. |
+| ← / → | Straight after switching to Studio (tab button, Shift+Tab or a double-click in the queue), with no output window, ← / → step through the queue. Not while typing in the code box or a text field, or after clicking a slider (it steps instead); clicking anywhere else releases those, and the arrows step the queue again. The code box's scrollbar keeps its focus. |
+| Quick tab switch | Shift+Tab twice quickly leaves the tab it lands on showing, not blank (`_Tabs.set` no longer hides tabs 100 ms later). |
+| FFStudio.app | The same in the packaged app. |
+
+If a font comes out wrong (e.g. `.AppleSystemUIFont` not accepted by this Tk), change the macOS lists in `theme._UI_FAMILIES` / `theme._MONO_FAMILIES`.
 
 ## If something fails
 

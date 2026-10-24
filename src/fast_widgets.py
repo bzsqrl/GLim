@@ -1,4 +1,4 @@
-"""Lightweight Tk/ttk widgets in FFStudio's dark CustomTkinter colours.
+"""Lightweight Tk/ttk widgets in FFStudio's colours (theme.py).
 
 Every CustomTkinter widget is a canvas that draws its own rounded shapes, so
 building many is slow: a 13-slider parameter list took about half a second,
@@ -11,19 +11,23 @@ from tkinter import ttk
 
 import customtkinter as ctk
 
-BG = "#2b2b2b"          # CTkFrame (gray17): the scrollable parameter list
-ROW = "#1f2430"         # one parameter's row
-FG = "#dce4ee"
-DIM = "#9ca3af"
-MUTED = "#6b7280"
-KIND = "#60a5fa"
-ENTRY_BG = "#343638"
-BORDER = "#565b5e"
-ACCENT = "#1f6aa5"
-ACCENT_HOVER = "#144870"
-FOCUS = "#f59e0b"       # a slider with keyboard focus (← / → step it)
-TROUGH = "#4a4d50"
-DISABLED = "#3a3d40"
+import theme as T
+
+BG = T.INSET            # the scrollable parameter list
+ROW = T.ROW             # one parameter's row
+FG = T.FG
+DIM = T.DIM
+MUTED = T.MUTED
+KIND = T.TAG
+ENTRY_BG = T.INSET
+BORDER = T.BORDER
+ACCENT = T.ACCENT
+ACCENT_HOVER = T.ACCENT_HOVER
+BUTTON = T.BUTTON
+BUTTON_HOVER = T.BUTTON_HOVER
+FOCUS = T.AMBER         # a slider with keyboard focus (← / → step it)
+TROUGH = T.BORDER
+DISABLED = T.LINE
 
 _font = None
 _scaling = 1.0
@@ -49,9 +53,9 @@ def setup(widget):
                  lightcolor=ACCENT, darkcolor=ACCENT, gripcount=0, sliderlength=px(14),
                  sliderthickness=px(14), troughrelief="flat")
     st.map("FF.Horizontal.TScale",
-           background=[("disabled", DISABLED), ("focus", FOCUS), ("active", "#2b7bbd")],
-           lightcolor=[("disabled", DISABLED), ("focus", FOCUS), ("active", "#2b7bbd")],
-           darkcolor=[("disabled", DISABLED), ("focus", FOCUS), ("active", "#2b7bbd")])
+           background=[("disabled", DISABLED), ("focus", FOCUS), ("active", T.ACCENT_ACTIVE)],
+           lightcolor=[("disabled", DISABLED), ("focus", FOCUS), ("active", T.ACCENT_ACTIVE)],
+           darkcolor=[("disabled", DISABLED), ("focus", FOCUS), ("active", T.ACCENT_ACTIVE)])
     st.configure("FF.TCheckbutton", background=ROW, foreground=FG, font=_font, focuscolor=ROW,
                  indicatorbackground=ENTRY_BG, indicatorforeground="white", indicatormargin=px(2),
                  upperbordercolor=BORDER, lowerbordercolor=BORDER)
@@ -125,7 +129,7 @@ def check(parent, variable, command=None, text=""):
 class Button(tk.Label):
     """A flat button (tk.Button ignores colours on macOS)."""
 
-    def __init__(self, parent, text, command, width=None, enabled=True, bg=ACCENT, hover=ACCENT_HOVER):
+    def __init__(self, parent, text, command, width=None, enabled=True, bg=BUTTON, hover=BUTTON_HOVER):
         super().__init__(parent, text=text, fg=FG, bg=bg, font=_font, padx=px(10), pady=px(2),
                          cursor="hand2", width=width or 0)
         self._bg, self._hover, self._command, self._enabled = bg, hover, command, True
@@ -161,7 +165,7 @@ class Menu(Button):
         return self._value
 
     def _popup(self):
-        m = tk.Menu(self, tearoff=False, bg=ENTRY_BG, fg=FG, activebackground=ACCENT,
+        m = tk.Menu(self, tearoff=False, bg=BUTTON, fg=FG, activebackground=ACCENT,
                     activeforeground="white", font=_font, bd=0)
         for v in self._values:
             m.add_command(label=v, command=lambda v=v: self._pick(v))
