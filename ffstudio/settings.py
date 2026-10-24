@@ -1,4 +1,6 @@
-"""Per-shader settings stored next to the shader as <name>.ffmaker.json.
+"""Per-shader settings stored next to the shader as <name>.ffstudio.json
+(<name>.ffmaker.json, from FFStudio's former name, is still read, and replaced
+by the new name the next time the settings are saved).
 
 {
   "plugin_name": "My Shader",
@@ -12,18 +14,32 @@
 import json
 import os
 
-SUFFIX = ".ffmaker.json"
+SUFFIX = ".ffstudio.json"
+LEGACY_SUFFIX = ".ffmaker.json"       # FFStudio's former name
 
 
 def path_for(shader_path):
+    """Where the settings are saved."""
     return os.path.splitext(shader_path)[0] + SUFFIX
+
+
+def _legacy_path(shader_path):
+    return os.path.splitext(shader_path)[0] + LEGACY_SUFFIX
+
+
+def existing_path(shader_path):
+    """The settings file there is for this shader (the new name first), or None."""
+    for p in (path_for(shader_path), _legacy_path(shader_path)):
+        if os.path.isfile(p):
+            return p
+    return None
 
 
 def load(shader_path):
     if not shader_path:
         return {}
-    p = path_for(shader_path)
-    if not os.path.isfile(p):
+    p = existing_path(shader_path)
+    if not p:
         return {}
     try:
         with open(p, encoding="utf-8") as f:
@@ -37,12 +53,16 @@ def save(shader_path, data):
     # Drop empty sections so the file stays readable.
     clean = {k: v for k, v in data.items() if v not in (None, "", {}, [])}
     p = path_for(shader_path)
+    legacy = _legacy_path(shader_path)
     if not clean:
-        if os.path.isfile(p):
-            os.remove(p)
+        for q in (p, legacy):
+            if os.path.isfile(q):
+                os.remove(q)
         return None
     with open(p, "w", encoding="utf-8") as f:
         json.dump(clean, f, indent=2)
+    if os.path.isfile(legacy):          # now saved under the new name
+        os.remove(legacy)
     return p
 
 

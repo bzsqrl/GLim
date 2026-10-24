@@ -1,7 +1,7 @@
 // Fixture: Shadertoy channel directives.
-// ffmaker: iChannel0 = input
-// ffmaker: iChannel1 = img/topred.png
-// ffmaker: iChannel2 = noise
+// ffstudio: iChannel0 = input
+// ffstudio: iChannel1 = img/topred.png
+// ffstudio: iChannel2 = noise
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = fragCoord / iResolution.xy;
     vec3 a = texture(iChannel0, uv).rgb;

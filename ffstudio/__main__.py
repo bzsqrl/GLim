@@ -1,8 +1,8 @@
-"""Command line: python -m ffmaker <files or folders> [options]
+"""Command line: python -m ffstudio <files or folders> [options]
 
 Examples:
-  python -m ffmaker sample-shaders/vv_brokenLCD.fs --to ffgl
-  python -m ffmaker sample-shaders --to both --out output/batch --test
+  python -m ffstudio sample-shaders/vv_brokenLCD.fs --to ffgl
+  python -m ffstudio sample-shaders --to both --out output/batch --test
 """
 import argparse
 import os
@@ -30,7 +30,7 @@ def smoke_test_subprocess(plugin_path, num_inputs, timeout=60):
     affect the caller."""
     import json
     import subprocess
-    cmd = [sys.executable, "-m", "ffmaker.ffgl_host", plugin_path, str(num_inputs)]
+    cmd = [sys.executable, "-m", "ffstudio.ffgl_host", plugin_path, str(num_inputs)]
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
                            cwd=paths.bundle_dir())
@@ -44,7 +44,7 @@ def smoke_test_subprocess(plugin_path, num_inputs, timeout=60):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="ffmaker", description="Convert GLSL shaders to FFGL plugins and ISF files.")
+    ap = argparse.ArgumentParser(prog="ffstudio", description="Convert GLSL shaders to FFGL plugins and ISF files.")
     ap.add_argument("inputs", nargs="+")
     ap.add_argument("--to", choices=["ffgl", "isf", "both", "check"], default="ffgl",
                     help="'check' only validates (no files written)")

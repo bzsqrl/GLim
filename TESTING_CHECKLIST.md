@@ -61,7 +61,7 @@ Location: `output/test_batch_v2/`. It has 7 FFGL plugins, the matching ISF files
 
 # Test batch v3: sampler settings and tempo
 
-Location: `output/test_batch_v3/` (rebuild with `venv/bin/python -m ffmaker --to both --out output/test_batch_v3 tests/fixtures/shadertoy_sampler.txt tests/fixtures/shadertoy_buffer_sampler.txt tests/fixtures/shadertoy_tempo.txt`). It has 3 FFGL plugins and the matching ISF files.
+Location: `output/test_batch_v3/` (rebuild with `venv/bin/python -m ffstudio --to both --out output/test_batch_v3 tests/fixtures/shadertoy_sampler.txt tests/fixtures/shadertoy_buffer_sampler.txt tests/fixtures/shadertoy_tempo.txt`). It has 3 FFGL plugins and the matching ISF files.
 
 | Plugin | What to check |
 | :-- | :-- |

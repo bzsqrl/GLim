@@ -1,6 +1,6 @@
 """Right-hand panel of the Studio tab: live preview, channel sources and
 the parameter editor. Edits are written into a settings dict (the shader's
-.ffmaker.json); changes that alter the GLSL ask the app to recompile."""
+.ffstudio.json); changes that alter the GLSL ask the app to recompile."""
 import math
 import os
 import sys
@@ -12,7 +12,7 @@ from tkinter import colorchooser
 import customtkinter as ctk
 from PIL import Image, ImageTk
 
-from ffmaker import settings as S
+from ffstudio import settings as S
 
 import fast_widgets as W
 
@@ -212,7 +212,7 @@ class EditorPanel(ctk.CTkFrame):
 
     def _open_previewer(self):
         try:
-            from ffmaker import validate as V
+            from ffstudio import validate as V
             with V.gpu():
                 self.previewer = V.Previewer(self.res.ir, self.res.ffgl_glsl, PREVIEW_W, PREVIEW_H)
                 if self._input_image:
@@ -232,7 +232,7 @@ class EditorPanel(ctk.CTkFrame):
         here: switch it to the new previewer's shader, sharing its slider values."""
         if not self._fs or not self.previewer:
             return
-        from ffmaker import validate as V
+        from ffstudio import validate as V
         view, old = self._fs["view"], self._fs["pv"]
         try:
             with V.gpu():                   # the output thread renders only while holding this
@@ -250,7 +250,7 @@ class EditorPanel(ctk.CTkFrame):
     def _close_previewer(self):
         if self.previewer:
             try:
-                from ffmaker import validate as V
+                from ffstudio import validate as V
                 with V.gpu():
                     self.previewer.close()
             except Exception:
@@ -291,7 +291,7 @@ class EditorPanel(ctk.CTkFrame):
     # Left/Right in it step through the queue (step_queue).
 
     def _fs_previewer(self, view, res):
-        from ffmaker import validate as V
+        from ffstudio import validate as V
         pv = V.Previewer(res.ir, res.ffgl_glsl, *(view.render_size() or (960, 540)))
         if self._input_image:
             w, h, px = self._input_image
@@ -304,7 +304,7 @@ class EditorPanel(ctk.CTkFrame):
         windowed=True in an output window that can go fullscreen on another monitor."""
         if self._fs or not self.previewer:
             return
-        from ffmaker import validate as V
+        from ffstudio import validate as V
         top = self.winfo_toplevel()
         near = (top.winfo_rootx() + top.winfo_width() // 2, top.winfo_rooty() + top.winfo_height() // 2)
         view = pv = None
@@ -358,7 +358,7 @@ class EditorPanel(ctk.CTkFrame):
     def _escape_output(self):
         """Esc in FFStudio: the output window leaves fullscreen; plain fullscreen closes."""
         if self._fs:
-            from ffmaker import validate as V
+            from ffstudio import validate as V
             with V.window_lock():
                 self._fs["view"].escape()
 
@@ -463,7 +463,7 @@ class EditorPanel(ctk.CTkFrame):
         """⛶, Ctrl+F, double-click: with the output window open, toggle its
         fullscreen; otherwise open / close fullscreen on FFStudio's monitor."""
         if self._fs:
-            from ffmaker import validate as V
+            from ffstudio import validate as V
             with V.window_lock():
                 self._fs["view"].toggle()      # plain fullscreen: marks it closed
         elif self.winfo_viewable():         # only from the Studio tab
@@ -481,7 +481,7 @@ class EditorPanel(ctk.CTkFrame):
         fs["stop"].set()
         fs["thread"].join(timeout=2)
         try:
-            from ffmaker import validate as V
+            from ffstudio import validate as V
             with V.gpu():
                 fs["timer"].close()
                 fs["pv"].close()
@@ -525,7 +525,7 @@ class EditorPanel(ctk.CTkFrame):
         if not (self.previewer and self.winfo_ismapped()):
             return
         try:
-            from ffmaker import validate as V
+            from ffstudio import validate as V
             speed = self._speed()
             if self.playing:
                 self.sim_time += dt * speed
@@ -586,7 +586,7 @@ class EditorPanel(ctk.CTkFrame):
         try:
             # Window events can resize the window or switch it to fullscreen, which on
             # macOS mustn't overlap a frame being drawn on the output thread.
-            from ffmaker import validate as V
+            from ffstudio import validate as V
             with V.window_lock():
                 alive = fs["view"].poll()
         except Exception as e:
@@ -621,7 +621,7 @@ class EditorPanel(ctk.CTkFrame):
         the UI, so rebuilding the parameter widgets after a shader switch (up to a
         second for big shaders) doesn't stall the output. Holds gpu() per frame;
         the shader it draws is whatever fs holds (switched under the same lock)."""
-        from ffmaker import validate as V
+        from ffstudio import validate as V
         last = time.perf_counter()
         due = None                          # when the next frame is due, if not paced by vsync
         small_t = 0.0                       # when the small preview was last drawn
@@ -702,7 +702,7 @@ class EditorPanel(ctk.CTkFrame):
         worker thread, with the slider values at the start of each run, until the
         shader, Live or the output changes (_bench_gen). Pauses while the preview
         isn't showing (e.g. the Queue tab), so the GPU isn't kept busy for nothing."""
-        from ffmaker import validate as V
+        from ffstudio import validate as V
         gen, res = self._bench_gen, self.res
         live = lambda: gen == self._bench_gen
 
@@ -761,7 +761,7 @@ class EditorPanel(ctk.CTkFrame):
             self._fs["sample_until"] = time.perf_counter() + GPU_SAMPLE_S
             self._show_gpu(None, "measuring in the output…")
             return
-        from ffmaker import validate as V
+        from ffstudio import validate as V
         self._bench_gen += 1
         gen, res, values = self._bench_gen, self.res, self._values()
         key = gpu_cache_key(res, values)
@@ -788,7 +788,7 @@ class EditorPanel(ctk.CTkFrame):
 
     def _show_gpu(self, r, note):
         """r: a benchmark result ({"ms", "size"}) or None (note says why)."""
-        from ffmaker import validate as V
+        from ffstudio import validate as V
         bar = self.gpu_bar
         bar.delete("all")
         if not r:
@@ -852,7 +852,7 @@ class EditorPanel(ctk.CTkFrame):
     def _channel_value(self, im):
         """(source, sampler options) for a channel: the saved setting, else what
         the shader's own directives produced."""
-        from ffmaker.convert import split_channel_options
+        from ffstudio.convert import split_channel_options
         saved = self.settings.get("channels", {}).get(im.name)
         if saved is not None:
             return split_channel_options(saved)

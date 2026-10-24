@@ -17,7 +17,7 @@ class Param:
     pixel_space: bool = False # point2D: value is in pixels (ISF default when MIN/MAX absent)
     origin: str = "isf"       # isf | const | define | uniform | synthetic
     hidden: bool = False      # user chose not to expose it: compiled in as a constant
-    source_default: object = None  # the shader's own default, before .ffmaker.json overrides
+    source_default: object = None  # the shader's own default, before .ffstudio.json overrides
 
     def display(self):
         return self.label or humanize(self.name)

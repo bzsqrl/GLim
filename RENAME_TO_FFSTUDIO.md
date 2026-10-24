@@ -2,7 +2,7 @@
 
 FFMaker became **FFStudio** on 2026-10-23. The app, its windows, the built `FFStudio.exe` / `FFStudio.app` and the GitHub repo (`bzsqrl/FFStudio`) already use the new name. Two things still say FFMaker:
 
-- **Part 1: legacy names in the code.** The `ffmaker` Python package, the `.ffmaker.json` settings files, the build cache folder and some internal names. They were kept so nothing broke during the rename. This is a code change, made once on either machine and pushed.
+- **Part 1: legacy names in the code.** **Done on 2026-10-23** (on Windows, pushed; see the notes at the end of Part 1). The Mac gets it with `git pull` and needs one check there (Resolume and the plugin bundle IDs, in `MAC_UPDATE.md`).
 - **Part 2: the local folders.** The git checkout is still in a folder called `FFMaker` on each machine. Each machine renames its own folder.
 
 The two parts are independent, so you can do either first, or only one. The smoothest order is Part 1 on Windows (commit and push), then Part 2 on Windows, then Part 2 on the Mac, where the pull picks up Part 1.
@@ -11,7 +11,7 @@ Nothing here is urgent. Git doesn't care what the folders are called, and every 
 
 ---
 
-## Part 1: remove legacy names from the code (once, on either machine)
+## Part 1: remove legacy names from the code (done 2026-10-23)
 
 The easiest way: open Claude Code in the project folder and ask it to *"do Part 1 of RENAME_TO_FFSTUDIO.md"*. The table lists what changes, and which old names must still be accepted so existing work keeps working.
 
@@ -46,6 +46,8 @@ done
 
 Afterwards, run the usual checks (`tests/run_corpus.py --isf`, the same with `--dir tests/fixtures`, `compile.py`, and the exe's or app's `--selftest`), then commit and push. The other machine needs `git pull`, a fresh build cache (row 2), and a rebuild.
 
+**How it was done (2026-10-23):** every row above as described. The package is `ffstudio/`, and the build cache is `%LOCALAPPDATA%\FFStudio` / `~/Library/Caches/FFStudio`. Settings save as `.ffstudio.json`; `.ffmaker.json` is still read, and removed when the shader's settings are next saved (or cleared). `// ffstudio:` is used in the docs and fixtures; `tests/fixtures/shadertoy_audio.txt` deliberately keeps `// ffmaker:`. The C++ runtime is `FFStudioPlugin`, and the Mac bundle IDs are `com.ffstudio.plugin.…` (**not yet checked in Resolume on the Mac**; see `MAC_UPDATE.md`). The only remaining mentions of `ffmaker` in the code are the deliberate compatibility ones (`LEGACY_SUFFIX` in `settings.py`, the directive pattern in `convert.py`) and that fixture. Left as history: `IMPROVEMENT_PLAN.md`'s old notes, `WINDOWS_UPDATE.md`'s commit list, `scratch/` and `categorized_all_source.csv`. On Windows, the old `%LOCALAPPDATA%\FFMaker` cache was deleted after the new one built.
+
 ---
 
 ## Part 2 on Windows: rename `C:\Users\beatf\Documents\ClaudeCode\FFMaker`
@@ -75,9 +77,9 @@ Everything else, including git, `deps`, `dist`, `output` and your shaders, moves
    ```
 4. **Reset the build workspace**, so CMake picks up the new path to GLEW:
    ```powershell
-   Remove-Item -Recurse -Force "$env:LOCALAPPDATA\FFMaker\ffgl_workspace"
+   Remove-Item -Recurse -Force "$env:LOCALAPPDATA\FFStudio\ffgl_workspace"
    ```
-   If Part 1 is already done, delete the whole `%LOCALAPPDATA%\FFMaker` folder instead (the cache is now under `FFStudio`).
+   (Part 1 is done, so the cache is under `FFStudio`. The old `%LOCALAPPDATA%\FFMaker` was already deleted on Windows.)
 5. **Check that `deps\glew-2.2.0` is there** (it isn't in git; it moved with the folder): `Test-Path deps\glew-2.2.0\include`.
 6. **Test and rebuild:**
    ```powershell
@@ -120,9 +122,9 @@ The same idea as on Windows: the `venv`, the build workspace and Claude Code's s
    ```
 5. **Reset the build workspace:**
    ```bash
-   rm -rf ~/Library/Caches/FFMaker/ffgl_workspace
+   rm -rf ~/Library/Caches/FFStudio/ffgl_workspace
+   rm -rf ~/Library/Caches/FFMaker      # from before Part 1, if still there
    ```
-   If Part 1 is already done, delete the whole `~/Library/Caches/FFMaker` instead.
 6. **Pull, test and rebuild:**
    ```bash
    git pull origin main

@@ -12,7 +12,7 @@
 Not yet checked inside Resolume or MadMapper.
 
 **New code layout:**
-- `ffmaker/`: the core library
+- `ffstudio/`: the core library
   - `glsl.py`: tokenizer
   - `convert.py`: front-ends and transformations
   - `emit_ffgl.py`, `emit_isf.py`: output writers
@@ -43,10 +43,10 @@ Not yet checked inside Resolume or MadMapper.
 - Test batch v2 is in `output/test_batch_v2`.
 
 **Phase 3 (GUI) and the Windows part of Phase 4 are done** (user confirmed batch v2):
-- **Live GPU preview** (`ffmaker/validate.Previewer`, shared with the offline renderer).
+- **Live GPU preview** (`ffstudio/validate.Previewer`, shared with the offline renderer).
 - **Parameter editor:** expose/hide, label, range, default.
 - **Shadertoy channel pickers.**
-- **Per-shader settings** in `<shader>.ffmaker.json`, used by queue, CLI and ISF export. ISF sources get their headers rewritten from these settings.
+- **Per-shader settings** in `<shader>.ffstudio.json` (`.ffmaker.json` from before the rename is still read), used by queue, CLI and ISF export. ISF sources get their headers rewritten from these settings.
 - **Packaged `.exe` verified:**
   - builds plugins headlessly (`FFStudio.exe --selftest <shader> <dir>`);
   - GLEW is bundled;
@@ -171,7 +171,7 @@ Smaller issues:
 - Clear per-shader diagnostics in the queue (with the reason) instead of a generic "Build failed".
 
 ### Phase 4: Build and packaging
-- Short term: compile the FFGL SDK once and cache it, and use a per-user build/cache folder (`%LOCALAPPDATA%\FFMaker`). Always clean up.
+- Short term: compile the FFGL SDK once and cache it, and use a per-user build/cache folder (`%LOCALAPPDATA%\FFStudio`). Always clean up.
 - Longer term: a **prebuilt, data-driven runtime plugin**. The shader, params and textures are stored as data inside a ready-made DLL (Windows resource) or bundle (Mac `Resources/`, then an ad-hoc codesign). End users wouldn't need MSVC/CMake/Xcode, and builds would take under a second.
 - Merge the Mac port back into one codebase with platform-specific build backends.
 - Update the bundled FFGL SDK snapshot (currently dated 2023-06) to the latest `resolume/ffgl` master.
