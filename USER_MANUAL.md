@@ -1,6 +1,6 @@
 # FFStudio User Manual
 
-**FFStudio** (formerly FFMaker) converts GLSL shaders into:
+**FFStudio** converts GLSL shaders into:
 - **FFGL 2 plugins** for Resolume 7.21.3+ and other FFGL hosts (`.dll` on Windows, universal `.bundle` on macOS)
 - **ISF 2 files** (`.fs`) for MadMapper, VDMX, Millumin and other ISF hosts
 
@@ -78,7 +78,7 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
   - While the output window (or fullscreen) is open, measuring times the output itself, at its actual resolution, instead of running a separate 1080p measurement alongside it: continuously with **Live** on ("live in the output"), or for one second when you press **Analyze** ("measured in the output"). These are the output's real frame times, so a light shader can read higher here than measured at 1080p: at 60 fps with little to do, the card lowers its clocks.
   - CPU load isn't shown: shaders run entirely on the GPU, and the plugin's CPU work per frame is tiny.
   - Results depend on the graphics card (and, on laptops, whether it's plugged in). Measurements from the queue and from this tab are shared for the session.
-- **Save settings.** Writes `<shader>.ffstudio.json` next to the shader (a `<shader>.ffmaker.json` from before the rename is still read, and replaced by the new name on the next save). **Build FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
+- **Save settings.** Writes `<shader>.ffstudio.json` next to the shader. **Build FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
 
 **Packaged app:** `dist\FFStudio.exe` (build it with `venv\Scripts\python compile.py`) runs without Python installed. Building plugins still needs CMake and Visual Studio's C++ tools.
 
@@ -123,8 +123,6 @@ By default every `iChannel` reads the clip, which makes the plugin an effect. Ch
 // ffstudio: iChannel3 = audio                (live audio spectrum from the host)
 // ffstudio: iChannel0 = input                (the clip; the default)
 ```
-
-`// ffmaker:` (FFStudio's former name) still works the same, so existing shaders don't need changing.
 
 If an image file is missing, a noise texture is used and FFStudio warns you.
 

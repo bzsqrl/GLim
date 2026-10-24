@@ -46,7 +46,7 @@ Not yet checked inside Resolume or MadMapper.
 - **Live GPU preview** (`ffstudio/validate.Previewer`, shared with the offline renderer).
 - **Parameter editor:** expose/hide, label, range, default.
 - **Shadertoy channel pickers.**
-- **Per-shader settings** in `<shader>.ffstudio.json` (`.ffmaker.json` from before the rename is still read), used by queue, CLI and ISF export. ISF sources get their headers rewritten from these settings.
+- **Per-shader settings** in `<shader>.ffstudio.json`, used by queue, CLI and ISF export. ISF sources get their headers rewritten from these settings.
 - **Packaged `.exe` verified:**
   - builds plugins headlessly (`FFStudio.exe --selftest <shader> <dir>`);
   - GLEW is bundled;
@@ -67,7 +67,7 @@ Not yet checked inside Resolume or MadMapper.
 - **Queue rewrite** (`5a72770`, `100a29c`): a native `ttk.Treeview`, so 800+ files load in under a second. Type detection and queue ISF export run in the background. Build/Export Selected, Delete to remove, a right-click menu.
 - **Sliders multiplied by time no longer scrub in FFGL** (`2892180`): `time * slider` becomes a running total (`ffm_phaseN`, `FFM_PHASES`) that the plugin and preview keep. ISF exports keep the plain product. A hidden persistent-buffer version for ISF failed in MadMapper (several shaders blank; Speed still jumped) and was reverted.
 - **Mac sync of the Windows work** (`MAC_UPDATE.md`) passed: corpus and fixtures match the Windows results, clang built the phase C++ as is, test batch v4 passes the test host and was confirmed in Resolume and MadMapper. The queue handles 790 files on macOS (rows in 0.1 s, types in ~7 s in the background). Added Control-click for the queue menu on macOS.
-- **Rename Part 1 on the Mac** (`RENAME_TO_FFSTUDIO.md`): corpus and fixtures still match Windows, clang built `FFStudioPlugin` as is, test batch v4 passes the test host, and `FFStudio.app` passes `--selftest`. Resolume saves FFGL plugins by plugin ID (`uniqueTypeId`), so the bundle IDs' change to `com.ffstudio.plugin.…` doesn't affect saved sets (checked by swapping a `com.ffmaker` build for a `com.ffstudio` one under a saved set).
+- **Plugin identity on the Mac:** Resolume saves FFGL plugins by plugin ID (`uniqueTypeId`), not bundle ID, so changing a plugin's bundle ID doesn't affect saved sets (checked by swapping builds under a saved set).
 - **Studio parameter panel on the Mac** (`MAC_UPDATE.md` step 6, 2026-10-24): the flat Tk/ttk parameter rows and channel menus, GPU load (timer queries work on the M1 Max), the button click fixes and the output window all work on macOS with no changes.
 - **Syphon output on the Mac** (`MAC_UPDATE.md` section 9, 2026-10-24): works from source with no changes (1920×1080, right way up, 60 fps, with and without the output window, server gone when turned off). The packaged `FFStudio.app` sends to Resolume too. `compile.py` re-signs the app after PyInstaller (`seal_mac_app`), so `codesign --verify --deep --strict` passes, with the bundled `Syphon.framework` included.
 - **Queue Reset Status:** sets built/failed rows (or just the selected ones) back to Pending, so a queue can be converted again without reloading it.
@@ -94,7 +94,7 @@ A shader that compiles still isn't proven to look right. See the runtime bugs in
 ## 2. Root causes, in order of impact
 
 ### 2.1 ISF → FFGL fails every time: two `main()` functions
-The wrapper template (`boilerplates/ffmaker_plugin/Plugin.cpp`) always emits its own `void main()`. ISF shaders also have a `void main()`, and the builder only bridges Shadertoy-style `mainImage`. Every one of the 36 ISF samples that got past the parser fails with `function "main" is already defined`. For 28 of them it's the first error the compiler reports.
+The old wrapper template always emits its own `void main()`. ISF shaders also have a `void main()`, and the builder only bridges Shadertoy-style `mainImage`. Every one of the 36 ISF samples that got past the parser fails with `function "main" is already defined`. For 28 of them it's the first error the compiler reports.
 
 Other ISF failures hidden behind that one:
 - **Texture macros expanded with regex.** `IMG_NORM_PIXEL(img, vec2(a, b))` gets cut at the first `)` and produces broken code (`vv_brokenLCD`: `textureLod(sampler2D, float)`).
@@ -123,10 +123,10 @@ Smaller issues:
 - `iMouse` is always 0 and `iDate` is always 0. In ISF export, `iDate` is hard-coded to 2026-05-13.
 
 ### 2.4 Structural problems
-- **Text replacement instead of host emulation.** The code rewrites shader text with dozens of regexes. Every new shader style needs a new regex, and fixes collide with each other (that's where the `// <FFMAKER_ISF_SHIMS>` round-trip markers came from).
+- **Text replacement instead of host emulation.** The code rewrites shader text with dozens of regexes. Every new shader style needs a new regex, and fixes collide with each other (that's where the old round-trip marker comments came from).
 - **No validation before building.** The tool runs a full CMake/MSVC build and reports "success" without ever compiling the GLSL. Shader errors only show up as a blank clip in Resolume.
 - **Slow builds.** Every plugin rebuilds the whole FFGL SDK through CMake, and failed builds leave their folders behind (`boilerplates/` holds about 13,000 leftover `build_temp_*` files). In the packaged `.exe`, builds are written into PyInstaller's temporary extraction folder.
-- ~~**The Mac port is a forked copy** of `src/` (`FFMaker-Mac/src_mac`), so the two versions will drift apart.~~ Fixed: one codebase runs on both.
+- ~~**The Mac port is a forked copy** of `src/` in a separate Mac folder, so the two versions will drift apart.~~ Fixed: one codebase runs on both.
 - Multi-pass is rejected with the message "FFGL does not support it". That's wrong: plugins can render into their own FBOs (`ffglex::FFGLFBO`).
 
 ## 3. Target architecture
@@ -149,7 +149,7 @@ Smaller issues:
 ## 4. Phased roadmap
 
 ### Phase 0: Test harness *(a prototype already exists)*
-- Turn the audit script into `tests/` plus a CLI (`ffmaker convert <file> --to ffgl|isf [--check]`).
+- Turn the audit script into `tests/` plus a CLI (`ffstudio convert <file> --to ffgl|isf [--check]`).
 - Pass/fail report per sample covering parse, FFGL compile, ISF compile, and render-not-black.
 - Keep a scoreboard so every later change is measured against the 18/79 baseline.
 

@@ -1,18 +1,6 @@
 # Updating the Mac build after the Windows work
 
-These steps bring a Mac checkout up to date with the work done on Windows, check the new features on macOS and rebuild `FFStudio.app`. Run the commands in Terminal from the FFMaker folder (the git checkout). If you're Claude on the Mac helping with this, read "Context" first.
-
-## The app is now FFStudio
-
-FFMaker was renamed **FFStudio**, and its **Single File** tab is now **Studio**. After the pull, `compile.py` builds `dist/FFStudio.app` (bundle id `com.ffstudio.app`), and plugins are written to `~/Documents/FFStudio/output` (plugins built earlier stay in `~/Documents/FFMaker/output`). The old `dist/FFMaker.app` and any copy in Applications can be deleted. Unchanged, so existing work keeps working: `<shader>.ffmaker.json` settings, `// ffmaker:` channel directives (`// ffstudio:` works too), plugin IDs, the `ffmaker` Python package (`python -m ffmaker`), and the local folder name (the GitHub repo itself is now `bzsqrl/FFStudio`; see step 1).
-
-**Then the legacy names in the code went too** ([RENAME_TO_FFSTUDIO.md](RENAME_TO_FFSTUDIO.md), Part 1):
-- The Python package is `ffstudio/`: the command line is `venv/bin/python -m ffstudio …`.
-- The build workspace is `~/Library/Caches/FFStudio` (the first plugin build sets it up, about a minute). Delete the old `~/Library/Caches/FFMaker`.
-- Settings save as `<shader>.ffstudio.json`. Existing `.ffmaker.json` files still load, and are replaced by the new name on the next save.
-- `// ffstudio:` is the channel directive in the docs and fixtures; `// ffmaker:` still works.
-- The plugin runtime class is `FFStudioPlugin` (`templates/ffgl/FFStudioPlugin.h`). Plugin IDs are unchanged.
-- Plugin bundles are now identified as `com.ffstudio.plugin.<name>.<id>` (they were `com.ffmaker.plugin.…`). **Checked on the Mac (2026-10-23):** Resolume saves FFGL plugins in a composition by their 4-character plugin ID (`uniqueTypeId`), not the bundle ID. A set saved with a `com.ffmaker` build of `bare_fractalSymetry` still loaded it, with its slider values, after the bundle was replaced by the `com.ffstudio` build. Existing plugins can be rebuilt and replaced in Extra Effects.
+These steps bring a Mac checkout up to date with the work done on Windows, check the new features on macOS and rebuild `FFStudio.app`. Run the commands in Terminal from the FFStudio folder (the git checkout). If you're Claude on the Mac helping with this, read "Context" first.
 
 ## Context
 
@@ -25,7 +13,7 @@ Commits since the Mac was last in sync (`6e47677`, "Add Windows update instructi
 | `ac835b5` | Shadertoy channels used only inside a `#define` (`#define FFT(a) texture(iChannel1, …)`) are now declared and wired. Before, these failed with `undefined variable "iChannel1"`. | Shared converter code. |
 | `5a72770` | The queue is now a native `ttk.Treeview` instead of one CustomTkinter widget per row. 800+ files load in under a second, where before they froze the window and left rows blank. File types are detected in the background, and the queue's **Export ISF** runs off the UI thread. The build log keeps its last 5,000 lines. New: **Build Selected / Export Selected**, Delete/Backspace to remove, a right-click menu, and double-click to open a file. | **GUI, never run on macOS.** The list uses the `clam` ttk theme with custom colours and the font "Segoe UI", which macOS replaces with a fallback. |
 | `100a29c` | Queue review fixes: worker threads no longer read Tk variables, rows removed mid-build are skipped, and right-click is bound to `<Button-2>` on macOS. | The `<Button-2>` binding is Mac-only. It may already be on this Mac if it was committed there. |
-| `2892180` | **Sliders multiplied by time no longer scrub.** `iTime * speed`, `vec3(rx, ry, rz) * iTime` and the like become running totals (`ffm_phaseN`). The plugin keeps them (`FFM_PHASES`), adding slider × frame time every frame. ISF exports still use the plain product, so they still jump in ISF hosts. | **New C++ in `templates/ffgl/Plugin.cpp` and `FFMakerPlugin.h`, never compiled with clang.** |
+| `2892180` | **Sliders multiplied by time no longer scrub.** `iTime * speed`, `vec3(rx, ry, rz) * iTime` and the like become running totals (`ffm_phaseN`). The plugin keeps them (`FFM_PHASES`), adding slider × frame time every frame. ISF exports still use the plain product, so they still jump in ISF hosts. | **New C++ in `templates/ffgl/Plugin.cpp` and `FFStudioPlugin.h`, never compiled with clang.** |
 
 The new C++ is small and should be portable: a `std::vector<double>` of totals, a loop over `FFM_PHASES` in `ProcessOpenGL`, and one `glUniform1f` per total per pass.
 
@@ -41,10 +29,7 @@ These should still be installed from the Mac port:
 
 Before pulling, check `git status`, and commit or `git stash` any local changes.
 
-The GitHub repo is now `bzsqrl/FFStudio` (renamed from `FFMaker`). GitHub redirects the old address, but point the checkout at the new one first (once):
-
 ```bash
-git remote set-url origin https://github.com/bzsqrl/FFStudio.git
 git checkout main
 git pull origin main
 git log --oneline -1
