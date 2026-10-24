@@ -147,6 +147,23 @@ Copy the four `.bundle` folders from `output/test_batch_v4` to `~/Documents/Reso
 
 Load the four `.fs` files from `output/test_batch_v4`. They should render like the plugins. Moving the speed and rate sliders **will still jump** the animation in MadMapper. That's expected: ISF exports keep the plain product. A hidden-buffer approach was tried and reverted, because some shaders rendered blank in MadMapper.
 
+## 9. Syphon output (new, untested on the Mac)
+
+The **Spout** button on Windows is **Syphon** on macOS (next to ⛶ in the Studio tab). Turned on, it publishes the Studio tab's shader as the Syphon server "FFStudio" at 1920×1080, with or without the output window. On Windows, Spout passed every check (`validate.FrameSender`, `EditorPanel.toggle_sending`). On the Mac it needs:
+
+1. `venv/bin/pip install -r requirements.txt` (adds `syphon-python[opengl]` and PyObjC; its wheel needs macOS 12 or later).
+2. From source (`venv/bin/python src/main_gui.py`): load a shader, click **Syphon** (it turns amber, and the log says `Syphon: sending "FFStudio" at 1920x1080`). In Resolume, add the **Syphon** source "FFStudio"; or use Syphon's Simple Client.
+
+| Check | What should happen |
+|---|---|
+| Picture | The shader, **the right way up** (if it's upside down, flip `is_flipped` in `FrameSender.send`), moving smoothly, at 1920×1080. |
+| No window | It keeps sending on the Queue tab, and when switching shaders (← / →, Auto). |
+| Output window | Opening **⧉** while sending shows the same frames; closing it keeps sending. Turning Syphon off with the window open keeps the window. |
+| Off | Syphon off: the source disappears from the receiver. |
+| FFStudio.app | The same works in the packaged app (the spec bundles the Syphon framework via `collect_data_files('syphon')`). |
+
+If creating the server fails, the log says `Syphon unavailable: …` and the button turns off. The likely spot is the context: `syphon.SyphonOpenGLServer(name)` uses the current NSOpenGLContext, which GLFW should have made current inside `gpu()`.
+
 ## If something fails
 
 - **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.
