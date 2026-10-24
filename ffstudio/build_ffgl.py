@@ -53,15 +53,22 @@ def _write_if_changed(path, text):
 
 
 def _glew_root(log):
+    """GLEW at a path that stays the same between runs, and between the packaged
+    app and running from source: CMake caches it. The copy bundled in a packaged
+    app unpacks to a new temp folder each launch, so whichever copy is found is
+    copied to the cache once (as _stable_sdk_dir does for the SDK)."""
     if sys.platform != "win32":
         return None
-    for base in (os.path.join(paths.app_dir(), "deps"), os.path.join(paths.bundle_dir(), "deps"),
-                 os.path.join(paths.cache_dir(), "deps")):
-        d = os.path.join(base, "glew-2.2.0")
-        if os.path.isdir(d):
-            return d
     base = os.path.join(paths.cache_dir(), "deps")
+    stable = os.path.join(base, "glew-2.2.0")
+    if os.path.isdir(stable):
+        return stable
     os.makedirs(base, exist_ok=True)
+    for d in (paths.app_dir(), paths.bundle_dir()):
+        src = os.path.join(d, "deps", "glew-2.2.0")
+        if os.path.isdir(src):
+            shutil.copytree(src, stable)
+            return stable
     log("Downloading GLEW (first build only)…")
     import urllib.request
     import zipfile
@@ -132,6 +139,18 @@ def workspace_dir():
     return os.path.join(paths.cache_dir(), "ffgl_workspace")
 
 
+def _cached_glew_root(bdir):
+    """The GLEW_ROOT the workspace was configured with, or None."""
+    try:
+        with open(os.path.join(bdir, "CMakeCache.txt"), encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if line.startswith("GLEW_ROOT:"):
+                    return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return None
+
+
 def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None):
     """Build the plugin; returns the output path."""
     # Absolute, because later steps run tools from other working directories.
@@ -154,10 +173,16 @@ def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None
                           emit_ffgl.shader_data_header(ir, glsl_list, plugin_name))
 
         bdir = os.path.join(ws, "build")
+        glew = _glew_root(log)
+        cached = _cached_glew_root(bdir)
+        if glew and cached and os.path.normcase(os.path.normpath(cached)) != os.path.normcase(os.path.normpath(glew)):
+            # Configured against a GLEW that's gone or moved (e.g. a packaged app's
+            # temp folder): CMake keeps the old include path, so start afresh.
+            log("GLEW moved: reconfiguring the build workspace…")
+            shutil.rmtree(bdir)
         if cm_changed or not os.path.exists(os.path.join(bdir, "CMakeCache.txt")):
             log("Configuring build workspace (first build takes a minute)…")
             cmd = ["cmake", "-S", ws, "-B", bdir]
-            glew = _glew_root(log)
             if glew:
                 cmd += [f"-DGLEW_ROOT={glew}", "-A", "x64"]
             if sys.platform == "darwin":
