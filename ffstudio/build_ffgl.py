@@ -80,14 +80,65 @@ def _glew_root(log):
     return os.path.join(base, "glew-2.2.0")
 
 
+# What to install, for a computer without the build tools (e.g. a copy of
+# FFStudio.exe on another PC): the compiler can't be bundled with the app.
+MSVC_HELP = ("No C++ compiler found. Building plugins needs Microsoft's C++ compiler: install the free "
+             "Build Tools for Visual Studio from https://visualstudio.microsoft.com/visual-cpp-build-tools/ "
+             "and tick the \"Desktop development with C++\" workload (it includes CMake), "
+             "then restart FFStudio. (Export ISF works without it.)")
+CMAKE_HELP = {
+    "win32": ("CMake not found. Building plugins needs CMake: install it from https://cmake.org/download/ "
+              "(Windows x64 Installer, with \"Add CMake to the PATH\"), or add \"C++ CMake tools for "
+              "Windows\" in the Visual Studio Installer, then restart FFStudio."),
+    "darwin": "CMake not found (install it with: brew install cmake).",
+}
+_vs_found = []                      # Visual Studio installs with the C++ compiler, once found
+
+
+def _vs_installs():
+    """Visual Studio / Build Tools installations that have the C++ compiler
+    (Windows), from vswhere, which every Visual Studio 2017+ installs."""
+    if _vs_found or sys.platform != "win32":
+        return _vs_found
+    vswhere = os.path.join(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+                           "Microsoft Visual Studio", "Installer", "vswhere.exe")
+    if not os.path.isfile(vswhere):
+        return []
+    try:
+        out = subprocess.run([vswhere, "-products", "*", "-requires",
+                              "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property",
+                              "installationPath"], capture_output=True, text=True, timeout=15,
+                             creationflags=subprocess.CREATE_NO_WINDOW).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    _vs_found.extend(l.strip() for l in out.splitlines() if l.strip())
+    return _vs_found
+
+
 def _tool_path():
     """PATH for build tools. Apps opened from Finder get a minimal PATH
-    without Homebrew, where CMake usually lives."""
+    without Homebrew, where CMake usually lives. On Windows, CMake's default
+    install folder and the CMake that ships with Visual Studio work too, when
+    they aren't on the PATH."""
     dirs = os.environ.get("PATH", "").split(os.pathsep)
     if sys.platform == "darwin":
-        dirs += [d for d in ("/opt/homebrew/bin", "/usr/local/bin",
-                             "/Applications/CMake.app/Contents/bin") if d not in dirs]
+        extra = ["/opt/homebrew/bin", "/usr/local/bin", "/Applications/CMake.app/Contents/bin"]
+    elif sys.platform == "win32":
+        extra = [os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "CMake", "bin")]
+        extra += [os.path.join(vs, "Common7", "IDE", "CommonExtensions", "Microsoft", "CMake", "CMake", "bin")
+                  for vs in _vs_installs()]
+    else:
+        extra = []
+    dirs += [d for d in extra if d not in dirs and os.path.isdir(d)]
     return os.pathsep.join(d for d in dirs if d)
+
+
+def check_toolchain():
+    """Raise BuildError saying what to install if plugins can't be built here."""
+    if sys.platform == "win32" and not _vs_installs():
+        raise BuildError(MSVC_HELP)
+    if shutil.which("cmake", path=_tool_path()) is None:
+        raise BuildError(CMAKE_HELP.get(sys.platform, "CMake not found."))
 
 
 def _run(cmd, cwd, log, cancel_event=None):
@@ -95,8 +146,8 @@ def _run(cmd, cwd, log, cancel_event=None):
     path = _tool_path()
     exe = shutil.which(cmd[0], path=path)
     if exe is None:
-        hint = " (install it with: brew install cmake)" if sys.platform == "darwin" else ""
-        raise BuildError(f"{cmd[0]} not found{hint}")
+        raise BuildError(CMAKE_HELP.get(sys.platform, f"{cmd[0]} not found") if cmd[0] == "cmake"
+                         else f"{cmd[0]} not found")
     proc = subprocess.Popen([exe] + cmd[1:], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, encoding="utf-8", errors="replace", creationflags=flags,
                             env={**os.environ, "PATH": path})
@@ -181,6 +232,7 @@ def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None
             log("GLEW moved: reconfiguring the build workspace…")
             shutil.rmtree(bdir)
         if cm_changed or not os.path.exists(os.path.join(bdir, "CMakeCache.txt")):
+            check_toolchain()               # a clear message on a computer without the tools
             log("Configuring build workspace (first build takes a minute)…")
             cmd = ["cmake", "-S", ws, "-B", bdir]
             if glew:

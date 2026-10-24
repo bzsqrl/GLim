@@ -11,9 +11,11 @@ It accepts ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.
 ## Prerequisites (Windows)
 
 - **Python 3.10+** with the packages in `requirements.txt`: `venv\Scripts\pip install -r requirements.txt`
-- **CMake** on your PATH
+- **CMake**: on your PATH, in its default folder (`C:\Program Files\CMake`), or the one that comes with Visual Studio
 - **Visual Studio 2022+ or the Build Tools**, with the "Desktop development with C++" workload
 - An OpenGL 4.1 GPU. FFStudio compiles and test-renders every shader on your GPU before building it.
+
+**Using `FFStudio.exe` on another computer:** copy it anywhere writable (not `Program Files`: plugins go to an `output` folder next to it). It needs no Python. Everything except **Build FFGL** works as it is: preview, the output window, Spout and **Export ISF** need only an OpenGL 4.1 graphics driver (not a virtual machine or Remote Desktop). **Build FFGL** also needs Microsoft's C++ compiler: install the free [Build Tools for Visual Studio](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the "Desktop development with C++" workload (it includes CMake). Without it, the build says what's missing and where to get it. The exe isn't code-signed, so Windows may warn on first run (*More info → Run anyway*).
 
 ## Prerequisites (macOS)
 
