@@ -559,7 +559,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     def _open_selected(self):
         """Double-click, or the menu's Open in Studio: always (re)load the first selected row."""
         if self._selected_items():
-            self.tabs.set(STUDIO_TAB)
+            self._show_tab(STUDIO_TAB)
             self._enter_studio(force=True)
 
     def _on_queue_double_click(self, event):
@@ -574,9 +574,19 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.tree.focus_set()       # so arrow keys, Delete and Ctrl+A act on the queue
 
     def _toggle_tab(self, event=None):
-        self.tabs.set("Queue" if self.tabs.get() == STUDIO_TAB else STUDIO_TAB)
+        self._show_tab("Queue" if self.tabs.get() == STUDIO_TAB else STUDIO_TAB)
         self._on_tab_changed()
         return "break"
+
+    def _show_tab(self, name):
+        """Switch tabs from code as a click on the tab buttons does: hide the
+        current tab, then show the new one. tabs.set() shows the new tab under
+        the current one and hides that 100 ms later; on macOS, where Tk draws
+        every widget into one view, the uncovered Queue tab was never repainted,
+        so the window kept showing a frozen Studio tab."""
+        if name != self.tabs.get():
+            self.tabs.tab(self.tabs.get()).grid_forget()
+        self.tabs.set(name)
 
     def _playlist(self) -> list[str]:
         """What Studio's ← / → and the slideshow step through, in queue order."""
