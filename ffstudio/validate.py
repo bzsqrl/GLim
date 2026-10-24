@@ -978,7 +978,9 @@ class FrameSender:
             except ImportError as e:
                 raise RuntimeError(f"Syphon needs the syphon-python package ({e})")
             # On the current context: GLFW makes it the current NSOpenGLContext.
-            self._syphon = syphon.SyphonOpenGLServer(name)
+            # Unnamed: receivers list a Syphon server as "<app> - <name>", so the
+            # app name alone ("FFStudio") is the label, not "FFStudio - FFStudio".
+            self._syphon = syphon.SyphonOpenGLServer("")
         else:
             raise RuntimeError("Spout / Syphon output needs Windows or macOS")
         self.name = name
