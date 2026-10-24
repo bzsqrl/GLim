@@ -5,6 +5,7 @@ Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for
 - `USER_MANUAL.md`: how to use it
 - `IMPROVEMENT_PLAN.md`: architecture, status and roadmap
 - `TESTING_CHECKLIST.md`: what to check when testing builds in the VJ hosts
+- `RENAME_TO_FFSTUDIO.md`: finishing the rename from FFMaker (legacy names in the code, and renaming the local folders on Windows and the Mac)
 
 ## Layout
 
