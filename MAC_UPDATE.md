@@ -191,6 +191,8 @@ Fonts are the first one installed from a list per platform. On macOS the UI uses
 
 If a font comes out wrong (e.g. `.AppleSystemUIFont` not accepted by this Tk), change the macOS lists in `theme._UI_FAMILIES` / `theme._MONO_FAMILIES`.
 
+**Checked on the Mac (2026-10-24, M1 Max, macOS 14.8, Tk 9.1):** every row passed. A script drove the GUI from source with screenshots: the UI font is `.AppleSystemUIFont` and code / the log use Menlo (SF Mono comes only inside Terminal and Xcode, so it isn't found); Syphon and NDI turn indigo while on; Shift+Tab to Studio, then → → ← stepped the queue, → in the code box didn't, and → stepped again once the focus left it; Shift+Tab twice 40 ms apart left Studio showing, and Queue repainted on the way back. The packaged app shows the new look, passes the self-test (both senders `ok`) and `codesign --verify --deep --strict`. One Mac fix: loading a shader logged "will export as <name>.dll"; it now says `.bundle` on the Mac.
+
 ## If something fails
 
 - **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.

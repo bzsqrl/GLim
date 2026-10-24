@@ -71,6 +71,7 @@ Not yet checked inside Resolume or MadMapper.
 - **Studio parameter panel on the Mac** (`MAC_UPDATE.md` step 6, 2026-10-24): the flat Tk/ttk parameter rows and channel menus, GPU load (timer queries work on the M1 Max), the button click fixes and the output window all work on macOS with no changes.
 - **Syphon output on the Mac** (`MAC_UPDATE.md` section 9, 2026-10-24): works from source with no changes (1920×1080, right way up, 60 fps, with and without the output window, server gone when turned off). The packaged `FFStudio.app` sends to Resolume too. `compile.py` re-signs the app after PyInstaller (`seal_mac_app`), so `codesign --verify --deep --strict` passes, with the bundled `Syphon.framework` included.
 - **NDI output on the Mac** (`MAC_UPDATE.md` section 10, 2026-10-24): works with no changes, from source and from the packaged `FFStudio.app` in Resolume: 30 fps with no dropped frames, the right way up, at 1080p and 720p, alongside Syphon, with and without the output window. The app asks for Local Network access the first time.
+- **New look on the Mac** (`MAC_UPDATE.md` section 11, 2026-10-24): every check passed from source and in the packaged app. The UI uses the system font; code uses Menlo, as SF Mono isn't installed system-wide. The Studio log said "will export as <name>.dll" on the Mac too; it now names the `.bundle`.
 - **Queue Reset Status:** sets built/failed rows (or just the selected ones) back to Pending, so a queue can be converted again without reloading it.
 
 **Next:**
