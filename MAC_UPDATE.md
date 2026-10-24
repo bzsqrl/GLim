@@ -4,7 +4,7 @@ These steps bring a Mac checkout up to date with the work done on Windows, check
 
 ## The app is now FFStudio
 
-FFMaker was renamed **FFStudio**, and its **Single File** tab is now **Studio**. After the pull, `compile.py` builds `dist/FFStudio.app` (bundle id `com.ffstudio.app`), and plugins are written to `~/Documents/FFStudio/output` (plugins built earlier stay in `~/Documents/FFMaker/output`). The old `dist/FFMaker.app` and any copy in Applications can be deleted. Unchanged, so existing work keeps working: `<shader>.ffmaker.json` settings, `// ffmaker:` channel directives (`// ffstudio:` works too), plugin IDs, the `ffmaker` Python package (`python -m ffmaker`), the `~/Library/Caches/FFMaker` build workspace and the repo / folder name.
+FFMaker was renamed **FFStudio**, and its **Single File** tab is now **Studio**. After the pull, `compile.py` builds `dist/FFStudio.app` (bundle id `com.ffstudio.app`), and plugins are written to `~/Documents/FFStudio/output` (plugins built earlier stay in `~/Documents/FFMaker/output`). The old `dist/FFMaker.app` and any copy in Applications can be deleted. Unchanged, so existing work keeps working: `<shader>.ffmaker.json` settings, `// ffmaker:` channel directives (`// ffstudio:` works too), plugin IDs, the `ffmaker` Python package (`python -m ffmaker`), the `~/Library/Caches/FFMaker` build workspace and the local folder name (the GitHub repo itself is now `bzsqrl/FFStudio`; see step 1).
 
 ## Context
 
@@ -33,7 +33,10 @@ These should still be installed from the Mac port:
 
 Before pulling, check `git status`, and commit or `git stash` any local changes.
 
+The GitHub repo is now `bzsqrl/FFStudio` (renamed from `FFMaker`). GitHub redirects the old address, but point the checkout at the new one first (once):
+
 ```bash
+git remote set-url origin https://github.com/bzsqrl/FFStudio.git
 git checkout main
 git pull origin main
 git log --oneline -1

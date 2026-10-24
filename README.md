@@ -35,7 +35,7 @@ Updating an existing Windows checkout after the Mac port: see [WINDOWS_UPDATE.md
 ```
 xcode-select --install                 # Apple compilers
 brew install python@3.12 python-tk@3.12 cmake   # Homebrew: https://brew.sh
-git clone <this repo> FFMaker && cd FFMaker
+git clone https://github.com/bzsqrl/FFStudio.git && cd FFStudio
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
 venv/bin/python tests/run_corpus.py    # converts, compiles and renders every sample on this Mac's GPU
