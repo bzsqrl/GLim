@@ -25,6 +25,7 @@ def build():
             print("You can find FFStudio.exe in the 'dist' folder.")
     except subprocess.CalledProcessError as e:
         print(f"\nBuild failed with error: {e}")
+        sys.exit(1)     # so scripts that run this see the failure
 
 if __name__ == "__main__":
     build()
