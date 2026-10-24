@@ -12,7 +12,7 @@ FFMaker was renamed **FFStudio**, and its **Single File** tab is now **Studio**.
 - Settings save as `<shader>.ffstudio.json`. Existing `.ffmaker.json` files still load, and are replaced by the new name on the next save.
 - `// ffstudio:` is the channel directive in the docs and fixtures; `// ffmaker:` still works.
 - The plugin runtime class is `FFStudioPlugin` (`templates/ffgl/FFStudioPlugin.h`). Plugin IDs are unchanged.
-- **Check this on the Mac:** plugin bundles are now identified as `com.ffstudio.plugin.<name>.<id>` (they were `com.ffmaker.plugin.…`). Resolume should find plugins by their FFGL plugin ID, which hasn't changed, but before rebuilding everything, rebuild one plugin you use in a saved Resolume set, replace it in Extra Effects, and check the set still loads it. If it doesn't, change `ident` in `ffstudio/build_ffgl.py` back to `com.ffmaker.plugin.` and tell Claude.
+- Plugin bundles are now identified as `com.ffstudio.plugin.<name>.<id>` (they were `com.ffmaker.plugin.…`). **Checked on the Mac (2026-10-23):** Resolume saves FFGL plugins in a composition by their 4-character plugin ID (`uniqueTypeId`), not the bundle ID. A set saved with a `com.ffmaker` build of `bare_fractalSymetry` still loaded it, with its slider values, after the bundle was replaced by the `com.ffstudio` build. Existing plugins can be rebuilt and replaced in Extra Effects.
 
 ## Context
 
