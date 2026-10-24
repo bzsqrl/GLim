@@ -14,19 +14,23 @@ ffgl_sdk = [(os.path.join(root, f), os.path.relpath(root, '.'))
 
 if MAC:
     # Plugins link the system OpenGL framework; no GLEW needed.
-    platform_datas = []
-    platform_imports = ['OpenGL.platform.darwin']
+    # Syphon output: syphon-python loads its Syphon.framework from the package folder.
+    platform_datas = collect_data_files('syphon')
+    platform_binaries = []
+    platform_imports = ['OpenGL.platform.darwin', 'syphon']
 else:
     platform_datas = [
         ('deps/glew-2.2.0/include', 'deps/glew-2.2.0/include'),
         ('deps/glew-2.2.0/lib/Release/x64', 'deps/glew-2.2.0/lib/Release/x64'),
     ]
-    platform_imports = ['OpenGL.platform.win32']
+    # Spout output: SpoutGL's extension needs its Spout.dll beside it.
+    platform_binaries = collect_dynamic_libs('SpoutGL')
+    platform_imports = ['OpenGL.platform.win32', 'SpoutGL']
 
 a = Analysis(
     [os.path.join('src', 'main_gui.py')],
     pathex=['.', 'src'],
-    binaries=collect_dynamic_libs('glfw'),
+    binaries=collect_dynamic_libs('glfw') + platform_binaries,
     datas=collect_data_files('customtkinter') + collect_data_files('tkinterdnd2') + [
         ('templates', 'templates'),
         ('assets/icon', 'assets/icon'),          # window icons (paths.icon_dir)

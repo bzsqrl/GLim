@@ -18,6 +18,7 @@ import fast_widgets as W
 
 PREVIEW_W, PREVIEW_H = 384, 216
 SMALL_FPS_WITH_OUTPUT = 10      # small preview rate while the output window draws the full one
+SMALL_FPS_SENDING = 30          # ... and while only Spout / Syphon is (no window), as without output
 AUTO_SECONDS = 10.0             # slideshow: default time each queue shader shows
 AUTO_MIN_SECONDS = 1.0
 GPU_REFRESH_S = 0.25            # live GPU readout update interval (output open)
@@ -76,6 +77,7 @@ class EditorPanel(ctk.CTkFrame):
         self._photo = None
         self._input_image = None              # (w, h, rgba) for effect previews
         self._fs = None                       # fullscreen state, see "Fullscreen" below
+        self.sending = False                  # Spout / Syphon on (see "Spout / Syphon" below)
         # Set by the app: the queue's file paths, a function converting one for
         # preview, and on_select(path, res), which loads a converted queue file
         # into the Studio tab (the output then follows, see load()).
@@ -110,6 +112,12 @@ class EditorPanel(ctk.CTkFrame):
         self.btn_fullscreen = ctk.CTkButton(transport, text="⛶", width=36,
                                             command=toggle_command(self._toggle_fullscreen))
         self.btn_fullscreen.pack(side="left", padx=(4, 0))
+        from ffstudio import validate as V
+        self.btn_send = None                  # Spout (Windows) / Syphon (macOS): off at start
+        if V.SENDER_KIND:
+            self.btn_send = ctk.CTkButton(transport, text=V.SENDER_KIND, width=60,
+                                          command=toggle_command(self.toggle_sending))
+            self.btn_send.pack(side="left", padx=(4, 0))
         self._output_btn_colors = (self.btn_output.cget("fg_color"), self.btn_output.cget("hover_color"))
         self._output_btn_open = False
         self._fullscreen_btn_on = False
@@ -226,6 +234,9 @@ class EditorPanel(ctk.CTkFrame):
             self.log(f"Preview unavailable: {e}")
             return
         self._sync_output()
+        if self.sending and not self._fs:   # turned on before a shader was loaded
+            from ffstudio import validate as V
+            self._start_output(V.HeadlessView())
 
     def _sync_output(self):
         """The output (fullscreen or output window) always shows the shader loaded
@@ -245,7 +256,7 @@ class EditorPanel(ctk.CTkFrame):
                 view.reattach()
         except Exception as e:
             self.log(f"Output stopped: {e}")
-            self.exit_fullscreen()
+            self._stop_output(failed=True)
 
     def _close_previewer(self):
         if self.previewer:
@@ -286,13 +297,15 @@ class EditorPanel(ctk.CTkFrame):
         self.restart()
 
     # ── Fullscreen ───────────────────────────────────────────────────────────
-    # self._fs = {"view", "pv", "res", "path"} while fullscreen or the output window
-    # is open. It always shows the shader loaded in this tab (see _sync_output);
-    # Left/Right in it step through the queue (step_queue).
+    # self._fs = {"view", "pv", "res", "path", "sender"} while fullscreen or the
+    # output window is open, or Spout / Syphon is sending (then "view" may be a
+    # windowless validate.HeadlessView). It always shows the shader loaded in this
+    # tab (see _sync_output); Left/Right in it step through the queue (step_queue).
 
     def _fs_previewer(self, view, res):
         from ffstudio import validate as V
-        pv = V.Previewer(res.ir, res.ffgl_glsl, *(view.render_size() or (960, 540)))
+        size = V.SEND_SIZE if self.sending else (view.render_size() or (960, 540))
+        pv = V.Previewer(res.ir, res.ffgl_glsl, *size)
         if self._input_image:
             w, h, px = self._input_image
             pv.set_input_image(w, h, px, 0)
@@ -302,39 +315,59 @@ class EditorPanel(ctk.CTkFrame):
     def enter_fullscreen(self, windowed=False):
         """Show the preview fullscreen on FFStudio's monitor (Esc returns), or with
         windowed=True in an output window that can go fullscreen on another monitor."""
-        if self._fs or not self.previewer:
+        if (self._fs and self._fs["view"].win) or not self.previewer:
             return
         from ffstudio import validate as V
         top = self.winfo_toplevel()
         near = (top.winfo_rootx() + top.winfo_width() // 2, top.winfo_rooty() + top.winfo_height() // 2)
-        view = pv = None
         try:
             with V.gpu():
                 view = V.OutputView(near, windowed=windowed)
+                if self._fs:                # sending without a window: show its frames here too
+                    self._fs["view"] = view
+                    return
+        except Exception as e:
+            self.log(f"{'Output window' if windowed else 'Fullscreen'} unavailable: {e}")
+            return
+        self._start_output(view)
+
+    def _start_output(self, view):
+        """Start the output thread, drawing into view: a window, or a HeadlessView
+        when only Spout / Syphon is sending. False if it couldn't start."""
+        from ffstudio import validate as V
+        pv = None
+        try:
+            with V.gpu():
                 pv = self._fs_previewer(view, self.res)
                 timer = V.GpuTimer(V.context().gl)
             pv.values = self.previewer.values     # same dict: slider moves show up live
             stop = threading.Event()
             self._fs = {"view": view, "pv": pv, "res": self.res, "path": self.shader_path,
-                        "stop": stop, "error": None, "timer": timer}
+                        "stop": stop, "error": None, "timer": timer, "sender": None}
+            if self.sending:
+                self._open_sender()
+                if not self._fs:                  # it failed, with no window to keep open
+                    return False
             self._gpu_after_load()                # Live: the output's own timing from now on
             self._fs["thread"] = threading.Thread(target=self._output_loop, args=(self._fs, stop),
                                                   daemon=True)
             self._fs["thread"].start()
+            return True
         except Exception as e:
-            self.log(f"{'Output window' if windowed else 'Fullscreen'} unavailable: {e}")
+            self.log(f"{'Output' if view.win else V.SENDER_KIND} unavailable: {e}")
+            self._fs = None
             with V.gpu():
                 if pv:
                     pv.close()
-                if view:
-                    view.close()
+                view.close()
+            return False
 
     def open_output_window(self):
         """The Output button toggles the output window: the live render in its own
         window, which can be moved to another monitor and made fullscreen there
         (double-click or Ctrl+F). A second press closes it, unless it's fullscreen
         (Esc first) or plain fullscreen is showing."""
-        if not self._fs:
+        if not (self._fs and self._fs["view"].win):
             self.enter_fullscreen(windowed=True)
         elif self._fs["view"].windowed and not self._fs["view"].fullscreen:
             self.exit_fullscreen()
@@ -361,6 +394,59 @@ class EditorPanel(ctk.CTkFrame):
             from ffstudio import validate as V
             with V.window_lock():
                 self._fs["view"].escape()
+
+    # ── Spout / Syphon ───────────────────────────────────────────────────────
+    # Off at start. On, the output thread also sends each frame to other apps
+    # (validate.FrameSender, at validate.SEND_SIZE), with or without the output
+    # window: without one it renders into a validate.HeadlessView. Turned on
+    # before a shader is loaded, it starts with the next one.
+
+    def toggle_sending(self):
+        from ffstudio import validate as V
+        self._set_sending(not self.sending)
+        if not self.sending:
+            return
+        if self._fs:
+            self._open_sender()
+        elif self.previewer:
+            self._start_output(V.HeadlessView())
+        else:
+            self.log(f"{V.SENDER_KIND} is on: it starts sending when a shader is loaded.")
+
+    def _set_sending(self, on):
+        """Set the flag and the button. Off also stops the sender, and the output
+        thread when there's no window."""
+        from ffstudio import validate as V
+        self.sending = on
+        if self.btn_send:
+            fg, hover = ("#f59e0b", "#d97706") if on else self._output_btn_colors
+            self.btn_send.configure(fg_color=fg, hover_color=hover)
+        if on or not self._fs:
+            return
+        sender = self._fs["sender"]
+        if sender:
+            try:
+                with V.gpu():
+                    self._fs["sender"] = None
+                    sender.close()
+            except Exception:
+                pass
+            self.log(f"{V.SENDER_KIND} off.")
+        if not self._fs["view"].win:
+            self._stop_output()
+
+    def _open_sender(self):
+        """Start sending from the running output (main thread)."""
+        from ffstudio import validate as V
+        try:
+            with V.gpu():
+                self._fs["sender"] = V.FrameSender()
+        except Exception as e:
+            self.log(f"{V.SENDER_KIND} unavailable: {e}")
+            self._set_sending(False)
+            return
+        w, h = V.SEND_SIZE
+        self.log(f'{V.SENDER_KIND}: sending "{V.SENDER_NAME}" at {w}x{h}.')
 
     # ── Queue playlist ───────────────────────────────────────────────────────
     def step_queue(self, direction):
@@ -462,7 +548,7 @@ class EditorPanel(ctk.CTkFrame):
     def _toggle_fullscreen(self, _e=None):
         """⛶, Ctrl+F, double-click: with the output window open, toggle its
         fullscreen; otherwise open / close fullscreen on FFStudio's monitor."""
-        if self._fs:
+        if self._fs and self._fs["view"].win:
             from ffstudio import validate as V
             with V.window_lock():
                 self._fs["view"].toggle()      # plain fullscreen: marks it closed
@@ -474,26 +560,55 @@ class EditorPanel(ctk.CTkFrame):
 
     def exit_fullscreen(self):
         """Close fullscreen / the output window. (It always shows the shader loaded
-        here, so nothing needs reloading.)"""
+        here, so nothing needs reloading.) While Spout / Syphon is sending, the
+        output carries on without a window."""
+        if not (self._fs and self._fs["view"].win):
+            return
+        if not self._fs["sender"]:
+            self._stop_output()
+            return
+        from ffstudio import validate as V
+        try:
+            with V.gpu():
+                view, self._fs["view"] = self._fs["view"], V.HeadlessView()
+                view.close()
+        except Exception as e:
+            self.log(f"Output stopped: {e}")
+            self._stop_output(failed=True)
+        self._focus_app()
+
+    def _stop_output(self, failed=False):
+        """Stop the output thread: close the window, and stop sending. failed: it
+        can't go on, so Spout / Syphon turns off too (else it stays on, and sends
+        again when the next shader loads)."""
+        if failed and self.sending:
+            self._set_sending(False)
         if not self._fs:
             return
         fs, self._fs = self._fs, None
         fs["stop"].set()
-        fs["thread"].join(timeout=2)
+        if fs.get("thread"):
+            fs["thread"].join(timeout=2)
+        from ffstudio import validate as V
         try:
-            from ffstudio import validate as V
             with V.gpu():
+                if fs["sender"]:
+                    fs["sender"].close()
                 fs["timer"].close()
                 fs["pv"].close()
                 fs["view"].close()
         except Exception:
             pass
+        if not isinstance(fs["view"], V.HeadlessView):
+            self._focus_app()               # back from the output window
+        if self.res:
+            self._gpu_after_load()             # back to the 1080p measurement
+
+    def _focus_app(self):
         try:
             self.winfo_toplevel().focus_force()
         except tk.TclError:
             pass
-        if self.res:
-            self._gpu_after_load()             # back to the 1080p measurement
 
     # ── Render loop ──────────────────────────────────────────────────────────
     def _tick(self):
@@ -578,20 +693,25 @@ class EditorPanel(ctk.CTkFrame):
         """Main thread, while the output is open: its window events (GLFW requires
         the main thread for them), Left/Right, and the time readout. The small
         preview pauses meanwhile."""
+        from ffstudio import validate as V
         fs = self._fs
         if fs["error"]:
             self.log(f"Output stopped: {fs['error']}")
-            self.exit_fullscreen()
+            self._stop_output(failed=True)
             return
+        if fs.get("send_error"):
+            self.log(f"{V.SENDER_KIND} stopped: {fs.pop('send_error')}")
+            self._set_sending(False)
+            if not self._fs:
+                return
         try:
             # Window events can resize the window or switch it to fullscreen, which on
             # macOS mustn't overlap a frame being drawn on the output thread.
-            from ffstudio import validate as V
             with V.window_lock():
                 alive = fs["view"].poll()
         except Exception as e:
             self.log(f"Output stopped: {e}")
-            self.exit_fullscreen()
+            self._stop_output(failed=True)
             return
         if not alive:
             self.exit_fullscreen()
@@ -632,8 +752,10 @@ class EditorPanel(ctk.CTkFrame):
                 with V.gpu():
                     if stop.is_set():
                         break
-                    view, pv, res = fs["view"], fs["pv"], fs["res"]
-                    size = view.render_size()  # follows the window as it's resized / goes fullscreen
+                    view, pv, res, sender = fs["view"], fs["pv"], fs["res"], fs["sender"]
+                    # Spout / Syphon: a fixed size (the window shows it scaled); else the
+                    # window's, following it as it's resized / goes fullscreen.
+                    size = V.SEND_SIZE if sender else view.render_size()
                     if size:
                         if size != (pv.width, pv.height):
                             pv.resize(*size)
@@ -649,15 +771,27 @@ class EditorPanel(ctk.CTkFrame):
                             fs["timer"].end()
                             fs["gpu"] = (fs["timer"].ms, (pv.width, pv.height))
                         view.show(pv)          # vsync in the swap paces this loop
-                        if start - small_t >= 1 / SMALL_FPS_WITH_OUTPUT:
+                        if sender:
+                            try:
+                                sender.send(pv)
+                            except Exception as e:
+                                fs["send_error"] = e    # the main thread turns sending off
+                                fs["sender"] = None
+                                try:
+                                    sender.close()
+                                except Exception:
+                                    pass
+                        small_fps = SMALL_FPS_WITH_OUTPUT if view.win else SMALL_FPS_SENDING
+                        if start - small_t >= 1 / small_fps:
                             self._render_small_for_output(fs, min(start - small_t, 0.25))
                             small_t = start
             except Exception as e:
                 fs["error"] = e
                 return
             V.let_waiters_in()              # the UI may be waiting to switch shaders etc.
-            # No vsync wait (minimised / hidden window, or a macOS display where the
-            # swap doesn't block): pace to the monitor's refresh rate instead, and leave
+            # No vsync wait (minimised / hidden window, no window while only sending, or
+            # a macOS display where the swap doesn't block): pace to the monitor's
+            # refresh rate (HeadlessView: 60 fps) instead, and leave
             # the UI thread time (Python runs one thread at a time). A frame that took
             # over half a refresh already waited for vsync, so it doesn't sleep (sleep
             # overshoots, and would miss the next refresh). Sleeping toward a running

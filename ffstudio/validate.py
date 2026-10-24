@@ -921,6 +921,86 @@ class OutputView:
         self.win = None
 
 
+class HeadlessView:
+    """Stands in for an OutputView while frames are only sent to other apps
+    (FrameSender), with no window: the output loop keeps rendering without one."""
+
+    windowed = fullscreen = closed = False
+    win = None
+    nav = 0
+    refresh = 60                                   # the sending rate
+    fb_size = (0, 0)
+
+    def poll(self):
+        return True
+
+    def render_size(self):
+        return None
+
+    def reattach(self):
+        pass
+
+    def show(self, pv):
+        pass
+
+    def toggle(self):
+        pass
+
+    def escape(self):
+        pass
+
+    def close(self):
+        pass
+
+
+# Sharing frames with other apps on the same computer: Spout on Windows, Syphon
+# on macOS (Resolume, MadMapper, OBS, TouchDesigner, ... receive them).
+SENDER_KIND = {"win32": "Spout", "darwin": "Syphon"}.get(sys.platform)
+SENDER_NAME = "FFStudio"
+SEND_SIZE = (1920, 1080)
+
+
+class FrameSender:
+    """Publishes Previewer frames as a Spout sender / Syphon server, GPU to GPU.
+    Create, send and close inside gpu() (the shared validation context)."""
+
+    def __init__(self, name=SENDER_NAME):
+        if SENDER_KIND == "Spout":
+            try:
+                import SpoutGL
+            except ImportError as e:
+                raise RuntimeError(f"Spout needs the SpoutGL package ({e})")
+            self._spout = SpoutGL.SpoutSender()
+            self._spout.setSenderName(name)
+        elif SENDER_KIND == "Syphon":
+            try:
+                import syphon
+            except ImportError as e:
+                raise RuntimeError(f"Syphon needs the syphon-python package ({e})")
+            # On the current context: GLFW makes it the current NSOpenGLContext.
+            self._syphon = syphon.SyphonOpenGLServer(name)
+        else:
+            raise RuntimeError("Spout / Syphon output needs Windows or macOS")
+        self.name = name
+
+    def send(self, pv):
+        """Publish pv's last rendered frame."""
+        gl = pv.gl
+        if SENDER_KIND == "Spout":
+            # Spout frames are top-down, GL textures bottom-up: invert.
+            if not self._spout.sendTexture(pv.out_tex, gl.GL_TEXTURE_2D, pv.width, pv.height, True, 0):
+                raise RuntimeError("Spout couldn't send the frame")
+        else:
+            # Syphon frames are GL textures, the same way up.
+            self._syphon.publish_frame_texture(pv.out_tex, size=(pv.width, pv.height))
+
+    def close(self):
+        if SENDER_KIND == "Spout":
+            self._spout.releaseSender()
+        else:
+            self._syphon.stop()
+
+
 def _set_window_icon(glfw, win):
     """FFStudio's icon on the output window (title bar, taskbar). macOS windows
     have no icons; the app's Dock icon is used there."""
