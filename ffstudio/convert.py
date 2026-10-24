@@ -568,8 +568,7 @@ def _map_distinctive_names(toks, ir, aliases):
             aliases[nm] = sym
 
 
-# `ffstudio:`, or `ffmaker:` (FFStudio's former name; still accepted in existing shaders).
-_CHANNEL_DIRECTIVE = re.compile(r"//\s*@?ff(?:maker|studio)\s*:?\s*(iChannel[0-3])\s*=\s*(.+?)\s*$", re.I | re.M)
+_CHANNEL_DIRECTIVE = re.compile(r"//\s*@?ffstudio\s*:?\s*(iChannel[0-3])\s*=\s*(.+?)\s*$", re.I | re.M)
 
 
 def channel_directives(code):
