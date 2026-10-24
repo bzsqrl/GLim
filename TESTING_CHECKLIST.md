@@ -75,7 +75,7 @@ Location: `output/test_batch_v3/` (rebuild with `venv/bin/python -m ffstudio --t
 
 # Test batch v4: smooth sliders and `#define` channels
 
-Location: `output/test_batch_v4/`. Rebuild it with the command in [MAC_UPDATE.md](MAC_UPDATE.md), step 4. It has 4 FFGL plugins and the matching ISF files. Windows: all four pass FFStudio's test host. macOS: all four pass the test host, and the user confirmed them in Resolume and MadMapper (2026-10-21).
+Location: `output/test_batch_v4/`. Rebuild it with the command in [MAC_UPDATE.md](MAC_UPDATE.md), step 4. It has 4 FFGL plugins and the matching ISF files. Windows: all four pass FFStudio's test host. macOS: all four pass the test host, and the user confirmed them in Resolume and MadMapper (2026-10-21). After the rename (2026-10-23), they rebuild and pass again on macOS, and a Resolume set saved with the old `com.ffmaker.plugin.…` bundle of `bare_fractalSymetry` still loads the new `com.ffstudio.plugin.…` one.
 
 | Plugin | What to check |
 | :-- | :-- |

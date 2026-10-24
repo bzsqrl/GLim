@@ -67,6 +67,7 @@ Not yet checked inside Resolume or MadMapper.
 - **Queue rewrite** (`5a72770`, `100a29c`): a native `ttk.Treeview`, so 800+ files load in under a second. Type detection and queue ISF export run in the background. Build/Export Selected, Delete to remove, a right-click menu.
 - **Sliders multiplied by time no longer scrub in FFGL** (`2892180`): `time * slider` becomes a running total (`ffm_phaseN`, `FFM_PHASES`) that the plugin and preview keep. ISF exports keep the plain product. A hidden persistent-buffer version for ISF failed in MadMapper (several shaders blank; Speed still jumped) and was reverted.
 - **Mac sync of the Windows work** (`MAC_UPDATE.md`) passed: corpus and fixtures match the Windows results, clang built the phase C++ as is, test batch v4 passes the test host and was confirmed in Resolume and MadMapper. The queue handles 790 files on macOS (rows in 0.1 s, types in ~7 s in the background). Added Control-click for the queue menu on macOS.
+- **Rename Part 1 on the Mac** (`RENAME_TO_FFSTUDIO.md`): corpus and fixtures still match Windows, clang built `FFStudioPlugin` as is, test batch v4 passes the test host, and `FFStudio.app` passes `--selftest`. Resolume saves FFGL plugins by plugin ID (`uniqueTypeId`), so the bundle IDs' change to `com.ffstudio.plugin.…` doesn't affect saved sets (checked by swapping a `com.ffmaker` build for a `com.ffstudio` one under a saved set).
 - **Queue Reset Status:** sets built/failed rows (or just the selected ones) back to Pending, so a queue can be converted again without reloading it.
 
 **Next:**
