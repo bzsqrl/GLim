@@ -115,6 +115,8 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._gpu_cache = {}                      # GPU measurements, shared with the editor
         self._measuring = None                    # threading.Event to stop Analyze, while running
         self._sort = (None, False)                # queue sorted by (column, descending)
+        self._playlist_only = None                # Studio's ← / →: None = the whole queue, else these paths
+        self._studio_entry = None                 # (queue, selection) when the Studio tab was last entered
         self._source_stem = "FFStudioPlugin"   # for single-file tab
         self._source_path = None
         self.settings = {}                    # single-file tab: the shader's .ffstudio.json
@@ -181,7 +183,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.grid_rowconfigure(2, weight=0)
 
         # ── Tab view ── (no title row: the window title names the app)
-        self.tabs = ctk.CTkTabview(self)
+        self.tabs = ctk.CTkTabview(self, command=self._on_tab_changed)
         self.tabs.grid(row=1, column=0, padx=20, pady=(6, 8), sticky="nsew")
         self.tabs.add("Queue")
         self.tabs.add(STUDIO_TAB)
@@ -320,6 +322,11 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         mod = "Command" if sys.platform == "darwin" else "Control"
         for key in ("a", "A"):
             self.bind_all(f"<{mod}-{key}>", self._select_all_queue, add="+")
+        # Shift+Tab switches between the Queue and Studio tabs, anywhere in the
+        # window (it replaces Tk's reverse focus traversal). Text widgets (the code
+        # box, the log) stop Shift+Tab in their class binding, so it goes there too.
+        self.bind_all("<Shift-Tab>", self._toggle_tab)
+        self.bind_class("Text", "<Shift-Tab>", self._toggle_tab)
 
         # Drop-zone label (shown when empty)
         self.lbl_drop = ctk.CTkLabel(
@@ -384,7 +391,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.panes.add(self.editor, stretch="always", minsize=760)
         # ← / → (buttons, or keys in the output window) step through the queue,
         # loading each shader here; the output follows.
-        self.editor.get_playlist = lambda: [i.path for i in self._queue]
+        self.editor.get_playlist = self._playlist
         self.editor.convert_path = self._convert_for_preview
         self.editor.on_select = lambda path, res: self._load_file_path(path, res=res)
         self.editor.gpu_cache = self._gpu_cache
@@ -503,6 +510,8 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
         # If dropping while the Studio tab is active, load the first file into the editor.
         if all_files and self.tabs.get() == STUDIO_TAB:
+            if self._playlist_only is not None:     # a playlist of selected rows takes the new files too
+                self._playlist_only.update(all_files)
             self._load_file_path(all_files[0])
 
     def _remove_items(self, items: list[QueueItem]):
@@ -548,14 +557,54 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._remove_items(self._selected_items())
 
     def _open_selected(self):
-        items = self._selected_items()
-        if items:
+        """Double-click, or the menu's Open in Studio: always (re)load the first selected row."""
+        if self._selected_items():
             self.tabs.set(STUDIO_TAB)
-            self._load_file_path(items[0].path)
+            self._enter_studio(force=True)
 
     def _on_queue_double_click(self, event):
         if self.tree.identify_row(event.y):
             self._open_selected()
+
+    def _on_tab_changed(self):
+        """A click on the Queue / Studio buttons (tabs.set() doesn't call this)."""
+        if self.tabs.get() == STUDIO_TAB:
+            self._enter_studio()
+        else:
+            self.tree.focus_set()       # so arrow keys, Delete and Ctrl+A act on the queue
+
+    def _toggle_tab(self, event=None):
+        self.tabs.set("Queue" if self.tabs.get() == STUDIO_TAB else STUDIO_TAB)
+        self._on_tab_changed()
+        return "break"
+
+    def _playlist(self) -> list[str]:
+        """What Studio's ← / → and the slideshow step through, in queue order."""
+        return [i.path for i in self._queue
+                if self._playlist_only is None or i.path in self._playlist_only]
+
+    def _enter_studio(self, force=False):
+        """Going to the Studio tab loads a shader from the queue:
+        - one row selected: that row, with the whole queue as the playlist;
+        - several selected: the first of them, with only those as the playlist;
+        - none selected: the first row, with the whole queue as the playlist;
+        - an empty queue: nothing (Studio keeps what it has).
+        If the queue and its selection haven't changed since Studio was last
+        entered, it keeps the shader it's on (so Shift+Tab can peek at the queue
+        mid-playlist); force (double-click) always loads."""
+        selected = self._selected_items()
+        entry = (tuple(i.path for i in self._queue), tuple(i.path for i in selected))
+        unchanged, self._studio_entry = entry == self._studio_entry, entry
+        if unchanged and not force:
+            return
+        self._playlist_only = {i.path for i in selected} if len(selected) > 1 else None
+        if not self._queue:
+            self.editor._update_queue_label()
+            return
+        path = (selected or self._queue)[0].path
+        if force or path != self.editor.shader_path:
+            self._load_file_path(path)
+        self.editor._update_queue_label()
 
     def _select_all_queue(self, event):
         if self.tabs.get() != "Queue" or isinstance(event.widget, (tk.Text, tk.Entry, ttk.Entry)):
