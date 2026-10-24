@@ -73,7 +73,9 @@ if MAC:
         info_plist={
             'CFBundleShortVersionString': '1.0',
             'NSHighResolutionCapable': True,
-            'LSMinimumSystemVersion': '11.0',
+            # Homebrew's Python and Tcl/Tk, bundled here, are built for macOS 14:
+            # on older systems Finder should say so instead of the app crashing.
+            'LSMinimumSystemVersion': '14.0',
         },
     )
 else:

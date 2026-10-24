@@ -25,6 +25,8 @@ It accepts ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.
 
 Plugins are universal `.bundle`s that run on Apple Silicon and Intel Macs (macOS 10.15+).
 
+**Using `FFStudio.app` on another Mac:** it needs an **Apple Silicon** Mac (M1 or later; it doesn't run on Intel Macs) with **macOS 14 Sonoma or later**. It needs no Python or Homebrew: Python, Tk and the other libraries are inside the app. Everything except **Build FFGL** works as it is: preview, the output window, Syphon and **Export ISF** need only the Mac's built-in OpenGL. **Build FFGL** also needs the free **Xcode Command Line Tools** (`xcode-select --install`) and **CMake** (`brew install cmake`, or CMake.app from [cmake.org](https://cmake.org/download/) in Applications). Without CMake, the build says what's missing. The app is signed ad hoc, not with an Apple Developer ID, so a copy that came by download, AirDrop or a zip is blocked the first time: try to open it, then click *Open Anyway* in *System Settings → Privacy & Security* (on macOS 14 you can instead right-click the app and choose *Open*), or run `xattr -dr com.apple.quarantine FFStudio.app` once. Plugins and ISF exports go to `~/Documents/FFStudio/output`, so macOS asks once for access to the Documents folder.
+
 The first plugin build sets up a build workspace in `%LOCALAPPDATA%\FFStudio` (macOS: `~/Library/Caches/FFStudio`) and compiles the FFGL SDK. This takes about a minute. After that, each plugin builds in about 2 seconds.
 
 ---
