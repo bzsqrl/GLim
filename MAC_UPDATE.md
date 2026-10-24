@@ -147,7 +147,7 @@ Copy the four `.bundle` folders from `output/test_batch_v4` to `~/Documents/Reso
 
 Load the four `.fs` files from `output/test_batch_v4`. They should render like the plugins. Moving the speed and rate sliders **will still jump** the animation in MadMapper. That's expected: ISF exports keep the plain product. A hidden-buffer approach was tried and reverted, because some shaders rendered blank in MadMapper.
 
-## 9. Syphon output (new, untested on the Mac)
+## 9. Syphon output
 
 The **Spout** button on Windows is **Syphon** on macOS (next to ⛶ in the Studio tab). Turned on, it publishes the Studio tab's shader as the Syphon server "FFStudio" at 1920×1080, with or without the output window. On Windows, Spout passed every check (`validate.FrameSender`, `EditorPanel.toggle_sending`). On the Mac it needs:
 
@@ -161,6 +161,10 @@ The **Spout** button on Windows is **Syphon** on macOS (next to ⛶ in the Studi
 | Output window | Opening **⧉** while sending shows the same frames; closing it keeps sending. Turning Syphon off with the window open keeps the window. |
 | Off | Syphon off: the source disappears from the receiver. |
 | FFStudio.app | The same works in the packaged app (the spec bundles the Syphon framework via `collect_data_files('syphon')`). |
+
+**Checked on the Mac (2026-10-24, M1 Max, macOS 14.8, syphon-python 0.2.0), from source, with no code changes:** the GUI was driven by a script and a separate Syphon client received the frames. Every row above passed except the last: 1920×1080, the right way up (`is_flipped` stays False), 60 fps sent and received; sending carries on from the Queue tab, across shader switches and while the output window opens, closes and reopens; Syphon off with the window open keeps the window, and the server is gone within about 2 s. Creating the server on GLFW's context works.
+
+**FFStudio.app:** builds with the Syphon framework and passes `--selftest`, but **sending from the packaged app still needs a check in Resolume**. Known packaging flaw: PyInstaller copies `Syphon.framework` with a top-level `Modules/` folder and no resource seal, so `codesign --verify --deep --strict dist/FFStudio.app` fails. The framework still loads (the app isn't built with the hardened runtime); it only matters if the app is copied to another Mac.
 
 If creating the server fails, the log says `Syphon unavailable: …` and the button turns off. The likely spot is the context: `syphon.SyphonOpenGLServer(name)` uses the current NSOpenGLContext, which GLFW should have made current inside `gpu()`.
 
