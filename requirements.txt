@@ -5,3 +5,4 @@ PyOpenGL
 glfw
 SpoutGL; sys_platform == "win32"
 syphon-python[opengl]; sys_platform == "darwin"
+cyndilib

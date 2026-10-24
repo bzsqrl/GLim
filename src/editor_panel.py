@@ -18,7 +18,7 @@ import fast_widgets as W
 
 PREVIEW_W, PREVIEW_H = 384, 216
 SMALL_FPS_WITH_OUTPUT = 10      # small preview rate while the output window draws the full one
-SMALL_FPS_SENDING = 30          # ... and while only Spout / Syphon is (no window), as without output
+SMALL_FPS_SENDING = 30          # ... and while only Spout / Syphon / NDI is (no window), as without output
 AUTO_SECONDS = 10.0             # slideshow: default time each queue shader shows
 AUTO_MIN_SECONDS = 1.0
 GPU_REFRESH_S = 0.25            # live GPU readout update interval (output open)
@@ -28,6 +28,11 @@ LOAD_COLOURS = ("#22c55e", "#f59e0b", "#ef4444")   # GPU load: light / heavy / o
 CHANNEL_CHOICES = ["input", "noise", "audio", "none", "file…"]
 FILTER_CHOICES = ["filter", "nearest", "linear", "mipmap"]   # first entry = Shadertoy default
 WRAP_CHOICES = ["wrap", "clamp", "repeat"]
+
+
+def _largest(sizes):
+    """The (w, h) with the most pixels."""
+    return max(sizes, key=lambda s: s[0] * s[1])
 
 
 def gpu_cache_key(res, values=None):
@@ -77,7 +82,10 @@ class EditorPanel(ctk.CTkFrame):
         self._photo = None
         self._input_image = None              # (w, h, rgba) for effect previews
         self._fs = None                       # fullscreen state, see "Fullscreen" below
-        self.sending = False                  # Spout / Syphon on (see "Spout / Syphon" below)
+        # Sending to other apps, by kind: "spout" (Spout / Syphon) and "ndi". See
+        # "Spout / Syphon / NDI" below.
+        self.send_on = {"spout": False, "ndi": False}
+        self.ndi_size = "1080p"               # a key of validate.NDI_SIZES
         # Set by the app: the queue's file paths, a function converting one for
         # preview, and on_select(path, res), which loads a converted queue file
         # into the Studio tab (the output then follows, see load()).
@@ -112,12 +120,6 @@ class EditorPanel(ctk.CTkFrame):
         self.btn_fullscreen = ctk.CTkButton(transport, text="⛶", width=36,
                                             command=toggle_command(self._toggle_fullscreen))
         self.btn_fullscreen.pack(side="left", padx=(4, 0))
-        from ffstudio import validate as V
-        self.btn_send = None                  # Spout (Windows) / Syphon (macOS): off at start
-        if V.SENDER_KIND:
-            self.btn_send = ctk.CTkButton(transport, text=V.SENDER_KIND, width=60,
-                                          command=toggle_command(self.toggle_sending))
-            self.btn_send.pack(side="left", padx=(4, 0))
         self._output_btn_colors = (self.btn_output.cget("fg_color"), self.btn_output.cget("hover_color"))
         self._output_btn_open = False
         self._fullscreen_btn_on = False
@@ -131,6 +133,29 @@ class EditorPanel(ctk.CTkFrame):
             top.bind(f"<{mod}-{key}>", self._toggle_fullscreen, add="+")
         self.lbl_time = ctk.CTkLabel(transport, text="", width=70, anchor="w", text_color="#9ca3af")
         self.lbl_time.pack(side="left", padx=4)
+        # Sending to other apps (see "Spout / Syphon / NDI" below): all off at start.
+        from ffstudio import validate as V
+        send_row = ctk.CTkFrame(left, fg_color="transparent")
+        send_row.pack(fill="x", padx=8, pady=(4, 0))
+        self.send_buttons = {}
+        if V.SENDER_KIND:
+            self.send_buttons["spout"] = ctk.CTkButton(
+                send_row, text=self._send_label("spout"), width=60,
+                command=toggle_command(lambda: self.toggle_sending("spout")))
+            self.send_buttons["spout"].pack(side="left", padx=(0, 12))
+        # NDI and its size menu share an outline, apart from Spout / Syphon: the
+        # size is NDI's alone (Spout / Syphon always send 1920x1080).
+        ndi_group = ctk.CTkFrame(send_row, fg_color="transparent", border_width=1,
+                                 border_color="#4b5563", corner_radius=8)
+        ndi_group.pack(side="left")
+        self.send_buttons["ndi"] = ctk.CTkButton(
+            ndi_group, text=self._send_label("ndi"), width=50,
+            command=toggle_command(lambda: self.toggle_sending("ndi")))
+        self.send_buttons["ndi"].pack(side="left", padx=(3, 2), pady=3)
+        self.ndi_size_menu = ctk.CTkOptionMenu(ndi_group, values=list(V.NDI_SIZES), width=80,
+                                               command=self._ndi_size_choice)
+        self.ndi_size_menu.set(self.ndi_size)
+        self.ndi_size_menu.pack(side="left", padx=(0, 3), pady=3)
         self.input_menu = ctk.CTkOptionMenu(transport, values=["Test pattern", "Load image…"],
                                             width=130, command=self._input_choice)
         self.input_menu.pack(side="right")
@@ -234,7 +259,7 @@ class EditorPanel(ctk.CTkFrame):
             self.log(f"Preview unavailable: {e}")
             return
         self._sync_output()
-        if self.sending and not self._fs:   # turned on before a shader was loaded
+        if any(self.send_on.values()) and not self._fs:   # turned on before a shader was loaded
             from ffstudio import validate as V
             self._start_output(V.HeadlessView())
 
@@ -297,14 +322,15 @@ class EditorPanel(ctk.CTkFrame):
         self.restart()
 
     # ── Fullscreen ───────────────────────────────────────────────────────────
-    # self._fs = {"view", "pv", "res", "path", "sender"} while fullscreen or the
-    # output window is open, or Spout / Syphon is sending (then "view" may be a
-    # windowless validate.HeadlessView). It always shows the shader loaded in this
+    # self._fs = {"view", "pv", "res", "path", "senders"} while fullscreen or the
+    # output window is open, or Spout / Syphon / NDI is sending (then "view" may be
+    # a windowless validate.HeadlessView). It always shows the shader loaded in this
     # tab (see _sync_output); Left/Right in it step through the queue (step_queue).
 
     def _fs_previewer(self, view, res):
         from ffstudio import validate as V
-        size = V.SEND_SIZE if self.sending else (view.render_size() or (960, 540))
+        sizes = [self._send_size(k) for k, on in self.send_on.items() if on]
+        size = _largest(sizes) if sizes else (view.render_size() or (960, 540))
         pv = V.Previewer(res.ir, res.ffgl_glsl, *size)
         if self._input_image:
             w, h, px = self._input_image
@@ -333,7 +359,7 @@ class EditorPanel(ctk.CTkFrame):
 
     def _start_output(self, view):
         """Start the output thread, drawing into view: a window, or a HeadlessView
-        when only Spout / Syphon is sending. False if it couldn't start."""
+        when only Spout / Syphon / NDI is sending. False if it couldn't start."""
         from ffstudio import validate as V
         pv = None
         try:
@@ -343,9 +369,9 @@ class EditorPanel(ctk.CTkFrame):
             pv.values = self.previewer.values     # same dict: slider moves show up live
             stop = threading.Event()
             self._fs = {"view": view, "pv": pv, "res": self.res, "path": self.shader_path,
-                        "stop": stop, "error": None, "timer": timer, "sender": None}
-            if self.sending:
-                self._open_sender()
+                        "stop": stop, "error": None, "timer": timer, "senders": {}}
+            for kind in [k for k, on in self.send_on.items() if on]:
+                self._open_sender(kind)
                 if not self._fs:                  # it failed, with no window to keep open
                     return False
             self._gpu_after_load()                # Live: the output's own timing from now on
@@ -354,7 +380,7 @@ class EditorPanel(ctk.CTkFrame):
             self._fs["thread"].start()
             return True
         except Exception as e:
-            self.log(f"{'Output' if view.win else V.SENDER_KIND} unavailable: {e}")
+            self.log(f"Output unavailable: {e}")
             self._fs = None
             with V.gpu():
                 if pv:
@@ -395,58 +421,91 @@ class EditorPanel(ctk.CTkFrame):
             with V.window_lock():
                 self._fs["view"].escape()
 
-    # ── Spout / Syphon ───────────────────────────────────────────────────────
-    # Off at start. On, the output thread also sends each frame to other apps
-    # (validate.FrameSender, at validate.SEND_SIZE), with or without the output
-    # window: without one it renders into a validate.HeadlessView. Turned on
-    # before a shader is loaded, it starts with the next one.
+    # ── Spout / Syphon / NDI ─────────────────────────────────────────────────
+    # All off at start; each has its own button. On, the output thread also sends
+    # its frames to other apps: "spout" (validate.FrameSender: Spout on Windows,
+    # Syphon on macOS, at validate.SEND_SIZE, every frame) and "ndi"
+    # (validate.NdiSender, at the size chosen beside it, 30 fps). It renders at the
+    # largest size they need, with or without the output window (which then shows
+    # those frames, scaled); without one it renders into a validate.HeadlessView,
+    # at the fastest sender's rate. Turned on before a shader is loaded, sending
+    # starts with the next one.
 
-    def toggle_sending(self):
+    def _send_label(self, kind):
         from ffstudio import validate as V
-        self._set_sending(not self.sending)
-        if not self.sending:
+        return V.SENDER_KIND if kind == "spout" else "NDI"
+
+    def _send_size(self, kind):
+        from ffstudio import validate as V
+        return V.SEND_SIZE if kind == "spout" else V.NDI_SIZES[self.ndi_size]
+
+    def toggle_sending(self, kind="spout"):
+        from ffstudio import validate as V
+        self._set_sending(kind, not self.send_on[kind])
+        if not self.send_on[kind]:
             return
         if self._fs:
-            self._open_sender()
+            self._open_sender(kind)
         elif self.previewer:
             self._start_output(V.HeadlessView())
         else:
-            self.log(f"{V.SENDER_KIND} is on: it starts sending when a shader is loaded.")
+            self.log(f"{self._send_label(kind)} is on: it starts sending when a shader is loaded.")
 
-    def _set_sending(self, on):
-        """Set the flag and the button. Off also stops the sender, and the output
-        thread when there's no window."""
-        from ffstudio import validate as V
-        self.sending = on
-        if self.btn_send:
-            fg, hover = ("#f59e0b", "#d97706") if on else self._output_btn_colors
-            self.btn_send.configure(fg_color=fg, hover_color=hover)
+    def _set_sending(self, kind, on):
+        """Set the flag and the button. Off also stops that sender, and the output
+        thread when nothing else uses it (no window, no other sender)."""
+        self.send_on[kind] = on
+        self._show_send_state(kind)
         if on or not self._fs:
             return
-        sender = self._fs["sender"]
-        if sender:
-            try:
-                with V.gpu():
-                    self._fs["sender"] = None
-                    sender.close()
-            except Exception:
-                pass
-            self.log(f"{V.SENDER_KIND} off.")
-        if not self._fs["view"].win:
+        if self._close_sender(kind):
+            self.log(f"{self._send_label(kind)} off.")
+        if not self._fs["view"].win and not self._fs["senders"]:
             self._stop_output()
 
-    def _open_sender(self):
+    def _show_send_state(self, kind):
+        btn = self.send_buttons.get(kind)
+        if btn:
+            fg, hover = ("#f59e0b", "#d97706") if self.send_on[kind] else self._output_btn_colors
+            btn.configure(fg_color=fg, hover_color=hover)
+
+    def _close_sender(self, kind):
+        """Stop one sender on the running output. True if there was one."""
+        from ffstudio import validate as V
+        sender = self._fs["senders"].get(kind)
+        if not sender:
+            return False
+        try:
+            with V.gpu():
+                self._fs["senders"].pop(kind, None)
+                sender.close()
+        except Exception:
+            pass
+        return True
+
+    def _open_sender(self, kind):
         """Start sending from the running output (main thread)."""
         from ffstudio import validate as V
         try:
             with V.gpu():
-                self._fs["sender"] = V.FrameSender()
+                if kind == "spout":
+                    sender = V.FrameSender()
+                else:
+                    sender = V.NdiSender(V.NDI_SIZES[self.ndi_size])
+                self._fs["senders"][kind] = sender
         except Exception as e:
-            self.log(f"{V.SENDER_KIND} unavailable: {e}")
-            self._set_sending(False)
+            self.log(f"{self._send_label(kind)} unavailable: {e}")
+            self._set_sending(kind, False)
             return
-        w, h = V.SEND_SIZE
-        self.log(f'{V.SENDER_KIND}: sending "{V.SENDER_NAME}" at {w}x{h}.')
+        w, h = sender.size
+        self.log(f'{self._send_label(kind)}: sending "{V.SENDER_NAME}" at {w}x{h}, {sender.fps} fps.')
+
+    def _ndi_size_choice(self, choice):
+        """The NDI size menu: a running NDI sender restarts at the new size."""
+        self.ndi_size = choice
+        if self._fs and "ndi" in self._fs["senders"]:
+            self._close_sender("ndi")
+            self._open_sender("ndi")
 
     # ── Queue playlist ───────────────────────────────────────────────────────
     def step_queue(self, direction):
@@ -560,11 +619,11 @@ class EditorPanel(ctk.CTkFrame):
 
     def exit_fullscreen(self):
         """Close fullscreen / the output window. (It always shows the shader loaded
-        here, so nothing needs reloading.) While Spout / Syphon is sending, the
-        output carries on without a window."""
+        here, so nothing needs reloading.) While Spout / Syphon / NDI is sending,
+        the output carries on without a window."""
         if not (self._fs and self._fs["view"].win):
             return
-        if not self._fs["sender"]:
+        if not self._fs["senders"]:
             self._stop_output()
             return
         from ffstudio import validate as V
@@ -579,10 +638,12 @@ class EditorPanel(ctk.CTkFrame):
 
     def _stop_output(self, failed=False):
         """Stop the output thread: close the window, and stop sending. failed: it
-        can't go on, so Spout / Syphon turns off too (else it stays on, and sends
-        again when the next shader loads)."""
-        if failed and self.sending:
-            self._set_sending(False)
+        can't go on, so Spout / Syphon / NDI turn off too (else they stay on, and
+        send again when the next shader loads)."""
+        if failed:
+            for kind in self.send_on:
+                self.send_on[kind] = False
+                self._show_send_state(kind)
         if not self._fs:
             return
         fs, self._fs = self._fs, None
@@ -592,8 +653,8 @@ class EditorPanel(ctk.CTkFrame):
         from ffstudio import validate as V
         try:
             with V.gpu():
-                if fs["sender"]:
-                    fs["sender"].close()
+                for sender in fs["senders"].values():
+                    sender.close()
                 fs["timer"].close()
                 fs["pv"].close()
                 fs["view"].close()
@@ -699,9 +760,10 @@ class EditorPanel(ctk.CTkFrame):
             self.log(f"Output stopped: {fs['error']}")
             self._stop_output(failed=True)
             return
-        if fs.get("send_error"):
-            self.log(f"{V.SENDER_KIND} stopped: {fs.pop('send_error')}")
-            self._set_sending(False)
+        while fs.get("send_errors"):              # the loop already dropped the sender
+            kind, e = fs["send_errors"].pop()
+            self.log(f"{self._send_label(kind)} stopped: {e}")
+            self._set_sending(kind, False)
             if not self._fs:
                 return
         try:
@@ -752,10 +814,11 @@ class EditorPanel(ctk.CTkFrame):
                 with V.gpu():
                     if stop.is_set():
                         break
-                    view, pv, res, sender = fs["view"], fs["pv"], fs["res"], fs["sender"]
-                    # Spout / Syphon: a fixed size (the window shows it scaled); else the
-                    # window's, following it as it's resized / goes fullscreen.
-                    size = V.SEND_SIZE if sender else view.render_size()
+                    view, pv, res, senders = fs["view"], fs["pv"], fs["res"], fs["senders"]
+                    # Sending: the largest size a sender needs (the window shows it
+                    # scaled); else the window's, following it as it's resized / goes
+                    # fullscreen.
+                    size = _largest([s.size for s in senders.values()]) if senders else view.render_size()
                     if size:
                         if size != (pv.width, pv.height):
                             pv.resize(*size)
@@ -771,12 +834,13 @@ class EditorPanel(ctk.CTkFrame):
                             fs["timer"].end()
                             fs["gpu"] = (fs["timer"].ms, (pv.width, pv.height))
                         view.show(pv)          # vsync in the swap paces this loop
-                        if sender:
+                        for kind, sender in list(senders.items()):
                             try:
                                 sender.send(pv)
                             except Exception as e:
-                                fs["send_error"] = e    # the main thread turns sending off
-                                fs["sender"] = None
+                                # The main thread turns it off (see _tick_output).
+                                fs.setdefault("send_errors", []).append((kind, e))
+                                del senders[kind]
                                 try:
                                     sender.close()
                                 except Exception:
@@ -791,12 +855,15 @@ class EditorPanel(ctk.CTkFrame):
             V.let_waiters_in()              # the UI may be waiting to switch shaders etc.
             # No vsync wait (minimised / hidden window, no window while only sending, or
             # a macOS display where the swap doesn't block): pace to the monitor's
-            # refresh rate (HeadlessView: 60 fps) instead, and leave
+            # refresh rate instead (no window: the fastest sender's rate, e.g. 30 fps
+            # for NDI alone), and leave
             # the UI thread time (Python runs one thread at a time). A frame that took
             # over half a refresh already waited for vsync, so it doesn't sleep (sleep
             # overshoots, and would miss the next refresh). Sleeping toward a running
             # deadline keeps those overshoots from adding up.
-            frame = 1 / fs["view"].refresh
+            view = fs["view"]
+            rates = [s.fps for s in list(fs["senders"].values())]   # a copy: the UI may change it
+            frame = 1 / (view.refresh if view.win or not rates else max(rates))
             now = time.perf_counter()
             if not size:
                 time.sleep(0.05)

@@ -3,9 +3,18 @@
 #              venv/bin/python compile.py       (macOS: dist/FFStudio.app)
 import os
 import sys
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
 MAC = sys.platform == 'darwin'
+
+# NDI output (Windows and macOS): cyndilib bundles the NDI runtime. Only the main
+# library is needed (not its DirectShow / UWP variants), plus the NDI licence
+# files, which must ship with it. Its compiled modules import each other, which
+# PyInstaller can't see, hence collect_submodules.
+ndi_binaries = [b for b in collect_dynamic_libs('cyndilib')
+                if not any(v in os.path.basename(b[0]) for v in ('DirectShow', 'UWP'))]
+ndi_datas = collect_data_files('cyndilib', includes=['**/*icenses*.txt'])
+ndi_imports = collect_submodules('cyndilib') + collect_submodules('pugixml_cython')
 
 ffgl_sdk = [(os.path.join(root, f), os.path.relpath(root, '.'))
             for root, dirs, files in os.walk(os.path.join('boilerplates', 'ffgl'))
@@ -30,16 +39,16 @@ else:
 a = Analysis(
     [os.path.join('src', 'main_gui.py')],
     pathex=['.', 'src'],
-    binaries=collect_dynamic_libs('glfw') + platform_binaries,
+    binaries=collect_dynamic_libs('glfw') + platform_binaries + ndi_binaries,
     datas=collect_data_files('customtkinter') + collect_data_files('tkinterdnd2') + [
         ('templates', 'templates'),
         ('assets/icon', 'assets/icon'),          # window icons (paths.icon_dir)
-    ] + platform_datas + ffgl_sdk,
-    hiddenimports=['ffstudio', 'glfw', 'OpenGL.GL'] + platform_imports,
+    ] + platform_datas + ndi_datas + ffgl_sdk,
+    hiddenimports=['ffstudio', 'glfw', 'OpenGL.GL'] + platform_imports + ndi_imports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['numpy'],
+    excludes=[],                                 # numpy: cyndilib (NDI) needs it
     noarchive=False,
     optimize=0,
 )
@@ -76,6 +85,11 @@ if MAC:
             # Homebrew's Python and Tcl/Tk, bundled here, are built for macOS 14:
             # on older systems Finder should say so instead of the app crashing.
             'LSMinimumSystemVersion': '14.0',
+            # NDI finds and announces sources on the local network (Bonjour), which
+            # macOS only allows once the user grants Local Network access.
+            'NSLocalNetworkUsageDescription':
+                'FFStudio sends its output over NDI to other apps and computers on your network.',
+            'NSBonjourServices': ['_ndi._tcp'],
         },
     )
 else:

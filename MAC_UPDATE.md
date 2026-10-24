@@ -153,6 +153,22 @@ The **Spout** button on Windows is **Syphon** on macOS (next to ⛶ in the Studi
 
 If creating the server fails, the log says `Syphon unavailable: …` and the button turns off. The likely spot is the context: `syphon.SyphonOpenGLServer(name)` uses the current NSOpenGLContext, which GLFW should have made current inside `gpu()`.
 
+## 10. NDI output (new, untested on the Mac)
+
+The Studio tab's controls for sending now sit in a **Send** row under the preview: **Syphon**, **NDI**, and the NDI size menu (**1080p** / **720p**). NDI sends the shader as "<Mac name> (FFStudio)" at 30 fps over the network (`validate.NdiSender`: the frame is flipped and scaled on the GPU, read back asynchronously through two pixel buffers, and sent with cyndilib). On Windows every check passed (30 fps, no dropped frames, the right way up, at both sizes, alongside Spout, with and without the output window); the Mac needs:
+
+1. `venv/bin/pip install -r requirements.txt` (adds `cyndilib`, which bundles the NDI runtime, and numpy).
+2. From source: load a shader, click **NDI** (amber; the log says `NDI: sending "FFStudio" at 1920x1080, 30 fps.`). Receive it in Resolume (**Sources → NDI**) or NDI Video Monitor.
+
+| Check | What should happen |
+|---|---|
+| Picture | The shader, the right way up, moving smoothly, at 1920×1080; **720p** in the menu switches it to 1280×720 while sending. |
+| With Syphon | Both on: both receivers get the shader (Syphon at 60 fps, NDI at 30). Turning one off leaves the other. |
+| No window | It keeps sending on the Queue tab and across shader switches, and with the output window opened and closed. |
+| Off | The NDI source disappears from the receiver. |
+| Self-test | `FFStudio --selftest <shader> <dir>` writes `sender Syphon: ok` and `sender NDI: ok` to `selftest.log`. |
+| FFStudio.app | The same works in the packaged app. The first time, macOS asks for **Local Network** access (the spec's `NSLocalNetworkUsageDescription` / `NSBonjourServices`); allow it. If NDI sends from source but not from the app, that permission is the first suspect (System Settings → Privacy & Security → Local Network). `compile.py`'s signing step must still verify with cyndilib's `libndi` included. |
+
 ## If something fails
 
 - **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.

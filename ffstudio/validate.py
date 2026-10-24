@@ -923,12 +923,13 @@ class OutputView:
 
 class HeadlessView:
     """Stands in for an OutputView while frames are only sent to other apps
-    (FrameSender), with no window: the output loop keeps rendering without one."""
+    (FrameSender, NdiSender), with no window: the output loop keeps rendering
+    without one, at the fastest sender's rate."""
 
     windowed = fullscreen = closed = False
     win = None
     nav = 0
-    refresh = 60                                   # the sending rate
+    refresh = 60
     fb_size = (0, 0)
 
     def poll(self):
@@ -963,6 +964,9 @@ SEND_SIZE = (1920, 1080)
 class FrameSender:
     """Publishes Previewer frames as a Spout sender / Syphon server, GPU to GPU.
     Create, send and close inside gpu() (the shared validation context)."""
+
+    size = SEND_SIZE
+    fps = 60                                       # every frame the output loop draws
 
     def __init__(self, name=SENDER_NAME):
         if SENDER_KIND == "Spout":
@@ -1001,6 +1005,97 @@ class FrameSender:
             self._spout.releaseSender()
         else:
             self._syphon.stop()
+
+
+# NDI: network video (other computers too), on Windows and macOS. NDI® is a
+# registered trademark of Vizrt NDI AB.
+NDI_SIZES = {"1080p": (1920, 1080), "720p": (1280, 720)}
+NDI_FPS = 30
+
+
+class NdiSender:
+    """Publishes Previewer frames as the NDI source "<computer> (FFStudio)", at
+    NDI_FPS. NDI takes CPU memory, so each sent frame is flipped (NDI images are
+    top-down) and scaled on the GPU into the sender's own buffer, then read back
+    asynchronously into one of two pixel-pack buffers; the frame read back last
+    time is sent, so a send doesn't wait for the GPU. Frames in between are
+    skipped (the output loop draws at up to 60 fps). Create, send and close
+    inside gpu()."""
+
+    def __init__(self, size=NDI_SIZES["1080p"], name=SENDER_NAME, fps=NDI_FPS):
+        try:
+            from cyndilib.sender import Sender
+            from cyndilib.video_frame import VideoSendFrame
+            from cyndilib.wrapper.ndi_structs import FourCC
+        except ImportError as e:
+            raise RuntimeError(f"NDI needs the cyndilib package ({e})")
+        from fractions import Fraction
+        ctx = context()
+        gl = self.gl = ctx.gl
+        self.size, self.fps, self.name = tuple(size), fps, name
+        w, h = self.size
+        vf = VideoSendFrame()
+        vf.set_resolution(w, h)
+        vf.set_fourcc(FourCC.RGBA)
+        vf.set_frame_rate(Fraction(fps, 1))
+        # clock_video=False: the output loop does the pacing; sending never blocks it.
+        self._ndi = Sender(name, clock_video=False)
+        self._ndi.set_video_frame(vf)
+        self._ndi.open()
+        self._tex = ctx._texture(w, h, None)
+        self._fbo = gl.glGenFramebuffers(1)
+        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, self._fbo)
+        gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, self._tex, 0)
+        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, 0)
+        self._nbytes = w * h * 4
+        self._pbos = [int(b) for b in gl.glGenBuffers(2)]
+        for b in self._pbos:
+            gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, b)
+            gl.glBufferData(gl.GL_PIXEL_PACK_BUFFER, self._nbytes, None, gl.GL_STREAM_READ)
+        gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, 0)
+        self._next = 0                             # the buffer the next read-back goes into
+        self._pending = None                       # the buffer holding a read-back not yet sent
+        self._due = None                           # when the next frame is due
+
+    def send(self, pv):
+        """Called for every frame drawn; sends one every 1 / fps seconds."""
+        import time
+        import numpy as np
+        now = time.perf_counter()
+        interval = 1.0 / self.fps
+        # A frame a little early still counts (the loop's frames don't line up exactly).
+        if self._due is not None and now < self._due - interval / 4:
+            return
+        self._due = max(self._due + interval, now - interval) if self._due else now + interval
+        gl = self.gl
+        if self._pending is not None:              # read back a frame ago: it has arrived
+            gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, self._pbos[self._pending])
+            ptr = gl.glMapBufferRange(gl.GL_PIXEL_PACK_BUFFER, 0, self._nbytes, gl.GL_MAP_READ_BIT)
+            try:
+                if not ptr:
+                    raise RuntimeError("couldn't read the frame back from the GPU")
+                data = np.ctypeslib.as_array((ctypes.c_ubyte * self._nbytes).from_address(int(ptr)))
+                self._ndi.write_video_async(data)  # copies it into cyndilib's own buffer
+            finally:
+                gl.glUnmapBuffer(gl.GL_PIXEL_PACK_BUFFER)
+                gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, 0)
+        w, h = self.size
+        gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, pv.out_fbo)
+        gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, self._fbo)
+        gl.glBlitFramebuffer(0, 0, pv.width, pv.height, 0, h, w, 0, gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
+        gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, self._fbo)
+        gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, self._pbos[self._next])
+        gl.glReadPixels(0, 0, w, h, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, ctypes.c_void_p(0))
+        gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, 0)
+        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, 0)
+        self._pending, self._next = self._next, 1 - self._next
+
+    def close(self):
+        gl = self.gl
+        self._ndi.close()
+        gl.glDeleteBuffers(2, self._pbos)
+        gl.glDeleteFramebuffers(1, [self._fbo])
+        gl.glDeleteTextures([self._tex])
 
 
 def _set_window_icon(glfw, win):
