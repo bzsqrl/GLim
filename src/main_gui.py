@@ -17,6 +17,7 @@ from ffstudio import settings as ffsettings                             # noqa: 
 from editor_panel import EditorPanel, gpu_cache_key, toggle_command    # noqa: E402
 import ctk_fixes                                                       # noqa: E402
 import theme as T                                                      # noqa: E402
+from osc_remote import OscRemote                                       # noqa: E402
 
 ctk_fixes.apply()       # before any widget exists: buttons that ignored some clicks
 
@@ -147,6 +148,8 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.after(10, lambda: T.colour_title_bar(self))
 
         self._build_layout()
+        # OSC remote control of the Studio tab (e.g. TouchOSC): always on.
+        self.osc = OscRemote(self, self.editor, self.log)
         self._set_icon()
         if isinstance(self, ctk.CTk):        # CTk puts its own icon back shortly after start
             self.after(300, self._set_icon)
@@ -1146,6 +1149,12 @@ def _selftest(shader, out_dir):
             lines.append(f"sender {kind}: ok")
         except Exception as e:
             lines.append(f"sender {kind}: {e}")
+    try:                                # OSC remote control: the library loads, a port opens
+        from pythonosc import dispatcher, osc_server
+        osc_server.BlockingOSCUDPServer(("127.0.0.1", 0), dispatcher.Dispatcher()).server_close()
+        lines.append("osc: ok")
+    except Exception as e:
+        lines.append(f"osc: {e}")
     with open(os.path.join(out_dir, "selftest.log"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 

@@ -88,7 +88,8 @@ if MAC:
             # NDI finds and announces sources on the local network (Bonjour), which
             # macOS only allows once the user grants Local Network access.
             'NSLocalNetworkUsageDescription':
-                'FFStudio sends its output over NDI to other apps and computers on your network.',
+                'FFStudio sends its output over NDI to other apps and computers on your network, '
+                'and can be remote-controlled from them (OSC, e.g. TouchOSC).',
             'NSBonjourServices': ['_ndi._tcp'],
         },
     )

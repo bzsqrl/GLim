@@ -193,6 +193,22 @@ If a font comes out wrong (e.g. `.AppleSystemUIFont` not accepted by this Tk), c
 
 **Checked on the Mac (2026-10-24, M1 Max, macOS 14.8, Tk 9.1):** every row passed. A script drove the GUI from source with screenshots: the UI font is `.AppleSystemUIFont` and code / the log use Menlo (SF Mono comes only inside Terminal and Xcode, so it isn't found); Syphon and NDI turn indigo while on; Shift+Tab to Studio, then → → ← stepped the queue, → in the code box didn't, and → stepped again once the focus left it; Shift+Tab twice 40 ms apart left Studio showing, and Queue repainted on the way back. The packaged app shows the new look, passes the self-test (both senders `ok`) and `codesign --verify --deep --strict`. One Mac fix: loading a shader logged "will export as <name>.dll"; it now says `.bundle` on the Mac.
 
+## 12. OSC remote control (TouchOSC)
+
+FFStudio now listens for OSC on UDP port 8000 and sends feedback to port 8001 (`src/osc_remote.py`, always on; the USER_MANUAL's *Remote control* section has the addresses). TouchOSC layouts are in `touchosc/` (`tools/build_touchosc.py` makes them). It needs python-osc:
+
+1. `venv/bin/pip install -r requirements.txt` (adds `python-osc`).
+2. Start FFStudio from source: the log says `OSC remote control: <address>, port 8000 (feedback to port 8001).`
+3. In TouchOSC (on the Mac, an iPad or a phone), set connection 10 to UDP, host = the Mac's address (`127.0.0.1` on the Mac itself), send port 8000, receive port 8001, and open `touchosc/FFStudio_desktop.tosc` or `FFStudio_phone.tosc`.
+
+| Check | What should happen |
+|---|---|
+| Connection | The layout's status line says **connected: FFStudio on <Mac name>**. |
+| Transport | PLAY / RESTART / PREV / NEXT and the slideshow (AUTO, - / +) work and light up as in FFStudio. |
+| Output | OUTPUT WINDOW and FULLSCREEN open and close them; the **Syphon** button (its label says Syphon on macOS) and NDI turn sending on and off. |
+| Parameters | The shader's parameter names, values and faders appear; moving a fader moves the Studio tab's slider, and the other way round; switching shaders refills them. |
+| FFStudio.app | The same in the packaged app. macOS asks for Local Network access the first time (the spec's `NSLocalNetworkUsageDescription` now mentions remote control): allow it, or a phone can't reach the app. `--selftest` writes `osc: ok`. |
+
 ## If something fails
 
 - **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.
