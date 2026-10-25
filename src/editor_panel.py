@@ -62,6 +62,20 @@ def toggle_command(command):
     return run
 
 
+class RemoteControl:
+    """One value of the loaded shader's parameters, for remote control
+    (osc_remote.py): a slider, a switch, a trigger, a choice, or one channel of
+    a colour or a point. get() / set() use the parameter's own units (an index
+    for a choice); set() moves the widget too, as if it had been used."""
+
+    def __init__(self, name, kind, get, set, bounds=lambda: (0.0, 1.0), options=()):
+        self.name = name            # function: the label shown for it
+        self.kind = kind            # range | int | toggle | trigger | choice
+        self.get, self.set = get, set
+        self.bounds = bounds        # function: (min, max), which the user can change
+        self.options = options      # choice: the option labels
+
+
 def _tk_bg(widget):
     """The colour a CustomTkinter frame actually shows (for plain Tk children)."""
     return tk.Frame.cget(widget, "bg")
@@ -99,6 +113,7 @@ class EditorPanel(ctk.CTkFrame):
         self._bench_gen = 0                 # bumped to cancel a running measurement
         self._gpu_shown = 0.0
         self.gpu_live = False               # Live: time the preview (at 1080p) or the output, continuously
+        self._remote = []                   # RemoteControl per parameter value (remote_controls)
         self._live_visible = False          # main thread → Live's measuring thread: the preview is showing
 
         # Two columns: preview + channels on the left, parameters on the right.
@@ -607,6 +622,74 @@ class EditorPanel(ctk.CTkFrame):
             text += f" · next in {left}s" if self.playing else " · paused"
         if text != self.lbl_queue.cget("text"):
             self.lbl_queue.configure(text=text)
+
+    # ── Remote control ───────────────────────────────────────────────────────
+    # What osc_remote.py reads and sets: the controls under the preview, as on /
+    # off states, and the loaded shader's parameters (remote_controls). Each
+    # set_* does what the button does, when the state differs.
+
+    def remote_controls(self):
+        """The loaded shader's parameter values (RemoteControl), in list order."""
+        return self._remote
+
+    def remote_state(self):
+        from ffstudio import validate as V
+        if self.shader_path:
+            shader = os.path.splitext(os.path.basename(self.shader_path))[0]
+        else:
+            shader = "(pasted code)" if self.res else ""
+        return {"playing": self.playing, "auto": self.auto, "auto_seconds": self.auto_seconds,
+                "output": self._output_btn_open, "fullscreen": self._fullscreen_btn_on,
+                "spout": self.send_on["spout"], "ndi": self.send_on["ndi"], "ndi_size": self.ndi_size,
+                "sender": V.SENDER_KIND or "", "shader": shader,
+                "queue": self.lbl_queue.cget("text"), "time": self.sim_time}
+
+    def set_playing(self, on):
+        if bool(on) != self.playing:
+            self._toggle_play()
+
+    def set_auto(self, on):
+        if bool(on) != self.auto:
+            self._toggle_auto()             # stays off with an empty queue
+
+    def set_auto_seconds(self, seconds):
+        self.entry_auto.delete(0, "end")
+        self.entry_auto.insert(0, self._fmt_seconds(max(AUTO_MIN_SECONDS, float(seconds))))
+        self._apply_auto_seconds()
+
+    def set_output_window(self, on):
+        """Open / close the output window (closing it also when it's fullscreen:
+        a remote can't press Esc). Does nothing while plain fullscreen shows."""
+        view = self._fs["view"] if self._fs else None
+        is_open = bool(view and view.win and view.windowed)
+        if on and not is_open:
+            self.open_output_window()
+        elif not on and is_open:
+            self.exit_fullscreen()
+            self._update_output_button()
+
+    def set_fullscreen(self, on):
+        """Fullscreen on / off as ⛶ does (the output window's, when it's open), from
+        either tab."""
+        if bool(on) == self._fullscreen_btn_on:
+            return
+        if self._fs and self._fs["view"].win:
+            from ffstudio import validate as V
+            with V.window_lock():
+                self._fs["view"].toggle()
+        elif on:
+            self.enter_fullscreen()
+        self._update_output_button()
+
+    def set_sending(self, kind, on):
+        """Spout / Syphon ("spout") or NDI on / off."""
+        if kind in self.send_buttons and bool(on) != self.send_on[kind]:
+            self.toggle_sending(kind)
+
+    def set_ndi_size(self, size):
+        if size != self.ndi_size:
+            self.ndi_size_menu.set(size)
+            self._ndi_size_choice(size)
 
     # ── Slideshow ────────────────────────────────────────────────────────────
     # Auto: every auto_seconds of playing time, step to the next shader in the
@@ -1171,6 +1254,7 @@ class EditorPanel(ctk.CTkFrame):
         then replaces the old one in one step (so the list lays out once)."""
         old = self.params_frame.winfo_children()
         self._params_box = box = W.frame(self.params_frame, bg=self._params_bg)
+        self._remote = []
         self._fill_params(box)
         box.pack(fill="x")
         for w in old:
@@ -1241,15 +1325,32 @@ class EditorPanel(ctk.CTkFrame):
             if not enabled:
                 sw.state(["disabled"])
             sw.pack(side="left")
+
+            def set_on(v):
+                on.set(bool(v))
+                self._set_value(i, p, bool(v))
+            self._add_remote(enabled, p, "toggle", lambda: bool(self._live_value(i, p)), set_on)
         elif p.kind == "event":
             W.Button(body, "Trigger", lambda: self._set_value(i, p, True, save=False),
                      enabled=enabled).pack(side="left")
+            self._add_remote(enabled, p, "trigger", lambda: False,
+                             lambda v: v and self._set_value(i, p, True, save=False))
         elif p.kind == "long":
             def pick(lbl):
                 self._set_value(i, p, p.values[p.labels.index(lbl)])
             om = W.Menu(body, list(p.labels), command=pick, enabled=enabled)
             om.set(p.labels[p.values.index(p.default)] if p.default in p.values else "")
             om.pack(side="left")
+
+            def choice():
+                v = self._live_value(i, p)
+                return p.values.index(v) if v in p.values else 0
+
+            def set_choice(index):
+                index = min(max(int(index), 0), len(p.values) - 1)
+                om.set(p.labels[index])
+                self._set_value(i, p, p.values[index])
+            self._add_remote(enabled, p, "choice", choice, set_choice, options=list(p.labels))
         elif p.kind == "color":
             self._color_control(body, i, p, enabled)
         elif p.kind in ("point2D", "mouse"):
@@ -1270,6 +1371,12 @@ class EditorPanel(ctk.CTkFrame):
                 sl = W.scale(line, mn[axis], mx[axis], command=move)
                 sl.set(vals[axis])
                 sl.pack(side="left", fill="x", expand=True, padx=4)
+
+                def set_axis(v, a=axis, s=sl, m=move):
+                    s.set(v)
+                    m(v, a)
+                self._add_remote(enabled, p, "range", lambda a=axis: vals[a], set_axis,
+                                 bounds=lambda a=axis: (mn[a], mx[a]), part="XY"[axis])
                 if enabled:
                     self._arrow_keys(sl, move)
                 else:
@@ -1339,6 +1446,8 @@ class EditorPanel(ctk.CTkFrame):
             e.bind("<Return>", commit_range)
             e.bind("<FocusOut>", commit_range)
 
+        self._add_remote(enabled, p, "int" if is_int else "range", lambda: self._live_value(i, p),
+                         lambda v: set_value(min(max(v, p.min), p.max)), bounds=lambda: (p.min, p.max))
         if not enabled:
             sl.state(["disabled"])
             return
@@ -1393,6 +1502,17 @@ class EditorPanel(ctk.CTkFrame):
         btn = W.Button(body, "", pick, width=6, enabled=enabled, bg=hexcol(rgba), hover=hexcol(rgba))
         btn.configure(highlightthickness=1, highlightbackground=W.BORDER)
         btn.pack(side="left")
+        alpha_slider = []
+
+        def set_channel(v, c):
+            rgba[c] = min(max(float(v), 0.0), 1.0)
+            btn.set_colour(hexcol(rgba))
+            if c == 3 and alpha_slider:
+                alpha_slider[0].set(rgba[3])
+            self._set_value(i, p, list(rgba))
+        for c in range(4 if p.glsl_type == "vec4" else 3):
+            self._add_remote(enabled, p, "range", lambda c=c: rgba[c], lambda v, c=c: set_channel(v, c),
+                             part="RGBA"[c])
         if p.glsl_type == "vec4":
             W.label(body, "alpha").pack(side="left", padx=(8, 2))
 
@@ -1400,6 +1520,7 @@ class EditorPanel(ctk.CTkFrame):
                 rgba[3] = float(v)
                 self._set_value(i, p, list(rgba))
             sl = W.scale(body, 0, 1, command=alpha)
+            alpha_slider.append(sl)
             sl.configure(length=W.px(120))
             sl.set(rgba[3])
             sl.pack(side="left")
@@ -1407,6 +1528,16 @@ class EditorPanel(ctk.CTkFrame):
                 self._arrow_keys(sl, alpha)
             else:
                 sl.state(["disabled"])
+
+    def _live_value(self, i, p):
+        return self.previewer.values.get(i, p.default) if self.previewer else p.default
+
+    def _add_remote(self, enabled, p, kind, get, set, bounds=lambda: (0.0, 1.0), options=(), part=""):
+        """Offer one value of a parameter for remote control (not one kept as a
+        constant, whose widgets are disabled). part: the channel of a colour or point."""
+        if enabled:
+            name = (lambda: f"{p.display()} {part}") if part else p.display
+            self._remote.append(RemoteControl(name, kind, get, set, bounds, options))
 
     def _arrow_keys(self, sl, command, is_int=False):
         """Click a slider to focus it (its handle turns amber); Left/Right then

@@ -54,6 +54,7 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
   - **Output window (multi-monitor):** click **⧉** (left of ⛶) to show the live render in its own window, opened on another monitor if you have one. Move and resize it like any window; FFStudio stays usable, and slider changes show up live. Double-click it or press **Ctrl+F** / ⌘F (in it, or in FFStudio) to make it fullscreen on the monitor it's on; **Esc** goes back to the window. The **⧉** button is a toggle (highlighted while the window is open): press it again, or use the window's close button, to close it. While the output is fullscreen the button does nothing; press Esc first.
   - **Sending to other apps (Send row, under the preview):** each button is off when FFStudio starts; click it to turn it on (highlighted) or off. They work together, and on their own: they keep sending when you switch shaders (← / →, the slideshow) or go to the Queue tab, with or without the output window. While one is on, the output window shows the same frames, scaled to fit. Turned on before a shader is loaded, sending starts with the first one.
     - **Spout** (Windows) or **Syphon** (macOS) sends the shader loaded in the Studio tab to other apps on the same computer (Resolume, MadMapper, OBS, TouchDesigner, …) as a source named **FFStudio**, at 1920×1080, about 60 fps, GPU to GPU.
+    - **Remote control:** the controls here and the shader's parameters can also be worked from TouchOSC on a phone, tablet or computer (see *Remote control* below).
     - **NDI®** sends it over the network, to apps on this computer or others on the same network, as the source **COMPUTERNAME (FFStudio)**, at 30 fps. The menu beside it picks **1080p** (1920×1080) or **720p** (1280×720); changing it while sending switches straight away. NDI uses some CPU to compress the frames, more at 1080p. The first time, Windows Firewall asks whether FFStudio may use the network (allow it, or other computers won't see the source), and macOS asks for Local Network access. Receive it in Resolume (Sources → NDI), OBS (with the DistroAV plugin), or NDI Studio Monitor (part of the free NDI Tools).
   - Both render at the window's resolution (up to 1920 wide, scaled up beyond that). The output draws on its own thread, so it keeps playing smoothly while FFStudio is busy (e.g. rebuilding the parameter list after a shader switch). While it's open, the small preview keeps running at a lower frame rate (about 10 fps) and follows shader switches; on Windows, FFStudio's own window pauses while you drag the output window.
   - **Queue playlist:** the **←** / **→** buttons under the preview (and the ← / → keys: anywhere in the Studio tab, unless you're typing in the code box or a text field or have clicked a slider (click anywhere else to release it); and in fullscreen or the output window) load the previous / next shader in the **Queue** (or in the selected rows, if several were selected when you switched to Studio) into the Studio tab. Each starts from the beginning with its saved settings, shaders that don't compile are skipped, and the list wraps around. The label next to them shows the position in the queue (e.g. "3 / 12"), or "not in queue" when the loaded shader isn't in it.
@@ -209,6 +210,50 @@ Resolume sends its tempo to FFGL plugins. Until a host sends any, and in the pre
 
 ### Alpha
 Shadertoy and GLSL Sandbox ignore output alpha, so FFStudio makes those plugins opaque. ISF shaders keep their alpha.
+
+## Remote control (OSC, TouchOSC)
+
+FFStudio's Studio tab can be controlled from a phone, a tablet or another computer over the network, with OSC. It's always on: FFStudio listens on UDP port **8000** and sends what it's doing back on port **8001**. The log says so when FFStudio starts, with this computer's address: `OSC remote control: 192.168.1.20, port 8000 (feedback to port 8001)`. The first time, Windows Firewall asks whether FFStudio may use the network: allow it on private networks, or other devices can't reach it. macOS asks for Local Network access.
+
+It controls what's under the preview: play / pause, restart, ← / →, the slideshow (**Auto** and its time), the output window and fullscreen, Spout (Syphon on macOS), NDI and its size, and the loaded shader's parameters. Not the queue, **Build FFGL**, **Export ISF** or **Analyze**.
+
+**TouchOSC layouts** are in the `touchosc` folder:
+
+- `FFStudio_desktop.tosc`: one landscape page, for TouchOSC on a computer or a tablet.
+- `FFStudio_phone.tosc`: for phones held upright (made for the Pixel 7a; fits other 20:9 phones). A **CONTROL** page, then the parameters, 8 to a page.
+
+To use one:
+
+1. In TouchOSC, open **Connections → OSC** and set up **connection 10** (the layouts use only that one, so connections 1–9 can stay as they are): **UDP**, **Host** = the FFStudio computer's address (from the log; `127.0.0.1` when TouchOSC runs on the same computer), **Send Port** `8000`, **Receive Port** `8001`.
+2. Open the layout in TouchOSC and start the control surface (▶).
+3. The status line (under the shader name on the desktop layout, at the bottom on the phone) changes to **connected: FFStudio on COMPUTERNAME** within a couple of seconds. If it stays at *not connected*, check the address and ports, that both are on the same network, and the firewall.
+
+The layout follows FFStudio: the switches light up as things are turned on (from the layout, in FFStudio or by the slideshow), and loading another shader fills in its parameter names, values and faders.
+
+**Parameters** take up to 24 slots, in the order of the Studio tab's list (without those kept as constants). Each value has a slot: a colour takes one per channel (R, G, B and, if it has one, A) and a point one per axis (X, Y). Unused slots are hidden. A fader covers the parameter's range (as set in the Studio tab); for a menu it steps through the options; a switch is on past the middle, and a trigger fires at the right-hand end. Moving a fader changes the value as the Studio tab's slider does, so it's saved with the shader's settings too. A shader with more than 24 values (rare: 1 of the 79 sample shaders) shows the first 24; the layout says e.g. *28 parameters: the first 24 are here*.
+
+**From other OSC apps** (Open Stage Control, Max, Lemur, …): send to UDP port 8000 at the FFStudio computer's address. Switches take `1` or `0` (no argument toggles); buttons act on a message with no argument or `1` (not on the `0` a button sends when it's released).
+
+| Address | Argument | What it does |
+| :-- | :-- | :-- |
+| `/ffstudio/play` | 1 / 0 | Play / pause |
+| `/ffstudio/restart` | | Restart the shader |
+| `/ffstudio/prev`, `/ffstudio/next` | | Previous / next shader in the queue (as ← / →) |
+| `/ffstudio/auto` | 1 / 0 | Slideshow on / off |
+| `/ffstudio/auto/seconds` | seconds | Slideshow time (minimum 1) |
+| `/ffstudio/auto/seconds/up`, `/down` | | Slideshow time one step longer / shorter (… 8, 10, 12, 15, 20 …) |
+| `/ffstudio/output` | 1 / 0 | Output window open / closed (closing works even when it's fullscreen) |
+| `/ffstudio/fullscreen` | 1 / 0 | Fullscreen, as ⛶ (the output window's, if it's open) |
+| `/ffstudio/spout` | 1 / 0 | Spout (Syphon on macOS) on / off |
+| `/ffstudio/ndi` | 1 / 0 | NDI on / off |
+| `/ffstudio/ndi/720p` | 1 / 0 | NDI at 1280×720 / 1920×1080 |
+| `/ffstudio/param/1` … `/24` | 0 … 1 | Parameter slot (as above) |
+| `/ffstudio/ping` | | Answered with `/ffstudio/pong` and the computer's name |
+| `/ffstudio/sync` | | Send the whole state again |
+
+FFStudio sends its state to every address that has sent it a message in the last 30 seconds (send `/ffstudio/ping` now and then to keep it coming; the TouchOSC layouts do, every second), on port 8001 and on the port the message came from. The switches come back on their own addresses as `1` / `0`, each parameter slot as its `0 … 1` value, and these as text: `/ffstudio/shader` (the shader's name), `/ffstudio/queue` (e.g. `3 / 12 · next in 4s`), `/ffstudio/time`, `/ffstudio/auto/label` (e.g. `10 s`), `/ffstudio/spout/name` (`Spout` or `Syphon`), `/ffstudio/params` (how many parameters), `/ffstudio/param/<n>/name` and `/ffstudio/param/<n>/value` (both empty for an unused slot). Only what changes is sent again.
+
+To change the layouts, edit `tools/build_touchosc.py` and run `venv\Scripts\python tools\build_touchosc.py`, or edit them in TouchOSC's editor.
 
 ---
 

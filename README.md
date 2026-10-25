@@ -13,7 +13,8 @@ Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for
 | `ffstudio/` | Core library: conversion, GLSL/ISF emitters, GPU validation and preview, plugin builder, CLI (`python -m ffstudio`) |
 | `templates/ffgl/` | The fixed C++ FFGL plugin runtime, driven by a generated `ShaderData.h` |
 | `boilerplates/ffgl/` | Vendored Resolume FFGL SDK (BSD-style license, see its `LICENSE.md`) |
-| `src/` | GUI (`main_gui.py`, `editor_panel.py`) |
+| `src/` | GUI (`main_gui.py`, `editor_panel.py`); `osc_remote.py`: OSC remote control of the Studio tab |
+| `touchosc/` | TouchOSC layouts for the remote control (desktop and phone), made by `tools/build_touchosc.py` |
 | `assets/icon/` | App icon: `FFStudio.ico` (Windows), `FFStudio.icns` (macOS), `FFStudio.png` (1024 px logo), window icons in `png/`. Regenerate with `python assets/icon/make_icon.py`. |
 | `tests/` | Regression runner (`run_corpus.py`) and feature fixtures |
 | `sample-shaders/` | Test corpus |
