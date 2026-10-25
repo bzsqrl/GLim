@@ -209,6 +209,8 @@ FFStudio now listens for OSC on UDP port 8000 and sends feedback to port 8001 (`
 | Parameters | The shader's parameter names, values and faders appear; moving a fader moves the Studio tab's slider, and the other way round; switching shaders refills them. |
 | FFStudio.app | The same in the packaged app. macOS asks for Local Network access the first time (the spec's `NSLocalNetworkUsageDescription` now mentions remote control): allow it, or a phone can't reach the app. `--selftest` writes `osc: ok`. |
 
+**Checked on the Mac (2026-10-25, M1 Max, macOS 14.8, python-osc 1.10.2), with no code changes:** a script sent real OSC over UDP to FFStudio from source, to `127.0.0.1` and to the Mac's network address, and listened on port 8001: the log line, `/ping` → `/pong FFStudio on <Mac name>`, `/spout/name` = Syphon; PREV / NEXT (not on a button's release), PLAY, RESTART, AUTO and its seconds stepped and lit up; OUTPUT WINDOW, FULLSCREEN, Syphon, NDI and 720p switched with feedback; `/param/1` moved the slider, a slider change came back on `/param/1`, and switching shaders refilled the names. The packaged app writes `osc: ok`, passes `codesign --verify --deep --strict`, and answered the same messages from another process (Syphon and NDI on / off). Not yet checked: the TouchOSC layouts themselves, and a phone or iPad reaching the packaged app (the Local Network prompt).
+
 ## If something fails
 
 - **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.
