@@ -224,9 +224,11 @@ It controls what's under the preview: play / pause, restart, ← / →, the slid
 
 To use one:
 
-1. In TouchOSC, open **Connections → OSC** and set up **connection 10** (the layouts use only that one, so connections 1–9 can stay as they are): **UDP**, **Host** = the FFStudio computer's address (from the log; `127.0.0.1` when TouchOSC runs on the same computer), **Send Port** `8000`, **Receive Port** `8001`.
+1. In TouchOSC, open **Connections → OSC** and set up any connection (the layouts send and receive on all of them; other enabled connections get FFStudio's messages too, which other apps ignore): **UDP**, **Host** = the FFStudio computer's address (from the log; `127.0.0.1` when TouchOSC runs on the same computer), **Send Port** `8000`, **Receive Port** `8001`.
 2. Open the layout in TouchOSC and start the control surface (▶).
 3. The status line (under the shader name on the desktop layout, at the bottom on the phone) changes to **connected: FFStudio on COMPUTERNAME** within a couple of seconds. If it stays at *not connected*, check the address and ports, that both are on the same network, and the firewall.
+
+On a Mac with tap to click turned on, TouchOSC on that Mac misses some taps on the trackpad (FFStudio never receives them; other macOS apps have the same problem). Press the trackpad down instead, or use a mouse.
 
 The layout follows FFStudio: the switches light up as things are turned on (from the layout, in FFStudio or by the slideshow), and loading another shader fills in its parameter names, values and faders.
 
