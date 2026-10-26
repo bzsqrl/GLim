@@ -213,7 +213,7 @@ FFStudio now listens for OSC on UDP port 8000 and sends feedback to port 8001 (`
 
 **TouchOSC on the Mac (2026-10-25):** the layouts connect from TouchOSC on the Mac and on a phone. Two findings:
 
-- **Only connection 10 worked.** The layouts sent and received only on connection 10. `tools/build_touchosc.py` now uses all ten connections (mask `1111111111`, and the script's `CONN`), so any connection can be set to FFStudio. The layouts were regenerated.
+- **Only connection 10 worked.** The layouts sent and received only on connection 10. `tools/build_touchosc.py` now uses all ten connections (mask `1111111111`, and the script's `CONN`), so any connection can be set to FFStudio. The layouts were regenerated. Checked: the phone works on connection 1 (once the new layout was copied to it; TouchOSC keeps its own copy on each device).
 - **Trackpad taps go missing** with the desktop layout in TouchOSC on the same Mac. Pressing the trackpad down works, and so does the phone. An OSC monitor in place of FFStudio showed that a missed tap sends nothing at all. This happened with PLAY (a toggle) as well as NEXT (momentary). Making the buttons toggles didn't help either: many taps still sent nothing. So it's TouchOSC's handling of macOS tap-to-click, which neither FFStudio nor the layout can fix. The USER_MANUAL says to press the trackpad down instead, or use a mouse.
 
 ## If something fails
