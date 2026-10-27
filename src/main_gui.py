@@ -95,6 +95,25 @@ def _size_text(n):
     return f"{n / (1024 * 1024):.1f} MB"
 
 
+def _disk_icon(size=16):
+    """A floppy-disk icon for the Save button, drawn at 4x and scaled down
+    so its edges are smooth (there's no icon font to take one from). Plain
+    rectangles: ImageDraw would bundle Pillow's FreeType (2 MB) for nothing."""
+    from PIL import Image
+    clear = (0, 0, 0, 0)
+    img = Image.new("RGBA", (64, 64), clear)
+    img.paste(T.FG, (4, 4, 61, 61))                                      # body
+    for y in range(4, 16):                                               # clipped corner
+        img.paste(clear, (48 + (y - 4), y, 61, y + 1))
+    img.paste(clear, (16, 4, 45, 23))                                    # shutter opening
+    img.paste(T.FG, (34, 8, 41, 19))                                     # shutter slot
+    img.paste(clear, (14, 34, 51, 56))                                   # label
+    img.paste(T.FG, (20, 42, 45, 46))                                    # label lines
+    img.paste(T.FG, (20, 50, 45, 54))
+    img = img.resize((size * 2, size * 2), Image.LANCZOS)
+    return ctk.CTkImage(light_image=img, dark_image=img, size=(size, size))
+
+
 # ---------------------------------------------------------------------------
 # Small data class for queue items
 # ---------------------------------------------------------------------------
@@ -380,6 +399,8 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
 
         ctk.CTkButton(tools, text="+", width=36, height=28, font=ctk.CTkFont(size=20, weight="bold"),
                       command=self.open_file).pack(side="left", padx=(0, 6))
+        ctk.CTkButton(tools, text="", image=_disk_icon(), width=36, height=28,
+                      command=self.save_file).pack(side="left", padx=(0, 6))
 
         ctk.CTkLabel(tools, text="Output name", font=T.ui(12), text_color=T.DIM).pack(side="left", padx=(8, 8))
         self.entry_plugin_name = ctk.CTkEntry(tools, width=200, placeholder_text="PluginName")
@@ -1008,6 +1029,32 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             filetypes=[("Shader Source", "*.fs *.txt *.glsl"), ("All Files", "*.*")])
         if path:
             self._load_file_path(path)
+
+    def save_file(self):
+        """Save the code in the Studio editor as a .txt or .fs file."""
+        code = self.textbox_code.get("1.0", "end-1c")
+        types = [("Text", "*.txt"), ("ISF Shader", "*.fs")]
+        ext = ".txt"
+        if self._source_path:
+            ext = os.path.splitext(self._source_path)[1].lower()
+            if ext == ".fs":
+                types.reverse()
+            elif ext != ".txt":
+                ext = ".txt"
+        path = ctk.filedialog.asksaveasfilename(
+            title="Save Shader Code",
+            initialdir=os.path.dirname(self._source_path) if self._source_path else None,
+            initialfile=(Path(self._source_path).stem if self._source_path else self._source_stem) + ext,
+            defaultextension=ext,
+            filetypes=types + [("All Files", "*.*")])
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(code)
+            self.log(f"✓ Saved {path}")
+        except OSError as exc:
+            self.log(f"ERROR: Save failed: {exc}")
 
     def _remember_plugin_name(self, name):
         if self._source_path and name != Path(self._source_path).stem:
