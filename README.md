@@ -2,7 +2,8 @@
 
 Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for Resolume 7.21.3+ and **ISF files** for MadMapper and other ISF hosts.
 
-- `USER_MANUAL.md`: how to use it
+- `USER_MANUAL.md`: how to use it (`compile.py` also writes it as `dist/USER_MANUAL.html` for the package)
+- `EULA.txt`: the beta's licence agreement (draft), shipped with the app
 - `IMPROVEMENT_PLAN.md`: architecture, status and roadmap
 - `TESTING_CHECKLIST.md`: what to check when testing builds in the VJ hosts
 
@@ -15,6 +16,7 @@ Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for
 | `boilerplates/ffgl/` | Vendored Resolume FFGL SDK (BSD-style license, see its `LICENSE.md`) |
 | `src/` | GUI (`main_gui.py`, `editor_panel.py`); `osc_remote.py`: OSC remote control of the Studio tab |
 | `touchosc/` | TouchOSC layouts for the remote control (desktop and phone), made by `tools/build_touchosc.py` |
+| `tools/` | `build_touchosc.py` (the layouts), `make_notices.py` (`THIRD_PARTY_NOTICES.txt`, with the licence texts in `tools/licenses/`), `build_manual.py` (`USER_MANUAL.html`); `compile.py` runs the last two |
 | `assets/icon/` | App icon: `FFStudio.ico` (Windows), `FFStudio.icns` (macOS), `FFStudio.png` (1024 px logo), window icons in `png/`. Regenerate with `python assets/icon/make_icon.py`. |
 | `tests/` | Regression runner (`run_corpus.py`) and feature fixtures |
 | `sample-shaders/` | Test corpus |

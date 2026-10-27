@@ -2,10 +2,17 @@
 # Build with:  venv\Scripts\python compile.py   (Windows: dist\FFStudio.exe)
 #              venv/bin/python compile.py       (macOS: dist/FFStudio.app)
 import os
+import re
 import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
 MAC = sys.platform == 'darwin'
+
+# ffstudio/__init__.py's version, e.g. 0.9.0-beta.1; its numeric part for the
+# exe's version resource and the Mac bundle.
+with open(os.path.join('ffstudio', '__init__.py'), encoding='utf-8') as f:
+    VERSION = re.search(r'__version__ = "([^"]+)"', f.read()).group(1)
+NUMBERS = tuple(int(n) for n in VERSION.split('-')[0].split('.'))
 
 # NDI output (Windows and macOS): cyndilib bundles the NDI runtime. Only the main
 # library is needed (not its DirectShow / UWP variants), plus the NDI licence
@@ -52,6 +59,13 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+# PyOpenGL's wheel carries GLUT and GLE DLLs (and their licences); FFStudio
+# uses neither (its windows are GLFW's), so leave them out.
+a.binaries = [b for b in a.binaries
+              if not os.path.normpath(b[0]).startswith(os.path.join('OpenGL', 'DLLS'))]
+a.datas = [d for d in a.datas
+           if not os.path.normpath(d[0]).startswith(os.path.join('OpenGL', 'DLLS'))]
+
 pyz = PYZ(a.pure)
 
 if MAC:
@@ -80,7 +94,8 @@ if MAC:
         icon='assets/icon/FFStudio.icns',
         bundle_identifier='com.ffstudio.app',
         info_plist={
-            'CFBundleShortVersionString': '1.0',
+            'CFBundleShortVersionString': '.'.join(map(str, NUMBERS)),
+            'CFBundleVersion': VERSION,
             'NSHighResolutionCapable': True,
             # Homebrew's Python and Tcl/Tk, bundled here, are built for macOS 14:
             # on older systems Finder should say so instead of the app crashing.
@@ -94,6 +109,17 @@ if MAC:
         },
     )
 else:
+    from PyInstaller.utils.win32 import versioninfo as vi
+    quad = (NUMBERS + (0, 0, 0, 0))[:4]
+    version_resource = vi.VSVersionInfo(
+        ffi=vi.FixedFileInfo(filevers=quad, prodvers=quad),
+        kids=[vi.StringFileInfo([vi.StringTable('040904B0', [
+                  vi.StringStruct('ProductName', 'FFStudio'),
+                  vi.StringStruct('FileDescription', 'FFStudio'),
+                  vi.StringStruct('ProductVersion', VERSION),
+                  vi.StringStruct('FileVersion', VERSION),
+                  vi.StringStruct('OriginalFilename', 'FFStudio.exe')])]),
+              vi.VarFileInfo([vi.VarStruct('Translation', [0x0409, 1200])])])
     exe = EXE(
         pyz,
         a.scripts,
@@ -102,6 +128,7 @@ else:
         [],
         name='FFStudio',
         icon='assets/icon/FFStudio.ico',
+        version=version_resource,
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,

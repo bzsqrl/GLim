@@ -1,0 +1,165 @@
+[DRAFT for review. Fill in the two bracketed items, have it checked, and delete this line.]
+
+FFSTUDIO BETA
+END USER LICENCE AGREEMENT
+
+Last updated: 26 October 2026
+
+This agreement is between you and [LICENSOR: your full legal name or business
+name] ("we", "us"), the maker of FFStudio. It covers the beta version of
+FFStudio (the app FFStudio.exe or FFStudio.app, its documentation, and the
+TouchOSC layouts and other files that come with it; together, "the Software").
+By installing, copying or using the Software, you agree to this agreement. If
+you don't agree, don't use the Software.
+
+
+1. LICENCE
+
+We grant you a free, personal, non-exclusive, non-transferable licence to
+install and use the Software on computers you own or control, to try it out,
+to give us feedback, and for your own creative work, until the licence ends
+(section 12).
+
+
+2. BETA SOFTWARE
+
+The Software is a pre-release test version. It may contain errors, may not
+work as described, and may change or stop being available at any time. Keep
+copies of your shaders and of anything you make with the Software.
+
+
+3. WHAT YOU MAY NOT DO
+
+You may not:
+  a. share, sell, rent, lend or otherwise distribute the Software, or copies
+     of it, to anyone else, except with our written permission;
+  b. reverse engineer, decompile or disassemble the Software, except to the
+     extent that applicable law allows this despite this restriction;
+  c. remove or change any copyright, trademark or licence notice in the
+     Software;
+  d. use the Software in breach of any law.
+
+This doesn't limit what the open-source licences of the third-party
+components (section 8) allow you to do with those components.
+
+
+4. YOUR SHADERS AND WHAT YOU MAKE
+
+You keep all rights to the shaders you use with the Software, and to the FFGL
+plugins and ISF files you make with it; we claim no rights to them. You are
+responsible for having the right to use, convert and share the shaders you
+use: many shaders published online have licences of their own (for example,
+Shadertoy shaders are under CC BY-NC-SA 3.0 unless their code says otherwise),
+which apply to the plugins and files made from them too.
+
+FFGL plugins made with the Software contain code from the FFGL SDK and, on
+Windows, from GLEW, under the licences in THIRD_PARTY_NOTICES.txt. Those
+licences ask that their notices go with plugins you distribute.
+
+The sample shaders that come with the Software are under the licences stated
+in them or beside them.
+
+
+5. FEEDBACK
+
+If you send us feedback, bug reports or suggestions, we may use them to
+improve FFStudio, without any obligation to you.
+
+
+6. PRIVACY
+
+The Software doesn't collect personal data or usage statistics, and doesn't
+connect to the internet. It uses your local network only for features you
+use: NDI® output, and remote control, for which it listens for OSC messages
+on UDP port 8000. What you send us in a bug report (for example FFStudio's
+log, which names your computer and graphics card) is used only to fix
+problems and improve FFStudio.
+
+
+7. OWNERSHIP
+
+The Software is licensed, not sold. We (and our licensors) keep all rights to
+the Software that this agreement doesn't expressly grant you.
+
+
+8. THIRD-PARTY SOFTWARE
+
+The Software contains third-party software, listed with its licences in
+THIRD_PARTY_NOTICES.txt. Each component is used under its own licence, which
+applies to that component in place of this agreement where the two differ.
+
+
+9. NDI® TECHNOLOGY
+
+The Software uses the NDI® SDK and contains the NDI® runtime (together with
+NDI's other products, "NDI Technology") of Vizrt NDI AB ("NDI"). As NDI's
+licence requires, your use of NDI Technology in the Software is also subject
+to these terms:
+  a. You may not modify NDI Technology or any part of it.
+  b. You may not reverse engineer, disassemble or recompile NDI Technology or
+     any part of it, or any protocols it uses, whether transmitted or
+     received over a network or used internally or externally to the
+     machine, physical or virtual, that it runs on, and you may not attempt
+     to do so.
+  c. You may not circumvent any technical limitations in NDI Technology or
+     any part of it.
+  d. You may not remove, obscure or alter any proprietary notices or labels
+     contained on or within NDI Technology or any part of it.
+  e. NDI and each of its licensors disclaim any and all warranties.
+  f. To the extent permitted by applicable law, NDI and its licensors are not
+     liable for any damages, whether direct, indirect, incidental or
+     consequential, arising from the use of the Software.
+  g. You must comply fully with all relevant export laws and regulations of
+     the United States, so that the Software or any part of it isn't
+     exported, directly or indirectly, in violation of United States law.
+  h. NDI Technology is copyright (c) 2023-2026 Vizrt NDI AB. All rights
+     reserved.
+  i. If you use the Software to develop products that use NDI Technology, you
+     must comply with the NDI® SDK licence (https://ndi.link/ndisdk_license),
+     including that those products have current and complete NDI
+     compatibility, and you must include the terms of this section 9 in your
+     own end user licence agreement.
+
+NDI® is a registered trademark of Vizrt NDI AB. FFStudio isn't made, sponsored
+or endorsed by Vizrt NDI AB.
+
+
+10. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NON-INFRINGEMENT. YOU USE IT AT YOUR OWN RISK. Some
+places don't allow excluding implied warranties, so this may not apply to you
+in full.
+
+
+11. LIMITATION OF LIABILITY
+
+TO THE EXTENT PERMITTED BY LAW, WE ARE NOT LIABLE FOR ANY INDIRECT,
+INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES, OR FOR LOST DATA, WORK, PROFITS
+OR REVENUE, ARISING FROM THE SOFTWARE OR ITS USE, EVEN IF WE WERE TOLD THEY
+WERE POSSIBLE. AS THE SOFTWARE IS FREE, OUR TOTAL LIABILITY IS LIMITED TO
+USD 50. Nothing in this agreement limits liability that the law doesn't allow
+to be limited.
+
+
+12. END OF THE LICENCE
+
+This licence ends when the beta ends (we'll tell you, or a later version of
+FFStudio replaces this agreement), when you stop using the Software and
+delete it, or straight away if you break this agreement. When it ends, stop
+using the Software and delete your copies. Sections 4 to 11 and 13 continue
+to apply after it ends. You keep the plugins and files you made.
+
+
+13. GENERAL
+
+This agreement is governed by the laws of [JURISDICTION: e.g. the State of
+..., USA], without regard to its conflict-of-law rules. If a part of it can't
+be enforced, the rest still applies. It is the whole agreement between you
+and us about the Software, and replaces anything said before about it. We may
+update it for later versions of the Software; the version that comes with a
+version applies to it.
+
+Questions about this agreement: bzsqrl@gmail.com
+Website: https://bzsqrl.com
