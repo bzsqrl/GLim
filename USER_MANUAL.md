@@ -18,8 +18,8 @@ This is a beta version. Questions, problems and suggestions are welcome: **[bzsq
 | `touchosc` | TouchOSC layouts for remote control (see *Remote control* below) |
 | `sample-shaders` | Shaders to try FFStudio with |
 | `USER_MANUAL.html` | This manual |
-| `EULA.txt` | The licence agreement for this beta. By using FFStudio, you agree to it. |
-| `THIRD_PARTY_NOTICES.txt` | The licences of the open-source software inside FFStudio |
+| `LICENSE.txt` | FFStudio's licence (MIT) |
+| `THIRD_PARTY_NOTICES.txt` | The terms for the NDI software inside FFStudio, and the licences of the other software by others inside it |
 
 ## System requirements
 
@@ -377,7 +377,7 @@ Send the `selftest.log` from the `selftest` folder (the plugin it builds there c
 ### Running and packaging
 
 - **GUI:** `venv\Scripts\python src\main_gui.py` (macOS: `venv/bin/python src/main_gui.py`). Plugins go to the project's `output` folder.
-- **Packaged app:** `venv\Scripts\python compile.py` builds `dist\FFStudio.exe`; on macOS, `venv/bin/python compile.py` builds `dist/FFStudio.app` (Apple Silicon, signed ad hoc, not notarized). It also writes the package's documents into `dist`: `EULA.txt` (a copy), `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles) and `USER_MANUAL.html` (`tools/build_manual.py`, from this file). The version is `__version__` in `ffstudio/__init__.py`: it's shown in the title bar, the log and `selftest.log`, and stamped on FFStudio.exe (*Properties → Details*) and FFStudio.app. Headless check: `FFStudio.exe --selftest <shader> <dir>` (macOS: `FFStudio.app/Contents/MacOS/FFStudio --selftest <shader> <dir>`) writes `selftest.log` into `<dir>`.
+- **Packaged app:** `venv\Scripts\python compile.py` builds `dist\FFStudio.exe`; on macOS, `venv/bin/python compile.py` builds `dist/FFStudio.app` (Apple Silicon, signed ad hoc, not notarized). It also writes the package's documents into `dist`: `LICENSE.txt` (a copy), `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles) and `USER_MANUAL.html` (`tools/build_manual.py`, from this file). The version is `__version__` in `ffstudio/__init__.py`: it's shown in the title bar, the log and `selftest.log`, and stamped on FFStudio.exe (*Properties → Details*) and FFStudio.app. Headless check: `FFStudio.exe --selftest <shader> <dir>` (macOS: `FFStudio.app/Contents/MacOS/FFStudio --selftest <shader> <dir>`) writes `selftest.log` into `<dir>`.
 - **TouchOSC layouts:** edit `tools/build_touchosc.py` and run `venv\Scripts\python tools\build_touchosc.py`, or edit them in TouchOSC's editor.
 
 ### Command line
@@ -395,7 +395,7 @@ The command line runs from source only, not from FFStudio.exe or FFStudio.app.
 
 ## NDI
 
-NDI® is a registered trademark of Vizrt NDI AB. FFStudio uses the NDI® SDK (through the cyndilib library) to send video; it isn't made or endorsed by Vizrt NDI AB. NDI runtime: Copyright © 2023–2026 Vizrt NDI AB, all rights reserved; its licence notices ship with FFStudio (`cyndilib/wrapper/bin/*licenses*.txt`). More about NDI: [ndi.video](https://ndi.video/).
+NDI® is a registered trademark of Vizrt NDI AB. FFStudio uses the NDI® SDK (through the cyndilib library) to send video; it isn't made or endorsed by Vizrt NDI AB. NDI runtime: Copyright © 2023–2026 Vizrt NDI AB, all rights reserved; its licence notices ship with FFStudio (`cyndilib/wrapper/bin/*licenses*.txt`), and the terms NDI asks users to agree to are at the top of `THIRD_PARTY_NOTICES.txt`. More about NDI: [ndi.video](https://ndi.video/).
 
 ## Shader licensing
 
@@ -404,3 +404,11 @@ Shaders are the creative property of their authors.
 - ISF and GLSL Sandbox shaders vary.
 
 Keep credits, and respect non-commercial and share-alike terms.
+
+What you make with FFStudio is yours, but a shader's licence also applies to the plugins and ISF files made from it. The sample shaders say who wrote them and where they come from.
+
+Plugins that FFStudio builds contain code from the FFGL SDK (and on Windows, GLEW). Their licences, in `THIRD_PARTY_NOTICES.txt`, ask that their notices go with any plugins you share.
+
+## Privacy
+
+FFStudio doesn't collect any data and doesn't connect to the internet. It uses your local network only for NDI output and for remote control (OSC on UDP port 8000).

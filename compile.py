@@ -27,10 +27,10 @@ def seal_mac_app(app):
 
 def package_docs(root):
     """The documents that go in the zip with the app, written into dist/:
-    the EULA, the third-party notices (for what this platform's build bundles)
+    the licence, the third-party notices (for what this platform's build bundles)
     and the user manual as HTML."""
     dist = os.path.join(root, "dist")
-    shutil.copyfile(os.path.join(root, "EULA.txt"), os.path.join(dist, "EULA.txt"))
+    shutil.copyfile(os.path.join(root, "LICENSE.txt"), os.path.join(dist, "LICENSE.txt"))
     for tool in ("make_notices.py", "build_manual.py"):
         subprocess.check_call([sys.executable, os.path.join(root, "tools", tool), dist], cwd=root)
 
@@ -61,7 +61,7 @@ def build():
             print("You can find FFStudio.app in the 'dist' folder.")
         else:
             print("You can find FFStudio.exe in the 'dist' folder.")
-        print("The package documents (EULA, notices, manual) are there too.")
+        print("The package documents (licence, notices, manual) are there too.")
     except subprocess.CalledProcessError as e:
         print(f"\nBuild failed with error: {e}")
         sys.exit(1)     # so scripts that run this see the failure
