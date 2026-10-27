@@ -7,3 +7,4 @@ SpoutGL; sys_platform == "win32"
 syphon-python[opengl]; sys_platform == "darwin"
 cyndilib
 python-osc
+markdown                # tools/build_manual.py only (not part of the app)

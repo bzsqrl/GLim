@@ -12,6 +12,7 @@ from tkinter import ttk
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ffstudio import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: E402
+from ffstudio import __version__                                       # noqa: E402
 from ffstudio import convert as ffconvert                               # noqa: E402
 from ffstudio import settings as ffsettings                             # noqa: E402
 from editor_panel import EditorPanel, gpu_cache_key, toggle_command    # noqa: E402
@@ -123,7 +124,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             ctk.set_appearance_mode("Dark")
         T.apply(self)                       # colours and fonts, before any widget
 
-        self.title("FFStudio – Shader to FFGL Converter")
+        self.title(f"FFStudio {__version__}")
         # Fit the screen (minus taskbar), up to 1440x900.
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
         w, h = min(1440, sw - 60), min(900, sh - 110)
@@ -236,7 +237,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.textbox_log.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="ew")
         for tag, colour in (("ok", T.GREEN_TEXT), ("warn", T.AMBER_TEXT), ("error", T.RED_TEXT)):
             self.textbox_log.tag_config(tag, foreground=colour)
-        self.log("System ready.")
+        self.log(f"FFStudio {__version__}. System ready.")
 
     # -----------------------------------------------------------------------
     # Queue tab
@@ -1131,7 +1132,7 @@ def _selftest(shader, out_dir):
     import traceback
     from ffstudio import validate as V
     os.makedirs(out_dir, exist_ok=True)
-    lines = []
+    lines = [f"FFStudio {__version__}"]
     try:
         code = open(shader, encoding="utf-8", errors="replace").read()
         res = pipeline.convert_ffgl(code, name=Path(shader).stem, path=shader)
