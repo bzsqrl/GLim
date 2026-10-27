@@ -29,7 +29,7 @@ A few interesting ones to try first:
 - `vv_circleOpen`: transition as a mixer
 
 Known gaps (expected, not bugs):
-- *(Fixed since v1.)* `stoy_abstractGlassyField`, `stoy_abstractPlane`, `stoy_abstractWaterTunnel`, `new_fireworks` and `vv_70tiesMaelstrom` reference `IMPORTED` images that aren't in `sample-shaders/`. Rebuilt now, they get a noise texture plus a warning; with the image files present, the images are embedded.
+- *(Fixed since v1.)* `stoy_abstractGlassyField`, `stoy_abstractPlane`, `stoy_abstractWaterTunnel`, `new_fireworks` and `vv_70tiesMaelstrom` reference `IMPORTED` images that aren't in `tests/corpus/` (formerly `sample-shaders/`). Rebuilt now, they get a noise texture plus a warning; with the image files present, the images are embedded.
 - `vv_butterflyWaveScrawler` renders flat colors. The original shader computes `pow()` of a negative number, which gives NaN on NVIDIA in any host.
 
 ## MadMapper (ISF exports)

@@ -1,0 +1,126 @@
+// License CC0: Overlapping hextiles
+//  There are many examples on Shadertoy of overlapping rectangular tiling. 
+//  Thought ST could need (another?) an example of how to do overlapping hex tiles.
+    
+#define PI              3.141592654
+#define TAU             (2.0*PI)
+#define TIME            iTime
+#define RESOLUTION      iResolution
+#define MROT(a) mat2(cos(a), sin(a), -sin(a), cos(a))
+
+const mat2 rot60    = MROT(TAU/6.0);
+const vec2 sz       = vec2(1.0, sqrt(3.0));
+const vec2 hsz      = 0.5*sz;
+const vec2 off1     = normalize(vec2(0.5, 0.0));
+const vec2 off2     = rot60*off1;
+const vec2 off3     = rot60*off2;
+const vec2 off4     = rot60*off3;
+const vec2 off5     = rot60*off4;
+const vec2 off6     = rot60*off5;
+const vec2 idx1     = vec2(+2.0, +0.0);
+const vec2 idx2     = vec2(+1.0, +1.0);
+const vec2 idx3     = vec2(-1.0, +1.0);
+const vec2 idx4     = vec2(-2.0, +0.0);
+const vec2 idx5     = vec2(-1.0, -1.0);
+const vec2 idx6     = vec2(+1.0, -1.0);
+
+float hash(in vec2 co) {
+  return fract(sin(dot(co.xy ,vec2(12.9898,58.233))) * 13758.5453);
+}
+
+float psin(float a) {
+  return 0.5 + 0.5*sin(a);
+}
+
+float pcos(float a) {
+  return 0.5 + 0.5*cos(a);
+}
+
+void rot(inout vec2 p, float a) {
+  float c = cos(a);
+  float s = sin(a);
+  p = vec2(c*p.x + s*p.y, -s*p.x + c*p.y);
+}
+
+float circle(vec2 p, float r) {
+  return length(p) - r;
+}
+
+float box(vec2 p, vec2 b) {
+  vec2 d = abs(p)-b;
+  return length(max(d,0.0)) + min(max(d.x,d.y),0.0);
+}
+
+vec2 hextile(inout vec2 p) {
+  // See Art of Code: Hexagonal Tiling Explained!
+  // https://www.youtube.com/watch?v=VmrIDyYiJBA
+
+  vec2 p1 = mod(p, sz)-hsz;
+  vec2 p2 = mod(p - hsz, sz)-hsz;
+  vec2 p3 = mix(p2, p1, vec2(dot(p1, p1) < dot(p2, p2)));
+  vec2 n = round((p3 - p + hsz)/hsz);
+  p = p3;
+
+  return round(n);
+}
+
+float pmin(float a, float b, float k) {
+  float h = clamp( 0.5+0.5*(b-a)/k, 0.0, 1.0 );
+  return mix( b, a, h ) - k*h*(1.0-h);
+}
+
+float pmax(float a, float b, float k) {
+  return -pmin(-a, -b, k);
+}
+
+// Single cell distance field
+float cell(vec2 p, vec2 n) {
+  float a = hash(n+sqrt(3.0));
+  rot(p, TAU*a+TIME);
+  float d0 = box(p, vec2(0.5, 0.25)*mix(0.25, 1.25, psin(TAU*a+TIME)));
+  return d0;
+}
+
+float df(vec2 p) {
+  // Close to origo seems the cell index is computed incorrectly
+  p += 100.0;
+  vec2 hp = p;
+  vec2 hn = hextile(hp);
+  
+  float d = 1E6;
+  // The current cell
+  d = min(d, cell(hp, hn));
+  // Take union with all surrounding cells to support overlapping distance fields
+  d = min(d, cell(hp - off1, hn - idx1));
+  d = min(d, cell(hp - off2, hn - idx2));
+  d = min(d, cell(hp - off3, hn - idx3));
+  d = min(d, cell(hp - off4, hn - idx4));
+  d = min(d, cell(hp - off5, hn - idx5));
+  d = min(d, cell(hp - off6, hn - idx6));
+    
+  return d;
+}
+
+vec3 effect(vec2 p, vec2 q) {
+  float s = 0.25;
+  float d = df(p/s)*s;
+  
+  float aa = 4.0/RESOLUTION.y;
+  
+  vec3 col = vec3(0.0);
+  
+  col = mix(col, vec3(1.0), smoothstep(-aa, 0.0, -d));
+  col += vec3(0.5)*pcos(300.0*d);
+
+  return col;
+}
+
+void mainImage(out vec4 fragColor, vec2 fragCoord) {
+  vec2 q = fragCoord/RESOLUTION.xy;
+  vec2 p = -1. + 2. * q;
+  p.x *= RESOLUTION.x/RESOLUTION.y;
+
+  vec3 col = effect(p, q);
+  
+  fragColor = vec4(col, 1.0);
+}

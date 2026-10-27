@@ -1,7 +1,7 @@
 """Command line: python -m ffstudio <files or folders> [options]
 
 Examples:
-  python -m ffstudio sample-shaders/vv_brokenLCD.fs --to ffgl
+  python -m ffstudio tests/corpus/vv_brokenLCD.fs --to ffgl
   python -m ffstudio sample-shaders --to both --out output/batch --test
 """
 import argparse
