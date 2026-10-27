@@ -1,6 +1,7 @@
-"""Write THIRD_PARTY_NOTICES.txt: the licences of the third-party software that
-FFStudio's packaged app (FFStudio.exe or FFStudio.app) contains, as their
-licences require when the app is distributed.
+"""Write THIRD_PARTY_NOTICES.txt: the terms NDI's licence asks users to agree
+to, and the licences of the third-party software that FFStudio's packaged app
+(FFStudio.exe or FFStudio.app) contains, as their licences require when the
+app is distributed.
 
 Usage: venv\\Scripts\\python tools\\make_notices.py [OUT_DIR]   (default: dist)
 compile.py runs it after each build. It covers what this platform's build
@@ -64,6 +65,35 @@ SOURCES = {
     "spout.txt": "https://github.com/leadedge/Spout2/blob/master/LICENSE",
     "syphon.txt": "https://github.com/Syphon/Syphon-Framework/blob/master/License.txt",
 }
+
+# The terms the NDI SDK licence (paragraph 3d) requires users to agree to when
+# a product that includes NDI is distributed.
+NDI_TERMS = """\
+NDI
+---
+
+FFStudio includes the NDI® runtime, which belongs to Vizrt NDI AB. NDI's
+licence asks everyone who gets it to agree to the following. These terms
+apply to the NDI software inside FFStudio only:
+
+  - Don't modify the NDI software.
+  - Don't reverse engineer, disassemble or recompile it, or the protocols it
+    uses, and don't try to.
+  - Don't get around any of its technical limits.
+  - Don't remove or change any of its copyright or other notices.
+  - NDI and its licensors give no warranty, and as far as the law allows,
+    they aren't liable for any damage from using FFStudio.
+  - Follow United States export law: don't export FFStudio, or any part of
+    it, in a way that breaks it.
+  - If you use FFStudio to make your own products that use NDI, follow the
+    NDI SDK licence: keep them fully NDI-compatible, and include these NDI
+    terms in your own licence.
+
+The NDI runtime is copyright (c) 2023-2026 Vizrt NDI AB. All rights reserved.
+NDI® is a registered trademark of Vizrt NDI AB. FFStudio isn't made or
+endorsed by Vizrt NDI AB. More about NDI: https://ndi.video/
+
+The NDI SDK licence: https://ndi.link/ndisdk_license""".split("\n")
 
 
 def read(path):
@@ -158,12 +188,11 @@ def main(out_dir):
     head = [
         f"FFStudio {__version__}: third-party notices",
         "",
-        "FFStudio contains the software listed below, each used under the licence",
+        "FFStudio's own code is under the MIT License (LICENSE.txt). FFStudio also",
+        "contains the software by others listed below, each used under the licence",
         "that follows its name. These notices are included as those licences require.",
         "",
-        "NDI® is a registered trademark of Vizrt NDI AB. FFStudio uses the NDI® SDK",
-        "(through cyndilib) and isn't made or endorsed by Vizrt NDI AB.",
-        "More about NDI: https://ndi.video/",
+    ] + NDI_TERMS + [
         "",
         "Contents:",
     ] + [f"  - {t}: {u}" for t, u, _ in sections]

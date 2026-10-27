@@ -216,20 +216,20 @@ FFStudio now listens for OSC on UDP port 8000 and sends feedback to port 8001 (`
 - **Only connection 10 worked.** The layouts sent and received only on connection 10. `tools/build_touchosc.py` now uses all ten connections (mask `1111111111`, and the script's `CONN`), so any connection can be set to FFStudio. The layouts were regenerated. Checked: the phone works on connection 1 (once the new layout was copied to it; TouchOSC keeps its own copy on each device).
 - **Trackpad taps go missing** with the desktop layout in TouchOSC on the same Mac. Pressing the trackpad down works, and so does the phone. An OSC monitor in place of FFStudio showed that a missed tap sends nothing at all. This happened with PLAY (a toggle) as well as NEXT (momentary). Making the buttons toggles didn't help either: many taps still sent nothing. So it's TouchOSC's handling of macOS tap-to-click, which neither FFStudio nor the layout can fix. The USER_MANUAL says to press the trackpad down instead, or use a mouse.
 
-## 13. Beta package: version, EULA, notices, HTML manual
+## 13. Beta package: version, licence, notices, HTML manual
 
-FFStudio now has a version number (`__version__` in `ffstudio/__init__.py`, `0.9.0-beta.1`), shown in the title bar, the log's first line and `selftest.log`; `FFStudio.spec` sets the app's `CFBundleShortVersionString` (`0.9.0`) and `CFBundleVersion` (`0.9.0-beta.1`) from it. After building, `compile.py` writes the package's documents into `dist/`: `EULA.txt` (copied from the repo), `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles, read from PyInstaller's `build/FFStudio/PYZ-00.toc`) and `USER_MANUAL.html` (`tools/build_manual.py`). The spec also leaves out PyOpenGL's GLUT/GLE DLLs (Windows only; nothing changes on the Mac).
+FFStudio now has a version number (`__version__` in `ffstudio/__init__.py`, `0.9.0-beta.1`), shown in the title bar, the log's first line and `selftest.log`; `FFStudio.spec` sets the app's `CFBundleShortVersionString` (`0.9.0`) and `CFBundleVersion` (`0.9.0-beta.1`) from it. After building, `compile.py` writes the package's documents into `dist/`: `LICENSE.txt` (copied from the repo), `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles, read from PyInstaller's `build/FFStudio/PYZ-00.toc`) and `USER_MANUAL.html` (`tools/build_manual.py`). The spec also leaves out PyOpenGL's GLUT/GLE DLLs (Windows only; nothing changes on the Mac).
 
 1. `venv/bin/pip install -r requirements.txt` (adds `markdown`, for `build_manual.py`).
 2. `venv/bin/python compile.py`.
 
 | Check | What should happen |
 |---|---|
-| Build | `compile.py` ends with "The package documents (EULA, notices, manual) are there too."; `dist/` has `FFStudio.app`, `EULA.txt`, `THIRD_PARTY_NOTICES.txt`, `USER_MANUAL.html`. |
-| Notices | `THIRD_PARTY_NOTICES.txt`'s contents list has Python 3.12, Tcl/Tk (from its `license.terms`), **syphon-python** and **Syphon framework**, and no SpoutGL, Spout or GLEW. If `make_notices.py` stops with "no licence file for dist:LICENSE* (syphon-python)", the wheel has no licence file: find syphon-python's licence in its repository, save it as `tools/licenses/syphon-python.txt`, and change its entry in `COMPONENTS` to `lic:syphon-python.txt`. |
+| Build | `compile.py` ends with "The package documents (licence, notices, manual) are there too."; `dist/` has `FFStudio.app`, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt`, `USER_MANUAL.html`. |
+| Notices | `THIRD_PARTY_NOTICES.txt` starts with the NDI terms, and its contents list has Python 3.12, Tcl/Tk (from its `license.terms`), **syphon-python** and **Syphon framework**, and no SpoutGL, Spout or GLEW. If `make_notices.py` stops with "no licence file for dist:LICENSE* (syphon-python)", the wheel has no licence file: find syphon-python's licence in its repository, save it as `tools/licenses/syphon-python.txt`, and change its entry in `COMPONENTS` to `lic:syphon-python.txt`. |
 | Manual | `USER_MANUAL.html` opens in Safari with the contents on the left, follows light / dark mode, and its nested lists (e.g. under *Studio tab → Live preview*) are indented. |
 | Version | The title bar says **FFStudio 0.9.0-beta.1**; Finder's *Get Info* on FFStudio.app shows version 0.9.0; `--selftest` writes `FFStudio 0.9.0-beta.1` as `selftest.log`'s first line. |
-| Zip | Make the Mac zip on the Mac: put FFStudio.app, `touchosc/`, `sample-shaders/`, `USER_MANUAL.html`, `EULA.txt` and the Mac `THIRD_PARTY_NOTICES.txt` in one folder and compress it with Finder (*Compress*) or `ditto -c -k --keepParent <folder> <zip>`. Unzip a copy elsewhere and check that the app still opens and `codesign --verify --deep --strict` passes. |
+| Zip | Make the Mac zip on the Mac: put FFStudio.app, `touchosc/`, `sample-shaders/`, `USER_MANUAL.html`, `LICENSE.txt` and the Mac `THIRD_PARTY_NOTICES.txt` in one folder and compress it with Finder (*Compress*) or `ditto -c -k --keepParent <folder> <zip>`. Unzip a copy elsewhere and check that the app still opens and `codesign --verify --deep --strict` passes. |
 
 ## If something fails
 

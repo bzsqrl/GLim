@@ -3,7 +3,7 @@
 Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for Resolume 7.21.3+ and **ISF files** for MadMapper and other ISF hosts.
 
 - `USER_MANUAL.md`: how to use it (`compile.py` also writes it as `dist/USER_MANUAL.html` for the package)
-- `EULA.txt`: the beta's licence agreement (draft), shipped with the app
+- `LICENSE.txt`: FFStudio's licence (MIT), shipped with the app; the NDI terms are at the top of the generated `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`)
 - `IMPROVEMENT_PLAN.md`: architecture, status and roadmap
 - `TESTING_CHECKLIST.md`: what to check when testing builds in the VJ hosts
 
