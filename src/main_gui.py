@@ -15,6 +15,7 @@ from ffstudio import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: 
 from ffstudio import __version__                                       # noqa: E402
 from ffstudio import convert as ffconvert                               # noqa: E402
 from ffstudio import settings as ffsettings                             # noqa: E402
+from ffstudio import prefs as ffprefs                                   # noqa: E402
 from editor_panel import EditorPanel, gpu_cache_key, toggle_command    # noqa: E402
 import ctk_fixes                                                       # noqa: E402
 import theme as T                                                      # noqa: E402
@@ -858,18 +859,21 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if not pending:
             self.log("Nothing to build (all items are done or queue is empty).")
             return
+        output_dir = self._ask_folder("build", "Choose a folder for the plugins")
+        if not output_dir:
+            return
         if selected:
             self.log(f"Building {len(pending)} selected item(s)…")
+        self.log(f"Plugins go to {output_dir}")
 
         self._building = True
         self._cancel_event.clear()
         self.btn_build_queue.configure(text="Cancel Build", fg_color=T.RED, hover_color=T.RED_HOVER)
         t = threading.Thread(target=self._build_queue_thread,
-                             args=(pending, EXTRACT_PARAMS), daemon=True)
+                             args=(pending, output_dir, EXTRACT_PARAMS), daemon=True)
         t.start()
 
-    def _build_queue_thread(self, items: list[QueueItem], extract_params: bool):
-        output_dir = ffpaths.default_output_dir()
+    def _build_queue_thread(self, items: list[QueueItem], output_dir: str, extract_params: bool):
         suffix = "-p" if extract_params else ""
 
         ok = err = 0
@@ -1002,7 +1006,10 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         return True
 
     def _build_single(self):
-        self.log("Starting build…")
+        output_dir = self._ask_folder("build", "Choose a folder for the plugin")
+        if not output_dir:
+            return
+        self.log(f"Starting build… (to {output_dir})")
         self.btn_build_single.configure(state="disabled")
         code = self.textbox_code.get("1.0", "end-1c")
         name = self.entry_plugin_name.get().strip() or "FFStudioPlugin"
@@ -1016,7 +1023,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         def run():
             try:
                 self._cancel_event.clear()
-                self._convert_and_build(code, name, path, ffpaths.default_output_dir(), settings, extract)
+                self._convert_and_build(code, name, path, output_dir, settings, extract)
             except Exception as exc:
                 self._gui_log(f"EXCEPTION: {exc}")
             finally:
@@ -1043,18 +1050,45 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                 ext = ".txt"
         path = ctk.filedialog.asksaveasfilename(
             title="Save Shader Code",
-            initialdir=os.path.dirname(self._source_path) if self._source_path else None,
+            initialdir=self._start_dir("save"),
             initialfile=(Path(self._source_path).stem if self._source_path else self._source_stem) + ext,
             defaultextension=ext,
             filetypes=types + [("All Files", "*.*")])
         if not path:
             return
+        ffprefs.set_folder("save", os.path.dirname(path))
         try:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(code)
             self.log(f"✓ Saved {path}")
         except OSError as exc:
             self.log(f"ERROR: Save failed: {exc}")
+
+    def _start_dir(self, kind):
+        """Where a dialog choosing where to write `kind` ("build", "isf" or
+        "save") opens: the folder chosen for it last time (kept in prefs.json),
+        else Resolume's Extra Effects folder for plugins, the loaded shader's
+        folder for saved code, or Documents."""
+        d = ffprefs.folder(kind)
+        if d:
+            return d
+        docs = ffpaths.documents_dir()
+        if kind == "build":
+            resolume = os.path.join(docs, "Resolume Arena", "Extra Effects")
+            if os.path.isdir(resolume):
+                return resolume
+        if kind == "save" and self._source_path:
+            return os.path.dirname(self._source_path)
+        return docs
+
+    def _ask_folder(self, kind, title):
+        """Ask for the folder to write `kind` into and remember it for next
+        time. None if cancelled."""
+        d = ctk.filedialog.askdirectory(title=title, initialdir=self._start_dir(kind))
+        if not d:
+            return None
+        ffprefs.set_folder(kind, d)
+        return d
 
     def _remember_plugin_name(self, name):
         if self._source_path and name != Path(self._source_path).stem:
@@ -1127,11 +1161,13 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         suffix = "-p" if EXTRACT_PARAMS else ""
         save_path = ctk.filedialog.asksaveasfilename(
             title="Export ISF Shader",
+            initialdir=self._start_dir("isf"),
             initialfile=f"{name}{suffix}.fs",
             defaultextension=".fs",
             filetypes=[("ISF Shader", "*.fs"), ("All Files", "*.*")])
         if not save_path:
             return
+        ffprefs.set_folder("isf", os.path.dirname(save_path))
         try:
             dst, note = self._isf_export(code, Path(save_path).stem, self._source_path,
                                          os.path.dirname(save_path), settings=self.settings)
@@ -1146,11 +1182,11 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if not items:
             self.log("Nothing to export.")
             return
-        out_dir = ctk.filedialog.askdirectory(title="Select folder for ISF exports")
+        out_dir = self._ask_folder("isf", "Choose a folder for the ISF files")
         if not out_dir:
             return
 
-        self.log(f"Exporting {len(items)} items to ISF...")
+        self.log(f"Exporting {len(items)} items to ISF in {out_dir}…")
         extract = EXTRACT_PARAMS
         suffix = "-p" if extract else ""
         self.btn_export_isf_queue.configure(state="disabled")

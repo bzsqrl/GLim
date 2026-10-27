@@ -72,12 +72,12 @@ This compiles the new plugin C++ with clang, then loads each plugin in FFStudio'
 ```bash
 venv/bin/python -m ffstudio --to both --test --out output/test_batch_v4 \
   tests/fixtures/shadertoy_rate_params.txt tests/fixtures/shadertoy_define_channel.txt \
-  sample-shaders/bare_fractalSymetry.txt sample-shaders/bare_lopyfrac3dOrthofractalEvolution.txt
+  tests/corpus/bare_fractalSymetry.txt tests/corpus/bare_lopyfrac3dOrthofractalEvolution.txt
 ```
 
 **Expected:** for each shader, a `✓ … .fs` line, then a `✓ … .bundle` line followed by `test host: OK`; at the end, `4/4 converted.` (On Windows, the same command gave four `.dll` files, all `test host: OK`.)
 
-If `sample-shaders/` on this Mac no longer has the two `bare_` files, take them from git: `git checkout -- sample-shaders/bare_fractalSymetry.txt sample-shaders/bare_lopyfrac3dOrthofractalEvolution.txt`.
+If `tests/corpus/` on this Mac no longer has the two `bare_` files, take them from git: `git checkout -- tests/corpus/bare_fractalSymetry.txt tests/corpus/bare_lopyfrac3dOrthofractalEvolution.txt`. (The test shaders moved from `sample-shaders/` to `tests/corpus/` on 2026-10-27; `sample-shaders/` now holds the CC0 shaders that ship with FFStudio.)
 
 If CMake complains about the existing workspace, delete `~/Library/Caches/FFStudio` and run the command again.
 
@@ -225,13 +225,31 @@ FFStudio now has a version number (`__version__` in `ffstudio/__init__.py`, `0.9
 
 | Check | What should happen |
 |---|---|
-| Build | `compile.py` ends with "The package documents (licence, notices, manual) are there too."; `dist/` has `FFStudio.app`, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt`, `USER_MANUAL.html`. |
+| Build | `compile.py` ends with "The rest of the package (sample shaders, TouchOSC layouts, licence, notices, manual) is there too."; `dist/` has `FFStudio.app`, `sample-shaders/` (99 CC0 shaders), `touchosc/`, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt`, `USER_MANUAL.html`. *(Since 2026-10-27, `compile.py` copies `sample-shaders/` and `touchosc/` too.)* |
 | Notices | `THIRD_PARTY_NOTICES.txt` starts with the NDI terms, and its contents list has Python 3.12, Tcl/Tk (from its `license.terms`), **syphon-python** and **Syphon framework**, and no SpoutGL, Spout or GLEW. If `make_notices.py` stops with "no licence file for dist:LICENSE* (syphon-python)", the wheel has no licence file: find syphon-python's licence in its repository, save it as `tools/licenses/syphon-python.txt`, and change its entry in `COMPONENTS` to `lic:syphon-python.txt`. |
 | Manual | `USER_MANUAL.html` opens in Safari with the contents on the left, follows light / dark mode, and its nested lists (e.g. under *Studio tab → Live preview*) are indented. |
 | Version | The title bar says **FFStudio 0.9.0-beta.1**; Finder's *Get Info* on FFStudio.app shows version 0.9.0; `--selftest` writes `FFStudio 0.9.0-beta.1` as `selftest.log`'s first line. |
-| Zip | Make the Mac zip on the Mac: put FFStudio.app, `touchosc/`, `sample-shaders/`, `USER_MANUAL.html`, `LICENSE.txt` and the Mac `THIRD_PARTY_NOTICES.txt` in one folder and compress it with Finder (*Compress*) or `ditto -c -k --keepParent <folder> <zip>`. Unzip a copy elsewhere and check that the app still opens and `codesign --verify --deep --strict` passes. |
+| Zip | Make the Mac zip on the Mac: put FFStudio.app, `touchosc/`, `sample-shaders/`, `USER_MANUAL.html`, `LICENSE.txt` and the Mac `THIRD_PARTY_NOTICES.txt` (all in `dist/` after a build) in one folder and compress it with Finder (*Compress*) or `ditto -c -k --keepParent <folder> <zip>`. Unzip a copy elsewhere and check that the app still opens and `codesign --verify --deep --strict` passes. |
 
 **Checked on the Mac (2026-10-27, M1 Max, macOS 14.8):** every row passed, after two fixes to `tools/make_notices.py`. (1) The first build stopped at "Tcl/Tk's license.terms not found": Homebrew's Tcl/Tk 9.1 keeps Tcl's `license.terms` at the top of its prefix and Tk's (the one naming Apple) in `lib/tk9.1/demos`, not in the library folders the tool looked in; it now looks there too, and the notices carry both. (2) The list of sources at the end named every file in `tools/licenses`, so the Mac notices mentioned Spout (and Windows' would mention Syphon); it now lists only the files used. The notices start with the NDI terms and list Python 3.12.15, Tcl/Tk, syphon-python 0.2.0 and the Syphon framework, with no SpoutGL, Spout or GLEW. The manual opens in Safari with the contents on the left, in dark mode, with nested lists indented. The title bar says FFStudio 0.9.0-beta.1, Finder's version is 0.9.0, `selftest.log` starts with `FFStudio 0.9.0-beta.1`, and the Studio tab's new Save button suggests the shader's name with its extension and saves the code unchanged. A test zip made with `ditto` (30 MB) unpacked elsewhere still passes `codesign --verify --deep --strict` and the self-test (Syphon, NDI and OSC `ok`). The app is still 71 MB, and the plugins it builds are universal (x86_64 and arm64).
+
+## 14. Sample shaders, package folders, save locations
+
+Three changes from Windows (2026-10-27):
+- `sample-shaders/` now holds the 99 CC0 Shadertoy shaders that ship with FFStudio (each starts with its Shadertoy link, author and licence). The old test shaders moved to `tests/corpus/`, which `tests/run_corpus.py` now uses by default.
+- `compile.py` also copies `sample-shaders/` and `touchosc/` into `dist/`, so a build leaves the whole package there.
+- Build FFGL, Export ISF and the Studio tab's save button always ask where to write (Queue and Studio tabs alike). Each dialog opens in the folder last chosen for that kind of file (plugins, ISF files, shader code), kept in `~/Library/Application Support/FFStudio/prefs.json`. With nothing remembered yet, plugins start in `~/Documents/Resolume Arena/Extra Effects` if it exists, else Documents. The app no longer writes to `~/Documents/FFStudio/output` (the command line still uses the project's `output/` unless given `--out`).
+
+Run `venv/bin/python compile.py`, then check:
+
+| Check | Expected |
+|---|---|
+| Corpus | `venv/bin/python tests/run_corpus.py --isf` gives OK=67, STATIC=12 of 79; with `--dir sample-shaders`, OK=99 of 99. |
+| Package | `dist/` has `sample-shaders/` (99 files) and `touchosc/` (2 layouts) next to FFStudio.app. |
+| Build folder | In FFStudio.app, **Build FFGL** in the Studio tab opens a folder dialog (in Extra Effects, or Documents). Choose a folder: the plugin goes there. Build again: the dialog opens in that folder. Cancel: nothing is built. |
+| Queue | **Build FFGL** and **Export ISF** on the Queue tab ask once per batch; the build dialog opens in the folder chosen in the Studio tab. |
+| Across sessions | Quit and reopen FFStudio: each dialog (build, Export ISF, save) opens in the folder chosen last. `prefs.json` lists them under `folders`. |
+| Documents access | If macOS asks for access to Documents, **Allow** works and building still succeeds. |
 
 ## If something fails
 

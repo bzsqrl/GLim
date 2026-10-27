@@ -30,6 +30,25 @@ def cache_dir():
     return d
 
 
+def config_dir():
+    """Writable per-user folder for FFStudio's own settings (prefs.json)."""
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA") or os.path.expanduser("~\\AppData\\Roaming")
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    d = os.path.join(base, "FFStudio")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def documents_dir():
+    """The user's Documents folder (their home folder if there's none)."""
+    d = os.path.expanduser(os.path.join("~", "Documents"))
+    return d if os.path.isdir(d) else os.path.expanduser("~")
+
+
 def templates_dir():
     return os.path.join(bundle_dir(), "templates")
 
