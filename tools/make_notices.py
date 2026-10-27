@@ -156,9 +156,13 @@ def python_and_tcl():
         raise SystemExit("make_notices: Python's LICENSE.txt not found")
     # Tcl/Tk's own terms, where its installation has them (Homebrew's does;
     # python.org's Windows build has them only inside its LICENSE.txt, above).
+    # Homebrew's Tcl/Tk 9 keeps Tcl's at the top of its prefix and Tk's in
+    # lib/tk9.x/demos.
     tcl_lib = tkinter.Tcl().eval("info library")
+    lib = os.path.dirname(tcl_lib)
     terms = []
-    for d in [tcl_lib] + sorted(glob.glob(os.path.join(os.path.dirname(tcl_lib), "tk*"))):
+    for d in ([tcl_lib, os.path.dirname(lib)] + sorted(glob.glob(os.path.join(lib, "tk*")))
+              + sorted(glob.glob(os.path.join(lib, "tk*", "demos")))):
         p = os.path.join(d, "license.terms")
         if os.path.isfile(p) and read(p) not in terms:
             terms.append(read(p))
@@ -172,6 +176,7 @@ def python_and_tcl():
 def main(out_dir):
     platform = "win" if WIN else "mac" if MAC else "other"
     sections = python_and_tcl()
+    used = set()                    # the tools/licenses files those use
     for title, use, dist, module, files, where in COMPONENTS:
         if where not in ("all", platform) or not in_build(module):
             continue
@@ -183,6 +188,7 @@ def main(out_dir):
         elif dist and not in_installed(dist):
             continue
         sections.append((title, use, texts(files, dist)))
+        used.update(f[len("lic:"):] for f in files if f.startswith("lic:"))
 
     rule = "=" * 78
     head = [
@@ -201,7 +207,7 @@ def main(out_dir):
         body += ["", rule, f"{title}: {use}", rule, ""]
         body += ("\n\n" + "-" * 40 + "\n\n").join(parts).split("\n")
     tail = ["", rule, "Sources of the texts not shipped with their packages:", ""]
-    tail += [f"  {k}: {v}" for k, v in SOURCES.items()]
+    tail += [f"  {k}: {v}" for k, v in SOURCES.items() if k in used]
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, "THIRD_PARTY_NOTICES.txt")
     with open(path, "w", encoding="utf-8") as f:     # the platform's line endings
