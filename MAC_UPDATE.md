@@ -251,6 +251,10 @@ Run `venv/bin/python compile.py`, then check:
 | Across sessions | Quit and reopen FFStudio: each dialog (build, Export ISF, save) opens in the folder chosen last. `prefs.json` lists them under `folders`. |
 | Documents access | If macOS asks for access to Documents, **Allow** works and building still succeeds. |
 
+**Checked on the Mac (2026-10-27, M1 Max, macOS 14.8), from source and in the build:** the corpus gives OK=67, STATIC=12 of 79, the fixtures 6 / 6, and `--dir sample-shaders` OK=99 of 99 (ISF OK=99). `compile.py` leaves `sample-shaders/` (99) and `touchosc/` (2) in `dist/`; the app passes the self-test and `codesign --verify --deep --strict` (71 MB). The folder logic was driven from source with the dialogs stubbed to record where they opened: the first Studio build opened in `~/Documents/Resolume Arena/Extra Effects` and the plugin went to the folder chosen; the next build opened there; Cancel built nothing and left Build FFGL usable; the Queue's Build FFGL asked once for two shaders, opening in the Studio tab's last folder; Queue Export ISF asked once (in Documents, with nothing remembered); Save opened in the shader's folder, then in the folder saved to last; `prefs.json` in `~/Library/Application Support/FFStudio` listed all three under `folders`. Still to check by hand in FFStudio.app: the real macOS folder dialogs and the Documents prompt.
+
+**Plugin names from the sample shaders:** every file starts with `stoy_cc0_mrange_`, which is 16 characters, exactly what FFGL shows of a plugin name. So in Resolume every sample plugin is named `stoy_cc0_mrange_`, and in one batch the rest become `stoy_cc0_mrang_2`, `_3`, … (`build_ffgl.unique_plugin_name`); the queue build here named northernJourney's plugin `stoy_cc0_mrang_2.bundle`. Not Mac-specific.
+
 ## If something fails
 
 - **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.
