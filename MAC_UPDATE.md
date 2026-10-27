@@ -255,6 +255,8 @@ Run `venv/bin/python compile.py`, then check:
 
 **Plugin names from the sample shaders:** every file starts with `stoy_cc0_mrange_`, which is 16 characters, exactly what FFGL shows of a plugin name. So in Resolume every sample plugin is named `stoy_cc0_mrange_`, and in one batch the rest become `stoy_cc0_mrang_2`, `_3`, … (`build_ffgl.unique_plugin_name`); the queue build here named northernJourney's plugin `stoy_cc0_mrang_2.bundle`. Not Mac-specific.
 
+**Fixed (2026-10-27):** the sample files are renamed to their short names (`stoy_cc0_mrange_rainbowWheel.txt` → `rainbowWheel.txt`); each file's header still gives its Shadertoy link, author (mrange) and licence (CC0). `--dir sample-shaders` still gives OK=99 of 99 (ISF OK=99), and `python -m ffstudio sample-shaders --to ffgl --test` builds all 99 plugins, each loading in the test host. Two pairs still share their first 16 characters: `logarithmicSpiralSpheres` / `logarithmicSpiralsTweaked` (`logarithmicSpira`) and `tunnelingThroughApollianFrac` / `tunnelingThroughGoldenFractal` (`tunnelingThrough`). In one batch the second of each is named `logarithmicSpi_2` / `tunnelingThrou_2`; built separately, both of a pair show the same name in Resolume.
+
 ## If something fails
 
 - **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.
