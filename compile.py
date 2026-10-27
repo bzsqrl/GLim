@@ -25,11 +25,16 @@ def seal_mac_app(app):
     subprocess.check_call(["codesign", "--force", "--sign", "-", app])
     subprocess.check_call(["codesign", "--verify", "--deep", "--strict", app])
 
-def package_docs(root):
-    """The documents that go in the zip with the app, written into dist/:
-    the licence, the third-party notices (for what this platform's build bundles)
-    and the user manual as HTML."""
+def package_files(root):
+    """What goes in the zip with the app, written into dist/: the sample shaders,
+    the TouchOSC layouts, the licence, the third-party notices (for what this
+    platform's build bundles) and the user manual as HTML."""
     dist = os.path.join(root, "dist")
+    for folder in ("sample-shaders", "touchosc"):
+        dst = os.path.join(dist, folder)
+        if os.path.isdir(dst):
+            shutil.rmtree(dst)          # so files removed from the repo go too
+        shutil.copytree(os.path.join(root, folder), dst)
     shutil.copyfile(os.path.join(root, "LICENSE.txt"), os.path.join(dist, "LICENSE.txt"))
     for tool in ("make_notices.py", "build_manual.py"):
         subprocess.check_call([sys.executable, os.path.join(root, "tools", tool), dist], cwd=root)
@@ -54,14 +59,14 @@ def build():
         if sys.platform == "darwin":
             print("Sealing the app's code signature...")
             seal_mac_app(os.path.join(root, "dist", "FFStudio.app"))
-        print("Writing the package documents...")
-        package_docs(root)
+        print("Writing the package files...")
+        package_files(root)
         print("\nBuild successful!")
         if sys.platform == "darwin":
             print("You can find FFStudio.app in the 'dist' folder.")
         else:
             print("You can find FFStudio.exe in the 'dist' folder.")
-        print("The package documents (licence, notices, manual) are there too.")
+        print("The rest of the package (sample shaders, TouchOSC layouts, licence, notices, manual) is there too.")
     except subprocess.CalledProcessError as e:
         print(f"\nBuild failed with error: {e}")
         sys.exit(1)     # so scripts that run this see the failure

@@ -1,0 +1,30 @@
+// CC0: Another bus shader
+//  Crafted while travelling on the bus
+//  Twigl:ed it: https://twigl.app?ol=true&ss=-OP_xRq3FyCOL-mNSi8o
+
+void mainImage(out vec4 o, vec2 C) {                       // Main function: outputs color 'o' for pixel coordinate 'C'
+  vec2 r=iResolution.xy;                                   // Screen resolution
+  o-=o;                                                    // Initialize output color to zero
+  float b,v,g,a,f;                                         // Temporary variables:
+                                                           // b: accumulated distance along ray
+                                                           // v: min distance (used for shading)
+                                                           // g: loop counter
+                                                           // a: inner loop counter
+                                                           // f: scale factor
+  for(vec3 m; ++g<33.;                                     // Outer loop: march forward along spiral path (max 32 steps)
+      m=normalize(vec3((C+C-r)/r.g,3))*b) {                // m: ray direction based on normalized screen coords, scaled by distance
+    m.b+=iTime;                                            // Animate by rotating in z over time
+    v=9.;                                                  // Start with large min distance
+    f=.5;                                                  // Initial scale for folding pattern
+    mat2 R=mat2(cos(f*(m.b+b)+vec4(0,11,33,0)));           // 2D rotation matrix with time-dependent phase shift
+    for(a=0.; ++a<4.;                                      // Inner loop: apply fractal-like folding 3 times
+        m.rg*=R,                                           // Rotate x–y plane (r = x, g = y)
+        m=abs(abs(m)-f),                                   // Fold space: double absolute value creates repeated geometry
+        f/=4.,                                             // Decrease scale at each level
+        v=min(v,length(m.rg)));                            // Union with a line along z axis
+    o+=(1.+sin(vec4(2,1,0,2)+m.b))/v;                      // Add glowing color based on sine wave and depth, scaled by distance
+    b+=v+.1;                                               // Move forward along ray by current distance + small step
+  }
+  o=tanh(o/2e2);                                           // Tone-map the color using hyperbolic tangent for glow falloff
+  o*=o.a;                                                  // Fade final color based on its own alpha (glow strength)
+}

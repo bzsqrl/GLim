@@ -26,7 +26,7 @@ All of these keep running as you switch shaders, so a queue of shaders can drive
 | :-- | :-- |
 | `FFStudio.exe` (Windows) or `FFStudio.app` (macOS) | The app. There's no installer: it runs from wherever you put it. |
 | `touchosc` | TouchOSC layouts for remote control (see *Remote control* below) |
-| `sample-shaders` | Shaders to try FFStudio with |
+| `sample-shaders` | Shaders to try FFStudio with. They're public domain (CC0), and each one starts with its author and a link to its Shadertoy page. |
 | `USER_MANUAL.html` | This manual |
 | `LICENSE.txt` | FFStudio's licence (MIT) |
 | `THIRD_PARTY_NOTICES.txt` | The terms for the NDI software inside FFStudio, and the licences of the other software by others inside it |
@@ -49,7 +49,7 @@ All of these keep running as you switch shaders, so a queue of shaders can drive
 
 1. Right-click the zip, choose **Extract All…**, and extract it to a folder you can write to, such as Documents or the Desktop.
    - Don't start FFStudio.exe from inside the zip: Windows would run it from a temporary folder, and the plugins it builds would be lost.
-   - Don't put it in `Program Files`: FFStudio writes the plugins it builds to an `output` folder next to FFStudio.exe, and its settings files next to your shaders.
+   - Don't put it in `Program Files`: FFStudio saves each shader's settings next to the shader, including the sample shaders that come with it.
 2. Double-click **FFStudio.exe**. It isn't code-signed yet, so Windows may say *Windows protected your PC*: click **More info**, then **Run anyway**. Windows asks only once. Some antivirus apps also scan it the first time, which can take a while.
 3. FFStudio takes a few seconds to start (it unpacks itself each time).
 4. Windows Firewall asks whether FFStudio may use the network. Allow it on **private networks**: remote control and NDI need it. Everything else works without it.
@@ -69,7 +69,7 @@ Without them, **Build FFGL** says what's missing and where to get it.
    - On macOS 14 you can instead right-click the app and choose **Open**.
    - Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/FFStudio.app`
 3. When FFStudio first uses the network (remote control or NDI), macOS asks whether it may find devices on your local network: click **Allow**.
-4. Plugins go to `~/Documents/FFStudio/output`, so macOS asks once for access to your Documents folder: click **Allow**.
+4. When you first build a plugin, macOS may ask once for access to your Documents folder (FFStudio looks there for Resolume's *Extra Effects* folder): click **Allow**.
 
 **To build FFGL plugins** (optional: the preview, Export ISF, Syphon, NDI and remote control work without it):
 
@@ -89,8 +89,8 @@ A first tour, with the sample shaders:
 2. Press **Shift+Tab** (or click **Studio**). The first shader in the queue plays in the preview, with a slider, switch or menu for each of its parameters.
 3. Press **→** and **←** to step through the queue, or click **Auto** to play it as a slideshow. Move a slider to change the shader as it plays.
 4. Click **⧉** to open an output window. Drag it to a second monitor and double-click it to make it fullscreen; **Esc** brings it back.
-5. Click **Build FFGL** to make a plugin of the shader that's showing (this needs the build tools above). The first build takes about a minute, because it sets up a build workspace and compiles the FFGL SDK; after that, a plugin takes a couple of seconds. The log says where the plugin went: the `output` folder next to FFStudio.exe (on macOS, `~/Documents/FFStudio/output`).
-6. Copy the plugin (`.dll` on Windows, `.bundle` on macOS) to **Documents\Resolume Arena\Extra Effects** (macOS: `~/Documents/Resolume Arena/Extra Effects`), which Resolume scans by default (more folders can be added in Resolume's *Preferences → Video*), and restart Resolume. A shader that makes its own picture appears under **Sources**, one that changes a clip under **Effects**.
+5. Click **Build FFGL** to make a plugin of the shader that's showing (this needs the build tools above). FFStudio asks where to put the plugin (`.dll` on Windows, `.bundle` on macOS): choose **Documents\Resolume Arena\Extra Effects** (macOS: `~/Documents/Resolume Arena/Extra Effects`), which Resolume scans by default (more folders can be added in Resolume's *Preferences → Video*). The first time, the dialog opens there if that folder exists. The first build takes about a minute, because it sets up a build workspace and compiles the FFGL SDK; after that, a plugin takes a couple of seconds.
+6. Restart Resolume. A shader that makes its own picture appears under **Sources**, one that changes a clip under **Effects**.
 7. **Export ISF** saves the shader as an `.fs` file for MadMapper, VDMX, Millumin and other ISF hosts.
 
 FFStudio saves each shader's settings (slider values, ranges, names) in a `<shader>.ffstudio.json` file next to the shader, so keep your shaders in a folder you can write to.
@@ -101,7 +101,7 @@ FFStudio saves each shader's settings (slider values, ranges, names) in a `<shad
 
 **To uninstall**, delete FFStudio.exe (or FFStudio.app). FFStudio installs nothing else, but it leaves:
 - its build workspace: `%LOCALAPPDATA%\FFStudio` (macOS: `~/Library/Caches/FFStudio`);
-- the `output` folder with your plugins (macOS: `~/Documents/FFStudio`);
+- its preferences (the folders you last chose to save into): `%APPDATA%\FFStudio` (macOS: `~/Library/Application Support/FFStudio`);
 - the `.ffstudio.json` settings files next to your shaders.
 
 The Build Tools, Command Line Tools and CMake are uninstalled separately, if you installed them for FFStudio.
@@ -110,13 +110,15 @@ The Build Tools, Command Line Tools and CMake are uninstalled separately, if you
 
 ## Using FFStudio
 
+Whenever FFStudio writes files (**Build FFGL**, **Export ISF**, or saving shader code), it asks where. Each dialog opens in the folder you chose last time for that kind of file (plugins, ISF files or shader code), also after you restart FFStudio, and the Queue and Studio tabs share these folders.
+
 ### Queue tab
 
 The queue is the list of shaders to build, export or play.
 
 1. Drop shader files or folders onto the **Queue** (or use **+** to add files and **📁** to add a folder).
-2. Click **Build FFGL** to make FFGL plugins, or **Export ISF** to make `.fs` files (it asks for a folder).
-3. Plugins are written to the `output` folder (see *First launch*). Copy them to a folder Resolume scans and restart Resolume.
+2. Click **Build FFGL** to make FFGL plugins, or **Export ISF** to make `.fs` files. Each asks for a folder.
+3. If you built plugins into a folder Resolume scans (see *First launch*), restart Resolume. Otherwise, copy them to one first.
 
 In the queue, select rows with a click (Shift/Ctrl-click for several), or press **Ctrl+A** (⌘A on macOS) to select them all. Ctrl+A works anywhere on the Queue tab; in text fields it keeps its usual meaning.
 - **With rows selected**, **Reset**, **Analyze**, **Build FFGL** and **Export ISF** act on just those rows, and show how many in brackets, e.g. **Build FFGL (3)**. Selected rows are rebuilt even if they're already done. Click empty space in the list or press **Esc** to deselect; the buttons then work on the whole queue again (Build skips rows that are already done).
@@ -386,8 +388,8 @@ Send the `selftest.log` from the `selftest` folder (the plugin it builds there c
 
 ### Running and packaging
 
-- **GUI:** `venv\Scripts\python src\main_gui.py` (macOS: `venv/bin/python src/main_gui.py`). Plugins go to the project's `output` folder.
-- **Packaged app:** `venv\Scripts\python compile.py` builds `dist\FFStudio.exe`; on macOS, `venv/bin/python compile.py` builds `dist/FFStudio.app` (Apple Silicon, signed ad hoc, not notarized). It also writes the package's documents into `dist`: `LICENSE.txt` (a copy), `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles) and `USER_MANUAL.html` (`tools/build_manual.py`, from this file). The version is `__version__` in `ffstudio/__init__.py`: it's shown in the title bar, the log and `selftest.log`, and stamped on FFStudio.exe (*Properties → Details*) and FFStudio.app. Headless check: `FFStudio.exe --selftest <shader> <dir>` (macOS: `FFStudio.app/Contents/MacOS/FFStudio --selftest <shader> <dir>`) writes `selftest.log` into `<dir>`.
+- **GUI:** `venv\Scripts\python src\main_gui.py` (macOS: `venv/bin/python src/main_gui.py`). It asks where to write plugins, ISF files and saved code, and remembers the folders in `prefs.json` (`ffstudio/prefs.py`) in `%APPDATA%\FFStudio` (macOS: `~/Library/Application Support/FFStudio`). The command line below writes to the project's `output` folder unless you pass `--out`.
+- **Packaged app:** `venv\Scripts\python compile.py` builds `dist\FFStudio.exe`; on macOS, `venv/bin/python compile.py` builds `dist/FFStudio.app` (Apple Silicon, signed ad hoc, not notarized). It also copies the rest of the package into `dist`: the `sample-shaders` and `touchosc` folders, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles) and `USER_MANUAL.html` (`tools/build_manual.py`, from this file). The version is `__version__` in `ffstudio/__init__.py`: it's shown in the title bar, the log and `selftest.log`, and stamped on FFStudio.exe (*Properties → Details*) and FFStudio.app. Headless check: `FFStudio.exe --selftest <shader> <dir>` (macOS: `FFStudio.app/Contents/MacOS/FFStudio --selftest <shader> <dir>`) writes `selftest.log` into `<dir>`.
 - **TouchOSC layouts:** edit `tools/build_touchosc.py` and run `venv\Scripts\python tools\build_touchosc.py`, or edit them in TouchOSC's editor.
 
 ### Command line

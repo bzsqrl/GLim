@@ -1,0 +1,65 @@
+// CC0: Another inversion
+//  This I found when looking through my weekend experiments. 
+//  Thought it looks neat in it's simplicity
+//  I guess I overused the @mla - inversion by now
+
+// Twigl: https://twigl.app?ol=true&ss=-OSQ1kDlfn5MIGm3aqnZ
+
+
+void mainImage(out vec4 O, vec2 C) {
+  // Variable declarations:
+  // i = iteration counter, d = distance to surface, z = ray depth
+  // k = inversion scaling factor, c = bounding sphere distance, t = time
+  float i,d,z,k,c,t=iTime;
+  vec4 o,p;  // o = accumulated color, p = 4D position
+  
+  for (
+      // Create rotation matrix that rotates over time
+      mat2 R = mat2(cos(.2*t+vec4(0,11,33,0)))
+    ; ++i<80.  
+    ; z += .7*d+1e-3  // Step forward along ray (with small epsilon to that makes surfaces translucent)
+    )
+    // Ray setup: convert screen coordinates to 3D ray direction
+    // Borrowed from one of @XorDevs shaders
+    p = vec4(z*normalize(vec3(C+C,0)-iResolution.xyy),0)
+  
+  // Transform the 3D point:
+  , p.z += 3.5  // Move camera backwards from origin
+  
+  // Apply 4D rotation using 2D rotation matrices on different plane pairs
+  // This creates complex tumbling motion in 4D space
+  , p.xw *= R   // Rotate in XW plane
+  , p.wy *= R   // Rotate in WY plane  
+  , p.zw *= R   // Rotate in ZW plane
+  
+  // Distance to bounding sphere (radius 3.0) - keeps geometry finite
+  , c = length(p)-3.
+  
+  // @mla inversion: spices up the boring grid of boxes
+  // k stores the inversion scale factor for later distance correction
+  , p *= k = 9./dot(p,p)  // 9 = 3² (sphere radius squared)
+  
+  // Create repeating pattern in inverted space:
+  , p += .5*t           // Animate the pattern over time, distorts the 4D hyperspheres
+  , p -= round(p)       // Create infinite grid by wrapping to [-0.5, 0.5] in each dimension
+  
+  // Create rounded hypercube shapes by raising to 8th power
+  // Higher powers make sharper corners, lower powers make more rounded
+  , p *= p              // p² 
+  , p *= p              // p^4
+  
+  // Distance estimation using 8th root (.125 = 1/8):
+  // First term: distance to the rounded hypercubes (corrected for inversion scaling)
+  // Second term: distance to bounding sphere  
+  // Max takes the intersection (inside both) of the two distance fields
+  , d = max(abs(pow(dot(p,p),.125)-.4)/k, c)
+  
+  // Lighting/coloring based on inversion factor and distance
+  //  The closer, the brighter it gets
+  , o += (p = 1. + sin(vec4(5,6,7,5)+2.*log2(k))).w/max(d, 1e-3)*p
+  ;
+    
+  // Tone mapping: tanh compresses bright values, prevents oversaturation
+  // Dividing by large constant (2e4) scales the accumulated light
+  O = tanh(o/2e4);
+}

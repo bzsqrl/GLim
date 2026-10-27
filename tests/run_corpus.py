@@ -1,4 +1,4 @@
-"""Run every shader in sample-shaders/ through the pipeline.
+"""Run every shader in tests/corpus/ through the pipeline (--dir for another folder).
 
     python tests/run_corpus.py [--filter substr] [--no-render] [--isf]
 
@@ -34,7 +34,7 @@ def main():
     ap.add_argument("--filter", default="")
     ap.add_argument("--no-render", action="store_true")
     ap.add_argument("--isf", action="store_true", help="also test ISF export")
-    ap.add_argument("--dir", default=os.path.join(ROOT, "sample-shaders"))
+    ap.add_argument("--dir", default=os.path.join(ROOT, "tests", "corpus"))
     args = ap.parse_args()
 
     out_dir = os.path.join(ROOT, "tests", "out")

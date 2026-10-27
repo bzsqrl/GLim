@@ -18,8 +18,8 @@ Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for
 | `touchosc/` | TouchOSC layouts for the remote control (desktop and phone), made by `tools/build_touchosc.py` |
 | `tools/` | `build_touchosc.py` (the layouts), `make_notices.py` (`THIRD_PARTY_NOTICES.txt`, with the licence texts in `tools/licenses/`), `build_manual.py` (`USER_MANUAL.html`); `compile.py` runs the last two |
 | `assets/icon/` | App icon: `FFStudio.ico` (Windows), `FFStudio.icns` (macOS), `FFStudio.png` (1024 px logo), window icons in `png/`. Regenerate with `python assets/icon/make_icon.py`. |
-| `tests/` | Regression runner (`run_corpus.py`) and feature fixtures |
-| `sample-shaders/` | Test corpus |
+| `tests/` | Regression runner (`run_corpus.py`), its test shaders (`corpus/`: ISF, Shadertoy, GLSL Sandbox and GLSL) and feature fixtures |
+| `sample-shaders/` | The sample shaders that ship with FFStudio: CC0 Shadertoy shaders, each starting with its link, author and licence |
 
 ## Windows setup
 

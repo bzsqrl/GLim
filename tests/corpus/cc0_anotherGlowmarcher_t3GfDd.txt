@@ -1,0 +1,46 @@
+// CC0: Another day, another glowmarcher
+
+// Twigl link: https://twigl.app?ol=true&ss=-OmZSyy0GfTTuMjy66sJ
+
+#define N normalize
+
+void mainImage(out vec4 o, vec2 C) {
+  vec3 
+    p
+  , Z
+  , I=iResolution
+  , S
+  ;
+  
+  vec2 
+    A=vec2(.4,.3)
+  , s
+  ;
+  
+  C+=C-I.xy;
+  s=sin(A*iTime);
+  Z=N(vec3(A*cos(A*iTime),1));
+  S=N(cross(vec3(0,1,0)+vec3(A*A*s,0),Z));
+  I=N(C.y*cross(S,Z)+2.*I.y*Z-C.x*S);
+  S=vec3(s,iTime);
+  
+  vec4 O;
+  
+  for (
+      float i,d,z
+    ; ++i<77.
+    ; O+=o.w*o/d
+    )
+    p=z*I+S
+  , s=sin(A*p.z)
+  , p.xy-=s
+  , Z=N(vec3(A*cos(A*p.z),-1))
+  , p-=dot(p.xy,Z.xy)*.5*Z
+  , p.xy*=mat2(cos(vec4(0,11,33,0)-(A*A*s).x))
+  , o=.9+sin(2.*abs(p.x)+vec4(8,3,4,2))
+  , p-=round(p)
+  , z+=d=1e-3+.7*abs(.53-sqrt(length(p*p)))
+  ;
+  
+  o=tanh(O/2E4);
+}
