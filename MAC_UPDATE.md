@@ -261,12 +261,13 @@ Run `venv/bin/python compile.py`, then check:
 
 ## 15. Original shaders
 
-`original-shaders/` holds 20 ISF shaders written for FFStudio (2026-10-27). Six use persistent buffers (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`), two of them at reduced size (`"WIDTH": "$WIDTH/2"` and `$WIDTH/4`); `meltEcho` is an effect. `compile.py` now copies the folder into `dist/` with `sample-shaders/`, so it goes in the zip too.
+`original-shaders/` holds 30 ISF shaders written for FFStudio (20 on 2026-10-27, 10 building blocks on 2026-10-28). Six use persistent buffers (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`), two of them at reduced size (`"WIDTH": "$WIDTH/2"` and `$WIDTH/4`); `meltEcho` is an effect. `compile.py` now copies the folder into `dist/` with `sample-shaders/`, so it goes in the zip too.
 
 | Check | Expected |
 |---|---|
-| Corpus | `venv/bin/python tests/run_corpus.py --dir original-shaders --isf` gives OK=20 of 20. |
-| Package | After `venv/bin/python compile.py`, `dist/` has `original-shaders/` (20 `.fs` files) next to `sample-shaders/`. |
+| Corpus | `venv/bin/python tests/run_corpus.py --dir original-shaders --isf` gives OK=30 of 30. |
+| Package | After `venv/bin/python compile.py`, `dist/` has `original-shaders/` (30 `.fs` files) next to `sample-shaders/`. |
+| Building blocks | Ten of the 30 (added 2026-10-28) are building blocks: sources with a **Transparent** switch (`shapeForge`, `lineScanner`, `gridMatrix`, `radialBurst`, `noiseField`) and effects (`kaleidoMirror`, `tileShift`, `colorMapper`, `displaceWarp`, `feedbackTrails`). In Resolume, a source with Transparent on shows the layers below through its background. |
 | Zip | The Mac zip (section 13) includes `original-shaders/` as well. |
 | Feedback | In FFStudio.app, `feedbackSwirl`, `reactionBloom` and `cyclicWaves` fill in over a few seconds instead of staying black or noisy; `cyclicWaves` forms spiral waves, and **Clear** / **Reseed** restarts them. |
 

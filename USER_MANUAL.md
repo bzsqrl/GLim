@@ -27,7 +27,7 @@ All of these keep running as you switch shaders, so a queue of shaders can drive
 | `FFStudio.exe` (Windows) or `FFStudio.app` (macOS) | The app. There's no installer: it runs from wherever you put it. |
 | `touchosc` | TouchOSC layouts for remote control (see *Remote control* below) |
 | `sample-shaders` | Shaders to try FFStudio with. They're public domain (CC0), and each one starts with its author and a link to its Shadertoy page. |
-| `original-shaders` | 20 ISF shaders made for FFStudio: psychedelic patterns that evolve over time, each with sliders to play with. Six of them use feedback buffers and build up over a few seconds (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`); `meltEcho` is an effect for your clips, the rest are sources. They're covered by FFStudio's licence (MIT). |
+| `original-shaders` | 30 ISF shaders made for FFStudio, covered by FFStudio's licence (MIT). Twenty are psychedelic patterns that evolve over time, each with sliders to play with; six of them use feedback buffers and build up over a few seconds (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`), and `meltEcho` is an effect for your clips. The other ten are building blocks to layer into your own looks (see *Building blocks* below). |
 | `USER_MANUAL.html` | This manual |
 | `LICENSE.txt` | FFStudio's licence (MIT) |
 | `THIRD_PARTY_NOTICES.txt` | The terms for the NDI software inside FFStudio, and the licences of the other software by others inside it |
@@ -281,6 +281,32 @@ Resolume sends its tempo to FFGL plugins. Until a host sends any, and in the pre
 
 ### Alpha
 Shadertoy and GLSL Sandbox ignore output alpha, so FFStudio makes those plugins opaque. ISF shaders keep their alpha.
+
+## Building blocks
+
+Ten of the shaders in `original-shaders` are simple pieces to combine into your own looks, for example rays from `radialBurst`, coloured by `colorMapper`, mirrored by `kaleidoMirror` and smeared by `feedbackTrails`. Build them as plugins and stack them as layers and effects in Resolume.
+
+**Sources** draw one element. Each has a **Transparent** switch: on, the background is see-through (alpha), so the layer sits over the ones below without a blend mode.
+
+| Shader | What it draws | Main controls |
+| :-- | :-- | :-- |
+| `shapeForge` | A polygon, star or circle, as outline, fill and glow, in concentric copies | Sides, Star, Roundness, Copies, Spacing, Spin, Twist, Pulse, Position |
+| `lineScanner` | Scrolling lines, rings or a grid | Mode, Count, Width, Angle, Scroll, Bend, Width Jitter, Flicker |
+| `gridMatrix` | A grid of dots, squares, crosses, rings or diamonds, sized by a travelling wave | Shape, Wave, Columns, Wave Amount / Freq / Speed, Cell Spin, Grid Spin |
+| `radialBurst` | Rays from a point, straight or spiralling | Rays, Width, Spin, Twist, Breathe, Length Jitter, Inner Radius, Position |
+| `noiseField` | Smooth, ridged, turbulent or cellular noise; with **Threshold** it becomes a mask | Type, Scale, Detail, Warp, Drift, Evolve, Contrast, Threshold |
+
+**Effects** change the clip they're applied to and keep its alpha:
+
+| Shader | What it does | Main controls |
+| :-- | :-- | :-- |
+| `kaleidoMirror` | Mirrors the clip left/right, top/bottom, into four, or into a kaleidoscope | Mode, Segments, Spin, Zoom, Source Point, Source Orbit |
+| `tileShift` | Repeats the clip in tiles, or slices it into tiles, with flips, sliding rows, spinning tiles and glitches | Tiles X / Y, Whole Clip per Tile, Mirror Tiles, Row / Column Slide, Tile Spin, Gap, Glitch |
+| `colorMapper` | Recolours by brightness: gradient map, rainbow map, hue rotate or solarize | Mode, Shadows / Midtones / Highlights, Bands, Cycle, Posterize, Amount |
+| `displaceWarp` | Bends the clip with waves, noise, a swirl, ripples or shattered cells | Field, Amount, Scale, Speed, Center, RGB Split |
+| `feedbackTrails` | Video feedback: trails that zoom, turn and drift, blended by lighten, smear or luma key | Blend, Trail, Zoom, Rotate, Drift X / Y, Hue Shift, Clear |
+
+Every moving part has its own rate slider (Spin, Scroll, Pulse Rate …), and in the plugins moving a rate slider changes the speed without the motion jumping. The flicker, glitch and jitter controls change in steps on purpose, for strobing.
 
 ## Remote control (OSC, TouchOSC)
 
