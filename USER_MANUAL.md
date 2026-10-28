@@ -27,6 +27,7 @@ All of these keep running as you switch shaders, so a queue of shaders can drive
 | `FFStudio.exe` (Windows) or `FFStudio.app` (macOS) | The app. There's no installer: it runs from wherever you put it. |
 | `touchosc` | TouchOSC layouts for remote control (see *Remote control* below) |
 | `sample-shaders` | Shaders to try FFStudio with. They're public domain (CC0), and each one starts with its author and a link to its Shadertoy page. |
+| `original-shaders` | 20 ISF shaders made for FFStudio: psychedelic patterns that evolve over time, each with sliders to play with. Six of them use feedback buffers and build up over a few seconds (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`); `meltEcho` is an effect for your clips, the rest are sources. They're covered by FFStudio's licence (MIT). |
 | `USER_MANUAL.html` | This manual |
 | `LICENSE.txt` | FFStudio's licence (MIT) |
 | `THIRD_PARTY_NOTICES.txt` | The terms for the NDI software inside FFStudio, and the licences of the other software by others inside it |

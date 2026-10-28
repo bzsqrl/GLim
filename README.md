@@ -20,6 +20,7 @@ Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for
 | `assets/icon/` | App icon: `FFStudio.ico` (Windows), `FFStudio.icns` (macOS), `FFStudio.png` (1024 px logo), window icons in `png/`. Regenerate with `python assets/icon/make_icon.py`. |
 | `tests/` | Regression runner (`run_corpus.py`), its test shaders (`corpus/`: ISF, Shadertoy, GLSL Sandbox and GLSL) and feature fixtures |
 | `sample-shaders/` | The sample shaders that ship with FFStudio: CC0 Shadertoy shaders, each starting with its link, author and licence |
+| `original-shaders/` | FFStudio's own ISF shaders (MIT, like the rest of the repo), also shipped in the package; check them with `tests/run_corpus.py --dir original-shaders` |
 
 ## Windows setup
 
