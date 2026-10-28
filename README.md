@@ -6,7 +6,6 @@ Converts GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** for
 - `LICENSE.txt`: GLim's licence (MIT), shipped with the app; the NDI terms are at the top of the generated `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`)
 - `IMPROVEMENT_PLAN.md`: architecture, status and roadmap
 - `TESTING_CHECKLIST.md`: what to check when testing builds in the VJ hosts
-- `RENAME_TO_GLIM.md`: finishing the rename from FFStudio (the GitHub repo, and the local folders on Windows and the Mac)
 
 ## Layout
 
