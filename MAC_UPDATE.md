@@ -259,6 +259,17 @@ Run `venv/bin/python compile.py`, then check:
 
 **Intermittent ISF differences:** on some runs, `--dir sample-shaders` reports a small ISF difference (DIFF3 to DIFF48) for `nothingComplicated` and sometimes `sorryForTheBanding`, and OK on others. The folder from before the renames does the same, so it isn't from them; it looks like `cc0_anotherBusShader`'s intermittent DIFFn in the corpus.
 
+## 15. Original shaders
+
+`original-shaders/` holds 20 ISF shaders written for FFStudio (2026-10-27). Six use persistent buffers (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`), two of them at reduced size (`"WIDTH": "$WIDTH/2"` and `$WIDTH/4`); `meltEcho` is an effect. `compile.py` now copies the folder into `dist/` with `sample-shaders/`, so it goes in the zip too.
+
+| Check | Expected |
+|---|---|
+| Corpus | `venv/bin/python tests/run_corpus.py --dir original-shaders --isf` gives OK=20 of 20. |
+| Package | After `venv/bin/python compile.py`, `dist/` has `original-shaders/` (20 `.fs` files) next to `sample-shaders/`. |
+| Zip | The Mac zip (section 13) includes `original-shaders/` as well. |
+| Feedback | In FFStudio.app, `feedbackSwirl`, `reactionBloom` and `cyclicWaves` fill in over a few seconds instead of staying black or noisy; `cyclicWaves` forms spiral waves, and **Clear** / **Reseed** restarts them. |
+
 ## If something fails
 
 - **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.
