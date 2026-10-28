@@ -5,8 +5,8 @@ Two input forms:
   * Sectioned text: tabs pasted into one file under header lines like
         // ==== Common ====
         // ==== Buffer A ====
-        // ffstudio: iChannel0 = Buffer A      (directives apply to their section)
-        // ffstudio: iChannel1 = rock.jpg filter=nearest wrap=clamp vflip=false
+        // glim: iChannel0 = Buffer A      (directives apply to their section)
+        // glim: iChannel1 = rock.jpg filter=nearest wrap=clamp vflip=false
         // ==== Image ====
 """
 import json

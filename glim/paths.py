@@ -25,20 +25,20 @@ def cache_dir():
         base = os.path.expanduser("~/Library/Caches")
     else:
         base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    d = os.path.join(base, "FFStudio")
+    d = os.path.join(base, "GLim")
     os.makedirs(d, exist_ok=True)
     return d
 
 
 def config_dir():
-    """Writable per-user folder for FFStudio's own settings (prefs.json)."""
+    """Writable per-user folder for GLim's own settings (prefs.json)."""
     if sys.platform == "win32":
         base = os.environ.get("APPDATA") or os.path.expanduser("~\\AppData\\Roaming")
     elif sys.platform == "darwin":
         base = os.path.expanduser("~/Library/Application Support")
     else:
         base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    d = os.path.join(base, "FFStudio")
+    d = os.path.join(base, "GLim")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -54,7 +54,7 @@ def templates_dir():
 
 
 def icon_dir():
-    """FFStudio's icon files (made by assets/icon/make_icon.py)."""
+    """GLim's icon files (made by assets/icon/make_icon.py)."""
     return os.path.join(bundle_dir(), "assets", "icon")
 
 
@@ -63,8 +63,8 @@ def ffgl_sdk_dir():
 
 
 def default_output_dir():
-    # A packaged Mac app can't write inside FFStudio.app (that breaks its
+    # A packaged Mac app can't write inside GLim.app (that breaks its
     # signature, and /Applications is read-only), so use Documents instead.
     if getattr(sys, "frozen", False) and sys.platform == "darwin":
-        return os.path.join(os.path.expanduser("~/Documents"), "FFStudio", "output")
+        return os.path.join(os.path.expanduser("~/Documents"), "GLim", "output")
     return os.path.join(app_dir(), "output")

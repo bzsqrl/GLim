@@ -1,4 +1,4 @@
-"""Lightweight Tk/ttk widgets in FFStudio's colours (theme.py).
+"""Lightweight Tk/ttk widgets in GLim's colours (theme.py).
 
 Every CustomTkinter widget is a canvas that draws its own rounded shapes, so
 building many is slow: a 13-slider parameter list took about half a second,
@@ -49,17 +49,17 @@ def setup(widget):
     st = ttk.Style(widget)
     if st.theme_use() != "clam":        # the native themes ignore colours
         st.theme_use("clam")
-    st.configure("FF.Horizontal.TScale", troughcolor=TROUGH, background=ACCENT, bordercolor=ROW,
+    st.configure("GLim.Horizontal.TScale", troughcolor=TROUGH, background=ACCENT, bordercolor=ROW,
                  lightcolor=ACCENT, darkcolor=ACCENT, gripcount=0, sliderlength=px(14),
                  sliderthickness=px(14), troughrelief="flat")
-    st.map("FF.Horizontal.TScale",
+    st.map("GLim.Horizontal.TScale",
            background=[("disabled", DISABLED), ("focus", FOCUS), ("active", T.ACCENT_ACTIVE)],
            lightcolor=[("disabled", DISABLED), ("focus", FOCUS), ("active", T.ACCENT_ACTIVE)],
            darkcolor=[("disabled", DISABLED), ("focus", FOCUS), ("active", T.ACCENT_ACTIVE)])
-    st.configure("FF.TCheckbutton", background=ROW, foreground=FG, font=_font, focuscolor=ROW,
+    st.configure("GLim.TCheckbutton", background=ROW, foreground=FG, font=_font, focuscolor=ROW,
                  indicatorbackground=ENTRY_BG, indicatorforeground="white", indicatormargin=px(2),
                  upperbordercolor=BORDER, lowerbordercolor=BORDER)
-    st.map("FF.TCheckbutton", background=[("active", ROW)],
+    st.map("GLim.TCheckbutton", background=[("active", ROW)],
            indicatorbackground=[("selected", ACCENT), ("pressed", ACCENT_HOVER)])
 
 
@@ -93,7 +93,7 @@ class Scale(ttk.Scale):
 
     def __init__(self, parent, lo, hi, command=None):
         self._command, self._quiet = command, False
-        super().__init__(parent, from_=lo, to=hi, orient="horizontal", style="FF.Horizontal.TScale",
+        super().__init__(parent, from_=lo, to=hi, orient="horizontal", style="GLim.Horizontal.TScale",
                          command=self._changed)
         self.bind("<Button-1>", self._jump, add=True)
 
@@ -123,7 +123,7 @@ def scale(parent, lo, hi, command=None):
 
 def check(parent, variable, command=None, text=""):
     return ttk.Checkbutton(parent, text=text, variable=variable, command=command,
-                           style="FF.TCheckbutton", takefocus=False)
+                           style="GLim.TCheckbutton", takefocus=False)
 
 
 class Button(tk.Label):

@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "An endless log-polar spiral tunnel: two counter-turning spirals weave a lattice that zooms in forever and slowly re-twists itself",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

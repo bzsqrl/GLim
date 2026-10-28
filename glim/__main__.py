@@ -1,8 +1,8 @@
-"""Command line: python -m ffstudio <files or folders> [options]
+"""Command line: python -m glim <files or folders> [options]
 
 Examples:
-  python -m ffstudio tests/corpus/vv_brokenLCD.fs --to ffgl
-  python -m ffstudio sample-shaders --to both --out output/batch --test
+  python -m glim tests/corpus/vv_brokenLCD.fs --to ffgl
+  python -m glim sample-shaders --to both --out output/batch --test
 """
 import argparse
 import os
@@ -30,7 +30,7 @@ def smoke_test_subprocess(plugin_path, num_inputs, timeout=60):
     affect the caller."""
     import json
     import subprocess
-    cmd = [sys.executable, "-m", "ffstudio.ffgl_host", plugin_path, str(num_inputs)]
+    cmd = [sys.executable, "-m", "glim.ffgl_host", plugin_path, str(num_inputs)]
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
                            cwd=paths.bundle_dir())
@@ -44,13 +44,17 @@ def smoke_test_subprocess(plugin_path, num_inputs, timeout=60):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="ffstudio", description="Convert GLSL shaders to FFGL plugins and ISF files.")
+    # The output uses ✓ / ✗; a redirected Windows console is cp1252 and can't encode them.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+    ap = argparse.ArgumentParser(prog="glim", description="Convert GLSL shaders to FFGL plugins and ISF files.")
     ap.add_argument("inputs", nargs="+")
     ap.add_argument("--to", choices=["ffgl", "isf", "both", "check"], default="ffgl",
                     help="'check' only validates (no files written)")
-    ap.add_argument("--out", default=None, help="output folder (default: the output folder next to FFStudio)")
+    ap.add_argument("--out", default=None, help="output folder (default: the output folder next to GLim)")
     ap.add_argument("--no-params", action="store_true", help="don't turn constants into sliders")
-    ap.add_argument("--prefix", default="", help="prefix for plugin names (e.g. 'FFM ')")
+    ap.add_argument("--prefix", default="", help="prefix for plugin names (e.g. 'GL ')")
     ap.add_argument("--test", action="store_true", help="load each built plugin in a test host")
     args = ap.parse_args(argv)
 

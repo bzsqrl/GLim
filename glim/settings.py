@@ -1,4 +1,4 @@
-"""Per-shader settings stored next to the shader as <name>.ffstudio.json.
+"""Per-shader settings stored next to the shader as <name>.glim.json.
 
 {
   "plugin_name": "My Shader",
@@ -12,7 +12,7 @@
 import json
 import os
 
-SUFFIX = ".ffstudio.json"
+SUFFIX = ".glim.json"
 
 
 def path_for(shader_path):

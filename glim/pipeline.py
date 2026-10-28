@@ -21,7 +21,7 @@ def convert_ffgl(code, name="Shader", path=None, extract_params=True, promote_in
                  validate=True, max_rounds=6, settings=None):
     """Convert to FFGL GLSL, compiling with the GPU when available. If a
     promoted constant breaks compilation, it's put back and we retry.
-    `settings` defaults to the shader's <name>.ffstudio.json, if any."""
+    `settings` defaults to the shader's <name>.glim.json, if any."""
     from . import settings as S
     if settings is None:
         settings = S.load(path)

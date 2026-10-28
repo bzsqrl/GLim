@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "A Truchet maze of quarter-circle arcs with colour flowing along the paths; tiles quietly cross-fade to new orientations, rewiring the maze",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

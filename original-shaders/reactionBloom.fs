@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "A living Gray-Scott reaction-diffusion: two chemicals grow coral, mazes and dividing cells; the recipe wanders across space and time, so different growths compete",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

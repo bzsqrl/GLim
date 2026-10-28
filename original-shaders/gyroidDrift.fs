@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "A flat slice travelling through a 3D gyroid lattice: contour lines bloom, merge and split as the slice moves deeper",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

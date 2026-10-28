@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Ripples from five wandering wave sources interfere into shifting moire contours with a chromatic split",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

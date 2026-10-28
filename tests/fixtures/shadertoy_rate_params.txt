@@ -1,4 +1,4 @@
-// Fixture: time * slider becomes a running total (ffm_phaseN) the host keeps,
+// Fixture: time * slider becomes a running total (glim_phaseN) the host keeps,
 // so moving the slider changes the rate instead of jumping the animation.
 // Lines marked "phase" must be rewritten; lines marked "keep" must not.
 const float rate = 1.0;

@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Building block effect: repeat the clip in a grid of tiles, or slice it into tiles, with flips, sliding rows, spinning tiles, gaps and glitchy jumps",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Stylize", "Building Block"],
   "INPUTS": [

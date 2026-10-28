@@ -1,6 +1,6 @@
-// FFStudio FFGL runtime. This file is fixed; everything shader-specific lives
+// GLim FFGL runtime. This file is fixed; everything shader-specific lives
 // in the generated ShaderData.h.
-#include "FFStudioPlugin.h"
+#include "GLimPlugin.h"
 #include "ShaderData.h"
 #include <algorithm>
 #include <cmath>
@@ -19,23 +19,23 @@
 using namespace ffglex;
 
 static CFFGLPluginInfo PluginInfo(
-	PluginFactory< FFStudioPlugin >,
-	FFM_PLUGIN_ID,
-	FFM_PLUGIN_NAME,
+	PluginFactory< GLimPlugin >,
+	GLIM_PLUGIN_ID,
+	GLIM_PLUGIN_NAME,
 	2, 1,// FFGL API version
 	1, 0,// plugin version
-	FFM_PLUGIN_TYPE,
-	FFM_DESCRIPTION,
-	FFM_ABOUT );
+	GLIM_PLUGIN_TYPE,
+	GLIM_DESCRIPTION,
+	GLIM_ABOUT );
 
 static const char* kVertexShader = R"(#version 410 core
 layout( location = 0 ) in vec4 vPosition;
 layout( location = 1 ) in vec2 vUV;
-out vec2 ffm_uv;
+out vec2 glim_uv;
 void main()
 {
 	gl_Position = vPosition;
-	ffm_uv      = vUV;
+	glim_uv      = vUV;
 }
 )";
 
@@ -47,7 +47,7 @@ static std::string JoinChunks( const char* const* chunks )
 	return s;
 }
 
-static void FFM_HSVtoRGB( float h, float s, float v, float& r, float& g, float& b )
+static void GLIM_HSVtoRGB( float h, float s, float v, float& r, float& g, float& b )
 {
 	h       = h - std::floor( h );
 	float i = std::floor( h * 6.0f );
@@ -64,14 +64,14 @@ static void FFM_HSVtoRGB( float h, float s, float v, float& r, float& g, float& 
 	}
 }
 
-FFStudioPlugin::FFStudioPlugin()
+GLimPlugin::GLimPlugin()
 {
-	SetMinInputs( FFM_NUM_INPUTS );
-	SetMaxInputs( FFM_NUM_INPUTS );
+	SetMinInputs( GLIM_NUM_INPUTS );
+	SetMaxInputs( GLIM_NUM_INPUTS );
 
-	for( int d = 0; d < FFM_NUM_PARAMS; ++d )
+	for( int d = 0; d < GLIM_NUM_PARAMS; ++d )
 	{
-		const FFMParamDef& p = FFM_PARAMS[ d ];
+		const GLimParamDef& p = GLIM_PARAMS[ d ];
 		firstHostParam.push_back( (int)hostParams.size() );
 		auto add = [ & ]( const std::string& name, unsigned int type, float def, int sub ) {
 			unsigned int idx = (unsigned int)hostParams.size();
@@ -86,21 +86,21 @@ FFStudioPlugin::FFStudioPlugin()
 		std::string label = p.label;
 		switch( p.kind )
 		{
-		case FFM_K_FLOAT:
-		case FFM_K_SPEED:
+		case GLIM_K_FLOAT:
+		case GLIM_K_SPEED:
 			SetParamRange( add( label, FF_TYPE_STANDARD, p.def[ 0 ], 0 ), p.min[ 0 ], p.max[ 0 ] );
 			break;
-		case FFM_K_INT:
+		case GLIM_K_INT:
 			SetParamRange( add( label, FF_TYPE_INTEGER, p.def[ 0 ], 0 ), p.min[ 0 ], p.max[ 0 ] );
 			break;
-		case FFM_K_BOOL:
-		case FFM_K_MOUSECLICK:
+		case GLIM_K_BOOL:
+		case GLIM_K_MOUSECLICK:
 			add( label, FF_TYPE_BOOLEAN, p.def[ 0 ], 0 );
 			break;
-		case FFM_K_EVENT:
+		case GLIM_K_EVENT:
 			add( label, FF_TYPE_EVENT, 0.0f, 0 );
 			break;
-		case FFM_K_OPTION:
+		case GLIM_K_OPTION:
 		{
 			unsigned int idx = (unsigned int)hostParams.size();
 			SetOptionParamInfo( idx, label.c_str(), (unsigned int)p.numOptions, p.def[ 0 ] );
@@ -110,45 +110,45 @@ FFStudioPlugin::FFStudioPlugin()
 			values.push_back( p.def[ 0 ] );
 			break;
 		}
-		case FFM_K_COLOR:
+		case GLIM_K_COLOR:
 			add( label, FF_TYPE_HUE, p.def[ 0 ], 0 );
 			add( label + " Saturation", FF_TYPE_SATURATION, p.def[ 1 ], 1 );
 			add( label + " Brightness", FF_TYPE_BRIGHTNESS, p.def[ 2 ], 2 );
 			add( label + " Alpha", FF_TYPE_ALPHA, p.def[ 3 ], 3 );
 			break;
-		case FFM_K_FFT:
+		case GLIM_K_FFT:
 		{
 			unsigned int idx = (unsigned int)hostParams.size();
-			SetBufferParamInfo( idx, label.c_str(), FFM_FFT_SIZE, FF_USAGE_FFT );
+			SetBufferParamInfo( idx, label.c_str(), GLIM_FFT_SIZE, FF_USAGE_FFT );
 			hostParams.push_back( { d, 0 } );
 			values.push_back( 0.0f );
 			fftParam = (int)idx;
 			break;
 		}
-		case FFM_K_POINT:
-		case FFM_K_MOUSE:
+		case GLIM_K_POINT:
+		case GLIM_K_MOUSE:
 			SetParamRange( add( label + " X", FF_TYPE_STANDARD, p.def[ 0 ], 0 ), p.min[ 0 ], p.max[ 0 ] );
 			SetParamRange( add( label + " Y", FF_TYPE_STANDARD, p.def[ 1 ], 1 ), p.min[ 1 ], p.max[ 1 ] );
 			break;
 		}
 	}
-	targets.resize( FFM_NUM_TARGETS > 0 ? FFM_NUM_TARGETS : 0 );
+	targets.resize( GLIM_NUM_TARGETS > 0 ? GLIM_NUM_TARGETS : 0 );
 }
 
-FFStudioPlugin::~FFStudioPlugin()
+GLimPlugin::~GLimPlugin()
 {
 }
 
-FFResult FFStudioPlugin::InitGL( const FFGLViewportStruct* vp )
+FFResult GLimPlugin::InitGL( const FFGLViewportStruct* vp )
 {
 	shaders.clear();
-	for( int i = 0; i < FFM_NUM_PROGRAMS; ++i )
+	for( int i = 0; i < GLIM_NUM_PROGRAMS; ++i )
 	{
-		std::string frag = JoinChunks( FFM_PROGRAMS[ i ] );
+		std::string frag = JoinChunks( GLIM_PROGRAMS[ i ] );
 		shaders.emplace_back( new FFGLShader() );
 		if( !shaders.back()->Compile( kVertexShader, frag.c_str() ) )
 		{
-			FFGLLog::LogToHost( "FFStudio: shader failed to compile" );
+			FFGLLog::LogToHost( "GLim: shader failed to compile" );
 			DeInitGL();
 			return FF_FAIL;
 		}
@@ -167,9 +167,9 @@ FFResult FFStudioPlugin::InitGL( const FFGLViewportStruct* vp )
 	glBindTexture( GL_TEXTURE_2D, 0 );
 
 	// Embedded images (ISF IMPORTED / Shadertoy textures) or generated noise.
-	for( int i = 0; i < FFM_NUM_IMAGES; ++i )
+	for( int i = 0; i < GLIM_NUM_IMAGES; ++i )
 	{
-		const FFMImageDef& d = FFM_IMAGES[ i ];
+		const GLimImageDef& d = GLIM_IMAGES[ i ];
 		int w = 0, h = 0, n = 0;
 		unsigned char* pixels = nullptr;
 		std::vector< unsigned char > noise;
@@ -222,7 +222,7 @@ FFResult FFStudioPlugin::InitGL( const FFGLViewportStruct* vp )
 	return CFFGLPlugin::InitGL( vp );
 }
 
-FFResult FFStudioPlugin::DeInitGL()
+FFResult GLimPlugin::DeInitGL()
 {
 	for( auto& s : shaders )
 		s->FreeGLResources();
@@ -249,7 +249,7 @@ FFResult FFStudioPlugin::DeInitGL()
 	return FF_SUCCESS;
 }
 
-void FFStudioPlugin::AllocTarget( Target& t, int w, int h, bool isFloat )
+void GLimPlugin::AllocTarget( Target& t, int w, int h, bool isFloat )
 {
 	FreeTarget( t );
 	t.w = w;
@@ -276,7 +276,7 @@ void FFStudioPlugin::AllocTarget( Target& t, int w, int h, bool isFloat )
 	glClearColor( prevClear[ 0 ], prevClear[ 1 ], prevClear[ 2 ], prevClear[ 3 ] );
 }
 
-void FFStudioPlugin::FreeTarget( Target& t )
+void GLimPlugin::FreeTarget( Target& t )
 {
 	for( int i = 0; i < 2; ++i )
 	{
@@ -289,19 +289,19 @@ void FFStudioPlugin::FreeTarget( Target& t )
 	t.w = t.h = 0;
 }
 
-void FFStudioPlugin::UpdateAudio()
+void GLimPlugin::UpdateAudio()
 {
 	if( fftParam < 0 )
 		return;
-	std::vector< float > fft( FFM_FFT_SIZE, 0.0f );
+	std::vector< float > fft( GLIM_FFT_SIZE, 0.0f );
 	if( ParamInfo* info = FindParamInfo( (unsigned int)fftParam ) )
 		for( size_t i = 0; i < fft.size() && i < info->elements.size(); ++i )
 			fft[ i ] = info->elements[ i ].value;
 	for( int rows = 1; rows <= 2; ++rows )
 	{
 		bool needed = false;
-		for( int s = 0; s < FFM_NUM_SAMPLERS; ++s )
-			needed |= FFM_SAMPLERS[ s ].source == FFM_SRC_AUDIO && FFM_SAMPLERS[ s ].index == rows;
+		for( int s = 0; s < GLIM_NUM_SAMPLERS; ++s )
+			needed |= GLIM_SAMPLERS[ s ].source == GLIM_SRC_AUDIO && GLIM_SAMPLERS[ s ].index == rows;
 		if( !needed )
 			continue;
 		std::vector< float > data( fft );
@@ -311,7 +311,7 @@ void FFStudioPlugin::UpdateAudio()
 		{
 			glGenTextures( 1, &audioTex[ rows ] );
 			glBindTexture( GL_TEXTURE_2D, audioTex[ rows ] );
-			glTexImage2D( GL_TEXTURE_2D, 0, GL_R32F, FFM_FFT_SIZE, rows, 0, GL_RED, GL_FLOAT, data.data() );
+			glTexImage2D( GL_TEXTURE_2D, 0, GL_R32F, GLIM_FFT_SIZE, rows, 0, GL_RED, GL_FLOAT, data.data() );
 			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
@@ -322,31 +322,31 @@ void FFStudioPlugin::UpdateAudio()
 		else
 		{
 			glBindTexture( GL_TEXTURE_2D, audioTex[ rows ] );
-			glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, FFM_FFT_SIZE, rows, GL_RED, GL_FLOAT, data.data() );
+			glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, GLIM_FFT_SIZE, rows, GL_RED, GL_FLOAT, data.data() );
 		}
 		glBindTexture( GL_TEXTURE_2D, 0 );
 	}
 }
 
-float FFStudioPlugin::Value( int def, int sub ) const
+float GLimPlugin::Value( int def, int sub ) const
 {
 	return values[ firstHostParam[ def ] + sub ];
 }
 
-float FFStudioPlugin::P( const char* uniform ) const
+float GLimPlugin::P( const char* uniform ) const
 {
-	for( int d = 0; d < FFM_NUM_PARAMS; ++d )
-		if( FFM_PARAMS[ d ].uniform[ 0 ] && strcmp( FFM_PARAMS[ d ].uniform, uniform ) == 0 )
+	for( int d = 0; d < GLIM_NUM_PARAMS; ++d )
+		if( GLIM_PARAMS[ d ].uniform[ 0 ] && strcmp( GLIM_PARAMS[ d ].uniform, uniform ) == 0 )
 			return Value( d, 0 );
 	return 0.0f;
 }
 
-void FFStudioPlugin::SendParams( GLuint program )
+void GLimPlugin::SendParams( GLuint program )
 {
 	const float W = (float)currentViewport.width, H = (float)currentViewport.height;
-	for( int d = 0; d < FFM_NUM_PARAMS; ++d )
+	for( int d = 0; d < GLIM_NUM_PARAMS; ++d )
 	{
-		const FFMParamDef& p = FFM_PARAMS[ d ];
+		const GLimParamDef& p = GLIM_PARAMS[ d ];
 		if( !p.uniform[ 0 ] )
 			continue;
 		GLint loc = glGetUniformLocation( program, p.uniform );
@@ -354,34 +354,34 @@ void FFStudioPlugin::SendParams( GLuint program )
 			continue;
 		switch( p.kind )
 		{
-		case FFM_K_FLOAT:
+		case GLIM_K_FLOAT:
 			glUniform1f( loc, Value( d, 0 ) );
 			break;
-		case FFM_K_INT:
+		case GLIM_K_INT:
 			glUniform1i( loc, (int)std::lround( Value( d, 0 ) ) );
 			break;
-		case FFM_K_BOOL:
-		case FFM_K_EVENT:
+		case GLIM_K_BOOL:
+		case GLIM_K_EVENT:
 			glUniform1i( loc, Value( d, 0 ) > 0.5f ? 1 : 0 );
 			break;
-		case FFM_K_OPTION:
+		case GLIM_K_OPTION:
 		{
 			int o = std::max( 0, std::min( p.numOptions - 1, (int)std::lround( Value( d, 0 ) ) ) );
 			glUniform1i( loc, (int)p.optValues[ o ] );
 			break;
 		}
-		case FFM_K_COLOR:
+		case GLIM_K_COLOR:
 		{
 			float hue = Value( d, 0 );
 			float r, g, b;
-			FFM_HSVtoRGB( hue >= 1.0f ? 0.0f : hue, Value( d, 1 ), Value( d, 2 ), r, g, b );
+			GLIM_HSVtoRGB( hue >= 1.0f ? 0.0f : hue, Value( d, 1 ), Value( d, 2 ), r, g, b );
 			if( p.glslComponents == 3 )
 				glUniform3f( loc, r, g, b );
 			else
 				glUniform4f( loc, r, g, b, Value( d, 3 ) );
 			break;
 		}
-		case FFM_K_POINT:
+		case GLIM_K_POINT:
 		{
 			float x = Value( d, 0 ), y = Value( d, 1 );
 			if( p.pixelSpace )
@@ -393,7 +393,7 @@ void FFStudioPlugin::SendParams( GLuint program )
 	}
 }
 
-FFResult FFStudioPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
+FFResult GLimPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 {
 	if( shaders.empty() )
 		return FF_FAIL;
@@ -407,24 +407,24 @@ FFResult FFStudioPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	float speed = 1.0f;
 	float mouseX = 0.0f, mouseY = 0.0f;
 	bool mouseDown = false;
-	for( int d = 0; d < FFM_NUM_PARAMS; ++d )
+	for( int d = 0; d < GLIM_NUM_PARAMS; ++d )
 	{
-		if( FFM_PARAMS[ d ].kind == FFM_K_SPEED )
+		if( GLIM_PARAMS[ d ].kind == GLIM_K_SPEED )
 			speed = Value( d, 0 );
-		else if( FFM_PARAMS[ d ].kind == FFM_K_MOUSE )
+		else if( GLIM_PARAMS[ d ].kind == GLIM_K_MOUSE )
 			mouseX = Value( d, 0 ), mouseY = Value( d, 1 );
-		else if( FFM_PARAMS[ d ].kind == FFM_K_MOUSECLICK )
+		else if( GLIM_PARAMS[ d ].kind == GLIM_K_MOUSECLICK )
 			mouseDown = Value( d, 0 ) > 0.5f;
 	}
 	lastDelta = dt * speed;
 	clockTime += lastDelta;
 	realTime += dt;
-	phases.resize( FFM_NUM_PHASES, 0.0 );
-	for( int k = 0; k < FFM_NUM_PHASES; ++k )
+	phases.resize( GLIM_NUM_PHASES, 0.0 );
+	for( int k = 0; k < GLIM_NUM_PHASES; ++k )
 	{
-		double rate = FFM_PHASES[ k ].scale;
-		for( int i = 0; i < FFM_PHASES[ k ].count; ++i )
-			rate *= Value( FFM_PHASES[ k ].defs[ i ], 0 );
+		double rate = GLIM_PHASES[ k ].scale;
+		for( int i = 0; i < GLIM_PHASES[ k ].count; ++i )
+			rate *= Value( GLIM_PHASES[ k ].defs[ i ], 0 );
 		phases[ k ] += rate * lastDelta;
 	}
 	float bpm = 120.0f, barPhase, beat;
@@ -453,19 +453,19 @@ FFResult FFStudioPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	GLboolean scissor = glIsEnabled( GL_SCISSOR_TEST );
 	glDisable( GL_SCISSOR_TEST );
 
-	for( int pi = 0; pi < FFM_NUM_PASSES; ++pi )
+	for( int pi = 0; pi < GLIM_NUM_PASSES; ++pi )
 	{
-		const FFMPassDef& pass = FFM_PASSES[ pi ];
+		const GLimPassDef& pass = GLIM_PASSES[ pi ];
 		int w = VW, h = VH;
 		if( pass.target >= 0 )
 		{
 			float fw = (float)VW, fh = (float)VH;
-			FFM_PassSize( pi, (float)VW, (float)VH, *this, fw, fh );
+			GLIM_PassSize( pi, (float)VW, (float)VH, *this, fw, fh );
 			w          = std::max( 1, (int)fw );
 			h          = std::max( 1, (int)fh );
 			Target& t  = targets[ pass.target ];
 			if( t.w != w || t.h != h )
-				AllocTarget( t, w, h, FFM_TARGETS[ pass.target ].isFloat != 0 );
+				AllocTarget( t, w, h, GLIM_TARGETS[ pass.target ].isFloat != 0 );
 			glBindFramebuffer( GL_FRAMEBUFFER, t.fbo[ 1 - t.front ] );
 		}
 		else
@@ -476,37 +476,37 @@ FFResult FFStudioPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 
 		GLuint prog = shaders[ pass.program ]->GetGLID();
 		glUseProgram( prog );
-		glUniform2f( glGetUniformLocation( prog, "ffm_Resolution" ), (float)w, (float)h );
-		glUniform1f( glGetUniformLocation( prog, "ffm_Time" ), (float)clockTime );
-		glUniform1f( glGetUniformLocation( prog, "ffm_TimeDelta" ), lastDelta );
-		for( int k = 0; k < FFM_NUM_PHASES; ++k )
-			glUniform1f( glGetUniformLocation( prog, FFM_PHASES[ k ].uniform ), (float)phases[ k ] );
-		glUniform1i( glGetUniformLocation( prog, "ffm_Frame" ), frame );
-		glUniform1i( glGetUniformLocation( prog, "ffm_PassIndex" ), pi );
-		glUniform1f( glGetUniformLocation( prog, "ffm_BPM" ), bpm );
-		glUniform1f( glGetUniformLocation( prog, "ffm_Beat" ), beat );
-		glUniform1f( glGetUniformLocation( prog, "ffm_BarPhase" ), barPhase );
-		glUniform4f( glGetUniformLocation( prog, "ffm_Date" ), (float)( lt.tm_year + 1900 ), (float)lt.tm_mon,
+		glUniform2f( glGetUniformLocation( prog, "glim_Resolution" ), (float)w, (float)h );
+		glUniform1f( glGetUniformLocation( prog, "glim_Time" ), (float)clockTime );
+		glUniform1f( glGetUniformLocation( prog, "glim_TimeDelta" ), lastDelta );
+		for( int k = 0; k < GLIM_NUM_PHASES; ++k )
+			glUniform1f( glGetUniformLocation( prog, GLIM_PHASES[ k ].uniform ), (float)phases[ k ] );
+		glUniform1i( glGetUniformLocation( prog, "glim_Frame" ), frame );
+		glUniform1i( glGetUniformLocation( prog, "glim_PassIndex" ), pi );
+		glUniform1f( glGetUniformLocation( prog, "glim_BPM" ), bpm );
+		glUniform1f( glGetUniformLocation( prog, "glim_Beat" ), beat );
+		glUniform1f( glGetUniformLocation( prog, "glim_BarPhase" ), barPhase );
+		glUniform4f( glGetUniformLocation( prog, "glim_Date" ), (float)( lt.tm_year + 1900 ), (float)lt.tm_mon,
 					 (float)lt.tm_mday, daySeconds );
 		float mx = mouseX * w, my = mouseY * h;
-		glUniform4f( glGetUniformLocation( prog, "ffm_Mouse" ), mx, my, mouseDown ? mx : -mx, mouseDown ? my : -my );
+		glUniform4f( glGetUniformLocation( prog, "glim_Mouse" ), mx, my, mouseDown ? mx : -mx, mouseDown ? my : -my );
 		SendParams( prog );
 
 		int unit = 0;
-		for( int s = 0; s < FFM_NUM_SAMPLERS; ++s )
+		for( int s = 0; s < GLIM_NUM_SAMPLERS; ++s )
 		{
-			const FFMSamplerDef& sd = FFM_SAMPLERS[ s ];
+			const GLimSamplerDef& sd = GLIM_SAMPLERS[ s ];
 			GLint loc = glGetUniformLocation( prog, sd.name );
 			if( loc < 0 )
 				continue;
 			GLuint tex = blackTex;
-			if( sd.source == FFM_SRC_HOST && (unsigned)sd.index < pGL->numInputTextures && pGL->inputTextures[ sd.index ] )
+			if( sd.source == GLIM_SRC_HOST && (unsigned)sd.index < pGL->numInputTextures && pGL->inputTextures[ sd.index ] )
 				tex = pGL->inputTextures[ sd.index ]->Handle;
-			else if( sd.source == FFM_SRC_AUDIO && audioTex[ sd.index ] )
+			else if( sd.source == GLIM_SRC_AUDIO && audioTex[ sd.index ] )
 				tex = audioTex[ sd.index ];
-			else if( sd.source == FFM_SRC_IMAGE && sd.index < (int)imageTex.size() )
+			else if( sd.source == GLIM_SRC_IMAGE && sd.index < (int)imageTex.size() )
 				tex = imageTex[ sd.index ];
-			else if( sd.source == FFM_SRC_TARGET && targets[ sd.index ].tex[ 0 ] )
+			else if( sd.source == GLIM_SRC_TARGET && targets[ sd.index ].tex[ 0 ] )
 				tex = targets[ sd.index ].tex[ targets[ sd.index ].front ];
 			glActiveTexture( GL_TEXTURE0 + unit );
 			glBindTexture( GL_TEXTURE_2D, tex );
@@ -527,7 +527,7 @@ FFResult FFStudioPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 		{
 			Target& t = targets[ pass.target ];
 			t.front   = 1 - t.front;
-			if( FFM_TARGETS[ pass.target ].mipmap )
+			if( GLIM_TARGETS[ pass.target ].mipmap )
 			{
 				glBindTexture( GL_TEXTURE_2D, t.tex[ t.front ] );
 				glGenerateMipmap( GL_TEXTURE_2D );
@@ -537,9 +537,9 @@ FFResult FFStudioPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	}
 
 	// If every pass rendered to a buffer, show the last one.
-	if( FFM_NUM_PASSES > 0 && FFM_PASSES[ FFM_NUM_PASSES - 1 ].target >= 0 )
+	if( GLIM_NUM_PASSES > 0 && GLIM_PASSES[ GLIM_NUM_PASSES - 1 ].target >= 0 )
 	{
-		Target& t = targets[ FFM_PASSES[ FFM_NUM_PASSES - 1 ].target ];
+		Target& t = targets[ GLIM_PASSES[ GLIM_NUM_PASSES - 1 ].target ];
 		glBindFramebuffer( GL_READ_FRAMEBUFFER, t.fbo[ t.front ] );
 		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, pGL->HostFBO );
 		glBlitFramebuffer( 0, 0, t.w, t.h, 0, 0, VW, VH, GL_COLOR_BUFFER_BIT, GL_LINEAR );
@@ -554,13 +554,13 @@ FFResult FFStudioPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 
 	// Events are one-frame pulses.
 	for( size_t i = 0; i < hostParams.size(); ++i )
-		if( FFM_PARAMS[ hostParams[ i ].def ].kind == FFM_K_EVENT )
+		if( GLIM_PARAMS[ hostParams[ i ].def ].kind == GLIM_K_EVENT )
 			values[ i ] = 0.0f;
 	++frame;
 	return FF_SUCCESS;
 }
 
-void FFStudioPlugin::SetBeatInfo( float bpm, float barPhase )
+void GLimPlugin::SetBeatInfo( float bpm, float barPhase )
 {
 	if( hasBeatInfo && barPhase < hostBarPhase - 0.5f )
 		++hostBars;// the bar wrapped
@@ -571,7 +571,7 @@ void FFStudioPlugin::SetBeatInfo( float bpm, float barPhase )
 	CFFGLPlugin::SetBeatInfo( bpm, barPhase );
 }
 
-FFResult FFStudioPlugin::SetFloatParameter( unsigned int index, float value )
+FFResult GLimPlugin::SetFloatParameter( unsigned int index, float value )
 {
 	if( index >= values.size() )
 		return FF_FAIL;
@@ -579,23 +579,23 @@ FFResult FFStudioPlugin::SetFloatParameter( unsigned int index, float value )
 	return FF_SUCCESS;
 }
 
-float FFStudioPlugin::GetFloatParameter( unsigned int index )
+float GLimPlugin::GetFloatParameter( unsigned int index )
 {
 	return index < values.size() ? values[ index ] : 0.0f;
 }
 
-char* FFStudioPlugin::GetParameterDisplay( unsigned int index )
+char* GLimPlugin::GetParameterDisplay( unsigned int index )
 {
 	static char buf[ 32 ];
 	if( index >= values.size() )
 		return (char*)FF_FAIL;
-	const FFMParamDef& p = FFM_PARAMS[ hostParams[ index ].def ];
-	if( p.kind == FFM_K_OPTION )
+	const GLimParamDef& p = GLIM_PARAMS[ hostParams[ index ].def ];
+	if( p.kind == GLIM_K_OPTION )
 	{
 		int o = std::max( 0, std::min( p.numOptions - 1, (int)std::lround( values[ index ] ) ) );
 		snprintf( buf, sizeof( buf ), "%s", p.optLabels[ o ] );
 	}
-	else if( p.kind == FFM_K_INT )
+	else if( p.kind == GLIM_K_INT )
 		snprintf( buf, sizeof( buf ), "%d", (int)std::lround( values[ index ] ) );
 	else
 		snprintf( buf, sizeof( buf ), "%.3f", values[ index ] );

@@ -96,8 +96,8 @@ def prepare(isf_text):
     pre = ("#version 330\n"
            "uniform int PASSINDEX; uniform vec2 RENDERSIZE; uniform float TIME; uniform float TIMEDELTA;\n"
            "uniform int FRAMEINDEX; uniform vec4 DATE;\n"
-           "in vec2 ffm_uv;  // validator's vertex shader output, bottom-left origin like ISF\n"
-           "#define isf_FragNormCoord ffm_uv\n"
+           "in vec2 glim_uv;  // validator's vertex shader output, bottom-left origin like ISF\n"
+           "#define isf_FragNormCoord glim_uv\n"
            "out vec4 isf_FragColor;\n" + "\n".join(decl) + "\n")
     return pre + body
 

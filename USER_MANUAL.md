@@ -1,11 +1,11 @@
-# FFStudio User Manual
+# GLim User Manual
 
-**FFStudio** plays GLSL shaders live and turns them into plugins for your VJ software. It takes ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.
+**GLim** plays GLSL shaders live and turns them into plugins for your VJ software. It takes ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.
 
 **Play shaders live**
 
 - **Playlists:** drop a folder of shaders on the **Queue** tab, then step through them with **←** / **→**, or click **Auto** to play them as a slideshow that changes every few seconds and loops.
-- **Fullscreen and output window:** show the shader fullscreen, or in its own window on a second monitor or a projector, while FFStudio stays free to use.
+- **Fullscreen and output window:** show the shader fullscreen, or in its own window on a second monitor or a projector, while GLim stays free to use.
 - **Spout / Syphon:** send it to Resolume, MadMapper, OBS, TouchDesigner and other apps on the same computer, at 1920×1080 and about 60 fps, GPU to GPU (Spout on Windows, Syphon on macOS).
 - **NDI®:** send it over the network to other computers, at 1080p or 720p and 30 fps.
 - **TouchOSC remote control:** run playback, the playlist, the slideshow, the outputs and the shader's parameters from a phone or tablet. Layouts for both are included.
@@ -24,23 +24,23 @@ All of these keep running as you switch shaders, so a queue of shaders can drive
 
 | File | What it is |
 | :-- | :-- |
-| `FFStudio.exe` (Windows) or `FFStudio.app` (macOS) | The app. There's no installer: it runs from wherever you put it. |
+| `GLim.exe` (Windows) or `GLim.app` (macOS) | The app. There's no installer: it runs from wherever you put it. |
 | `touchosc` | TouchOSC layouts for remote control (see *Remote control* below) |
-| `sample-shaders` | Shaders to try FFStudio with. They're public domain (CC0), and each one starts with its author and a link to its Shadertoy page. |
-| `original-shaders` | 30 ISF shaders made for FFStudio, covered by FFStudio's licence (MIT). Twenty are psychedelic patterns that evolve over time, each with sliders to play with; six of them use feedback buffers and build up over a few seconds (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`), and `meltEcho` is an effect for your clips. The other ten are building blocks to layer into your own looks (see *Building blocks* below). |
+| `sample-shaders` | Shaders to try GLim with. They're public domain (CC0), and each one starts with its author and a link to its Shadertoy page. |
+| `original-shaders` | 30 ISF shaders made for GLim, covered by GLim's licence (MIT). Twenty are psychedelic patterns that evolve over time, each with sliders to play with; six of them use feedback buffers and build up over a few seconds (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`), and `meltEcho` is an effect for your clips. The other ten are building blocks to layer into your own looks (see *Building blocks* below). |
 | `USER_MANUAL.html` | This manual |
-| `LICENSE.txt` | FFStudio's licence (MIT) |
-| `THIRD_PARTY_NOTICES.txt` | The terms for the NDI software inside FFStudio, and the licences of the other software by others inside it |
+| `LICENSE.txt` | GLim's licence (MIT) |
+| `THIRD_PARTY_NOTICES.txt` | The terms for the NDI software inside GLim, and the licences of the other software by others inside it |
 
 ## System requirements
 
 **Windows**
 - 64-bit Windows 10 or 11.
-- A graphics card with **OpenGL 4.1** or later and its manufacturer's driver (practically any NVIDIA, AMD or Intel graphics from 2012 on). FFStudio renders every shader on your graphics card, so it doesn't work in a virtual machine or over Remote Desktop.
+- A graphics card with **OpenGL 4.1** or later and its manufacturer's driver (practically any NVIDIA, AMD or Intel graphics from 2012 on). GLim renders every shader on your graphics card, so it doesn't work in a virtual machine or over Remote Desktop.
 - *Only for building FFGL plugins:* Microsoft's free Build Tools for Visual Studio (see *Installing on Windows*). Everything else works without them.
 
 **macOS**
-- A Mac with **Apple Silicon** (M1 or later). FFStudio.app doesn't run on Intel Macs.
+- A Mac with **Apple Silicon** (M1 or later). GLim.app doesn't run on Intel Macs.
 - **macOS 14 Sonoma** or later.
 - *Only for building FFGL plugins:* Apple's free Xcode Command Line Tools and CMake (see *Installing on macOS*).
 
@@ -49,40 +49,40 @@ All of these keep running as you switch shaders, so a queue of shaders can drive
 ## Installing on Windows
 
 1. Right-click the zip, choose **Extract All…**, and extract it to a folder you can write to, such as Documents or the Desktop.
-   - Don't start FFStudio.exe from inside the zip: Windows would run it from a temporary folder, and the plugins it builds would be lost.
-   - Don't put it in `Program Files`: FFStudio saves each shader's settings next to the shader, including the sample shaders that come with it.
-2. Double-click **FFStudio.exe**. It isn't code-signed yet, so Windows may say *Windows protected your PC*: click **More info**, then **Run anyway**. Windows asks only once. Some antivirus apps also scan it the first time, which can take a while.
-3. FFStudio takes a few seconds to start (it unpacks itself each time).
-4. Windows Firewall asks whether FFStudio may use the network. Allow it on **private networks**: remote control and NDI need it. Everything else works without it.
+   - Don't start GLim.exe from inside the zip: Windows would run it from a temporary folder, and the plugins it builds would be lost.
+   - Don't put it in `Program Files`: GLim saves each shader's settings next to the shader, including the sample shaders that come with it.
+2. Double-click **GLim.exe**. It isn't code-signed yet, so Windows may say *Windows protected your PC*: click **More info**, then **Run anyway**. Windows asks only once. Some antivirus apps also scan it the first time, which can take a while.
+3. GLim takes a few seconds to start (it unpacks itself each time).
+4. Windows Firewall asks whether GLim may use the network. Allow it on **private networks**: remote control and NDI need it. Everything else works without it.
 
 **To build FFGL plugins** (optional: the preview, Export ISF, Spout, NDI and remote control work without it):
 
 1. Download the free **Build Tools for Visual Studio** from [visualstudio.microsoft.com/visual-cpp-build-tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) and run it. If you already have Visual Studio 2022 or later, open the Visual Studio Installer and modify your installation instead.
-2. Tick the **Desktop development with C++** workload and click **Install**. Its default parts are all FFStudio needs (they include CMake). The download is several GB.
-3. If FFStudio was running, restart it.
+2. Tick the **Desktop development with C++** workload and click **Install**. Its default parts are all GLim needs (they include CMake). The download is several GB.
+3. If GLim was running, restart it.
 
 Without them, **Build FFGL** says what's missing and where to get it.
 
 ## Installing on macOS
 
-1. Double-click the zip to unpack it, and drag **FFStudio.app** to your **Applications** folder (or wherever you like).
-2. The app isn't notarized by Apple yet, so macOS blocks it the first time. Double-click it, and click **Done** (or **OK**) when macOS says it can't verify it. Then open **System Settings → Privacy & Security**, scroll down to the message about FFStudio, click **Open Anyway**, and confirm with your password. macOS asks only once.
+1. Double-click the zip to unpack it, and drag **GLim.app** to your **Applications** folder (or wherever you like).
+2. The app isn't notarized by Apple yet, so macOS blocks it the first time. Double-click it, and click **Done** (or **OK**) when macOS says it can't verify it. Then open **System Settings → Privacy & Security**, scroll down to the message about GLim, click **Open Anyway**, and confirm with your password. macOS asks only once.
    - On macOS 14 you can instead right-click the app and choose **Open**.
-   - Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/FFStudio.app`
-3. When FFStudio first uses the network (remote control or NDI), macOS asks whether it may find devices on your local network: click **Allow**.
-4. When you first build a plugin, macOS may ask once for access to your Documents folder (FFStudio looks there for Resolume's *Extra Effects* folder): click **Allow**.
+   - Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/GLim.app`
+3. When GLim first uses the network (remote control or NDI), macOS asks whether it may find devices on your local network: click **Allow**.
+4. When you first build a plugin, macOS may ask once for access to your Documents folder (GLim looks there for Resolume's *Extra Effects* folder): click **Allow**.
 
 **To build FFGL plugins** (optional: the preview, Export ISF, Syphon, NDI and remote control work without it):
 
 1. Install the **Xcode Command Line Tools**: open Terminal, type `xcode-select --install`, press Return, and click **Install**. The full Xcode app isn't needed (if you have it, this step is already done).
 2. Install **CMake**: download the macOS `.dmg` from [cmake.org/download](https://cmake.org/download/) and drag **CMake.app** to Applications. If you use Homebrew, `brew install cmake` works too.
-3. If FFStudio was running, restart it.
+3. If GLim was running, restart it.
 
 Without CMake, **Build FFGL** says what's missing.
 
 ## First launch
 
-FFStudio opens with two tabs, **Queue** and **Studio**, and the **Log** at the bottom, which reports everything FFStudio does. Its first lines include FFStudio's version, the graphics card FFStudio uses (`GPU: …`) and the address for remote control (`OSC remote control: …`). If it says *GPU validation unavailable* instead, see *Troubleshooting*.
+GLim opens with two tabs, **Queue** and **Studio**, and the **Log** at the bottom, which reports everything GLim does. Its first lines include GLim's version, the graphics card GLim uses (`GPU: …`) and the address for remote control (`OSC remote control: …`). If it says *GPU validation unavailable* instead, see *Troubleshooting*.
 
 A first tour, with the sample shaders:
 
@@ -90,28 +90,28 @@ A first tour, with the sample shaders:
 2. Press **Shift+Tab** (or click **Studio**). The first shader in the queue plays in the preview, with a slider, switch or menu for each of its parameters.
 3. Press **→** and **←** to step through the queue, or click **Auto** to play it as a slideshow. Move a slider to change the shader as it plays.
 4. Click **⧉** to open an output window. Drag it to a second monitor and double-click it to make it fullscreen; **Esc** brings it back.
-5. Click **Build FFGL** to make a plugin of the shader that's showing (this needs the build tools above). FFStudio asks where to put the plugin (`.dll` on Windows, `.bundle` on macOS): choose **Documents\Resolume Arena\Extra Effects** (macOS: `~/Documents/Resolume Arena/Extra Effects`), which Resolume scans by default (more folders can be added in Resolume's *Preferences → Video*). The first time, the dialog opens there if that folder exists. The first build takes about a minute, because it sets up a build workspace and compiles the FFGL SDK; after that, a plugin takes a couple of seconds.
+5. Click **Build FFGL** to make a plugin of the shader that's showing (this needs the build tools above). GLim asks where to put the plugin (`.dll` on Windows, `.bundle` on macOS): choose **Documents\Resolume Arena\Extra Effects** (macOS: `~/Documents/Resolume Arena/Extra Effects`), which Resolume scans by default (more folders can be added in Resolume's *Preferences → Video*). The first time, the dialog opens there if that folder exists. The first build takes about a minute, because it sets up a build workspace and compiles the FFGL SDK; after that, a plugin takes a couple of seconds.
 6. Restart Resolume. A shader that makes its own picture appears under **Sources**, one that changes a clip under **Effects**.
 7. **Export ISF** saves the shader as an `.fs` file for MadMapper, VDMX, Millumin and other ISF hosts.
 
-FFStudio saves each shader's settings (slider values, ranges, names) in a `<shader>.ffstudio.json` file next to the shader, so keep your shaders in a folder you can write to.
+GLim saves each shader's settings (slider values, ranges, names) in a `<shader>.glim.json` file next to the shader, so keep your shaders in a folder you can write to.
 
 ## Updating and uninstalling
 
-**To update**, replace FFStudio.exe (or FFStudio.app) with the new one. Your shaders' settings stay, since they're next to the shaders. If the TouchOSC layouts changed, copy them to your phone or tablet again: TouchOSC keeps its own copy.
+**To update**, replace GLim.exe (or GLim.app) with the new one. Your shaders' settings stay, since they're next to the shaders. If the TouchOSC layouts changed, copy them to your phone or tablet again: TouchOSC keeps its own copy.
 
-**To uninstall**, delete FFStudio.exe (or FFStudio.app). FFStudio installs nothing else, but it leaves:
-- its build workspace: `%LOCALAPPDATA%\FFStudio` (macOS: `~/Library/Caches/FFStudio`);
-- its preferences (the folders you last chose to save into): `%APPDATA%\FFStudio` (macOS: `~/Library/Application Support/FFStudio`);
-- the `.ffstudio.json` settings files next to your shaders.
+**To uninstall**, delete GLim.exe (or GLim.app). GLim installs nothing else, but it leaves:
+- its build workspace: `%LOCALAPPDATA%\GLim` (macOS: `~/Library/Caches/GLim`);
+- its preferences (the folders you last chose to save into): `%APPDATA%\GLim` (macOS: `~/Library/Application Support/GLim`);
+- the `.glim.json` settings files next to your shaders.
 
-The Build Tools, Command Line Tools and CMake are uninstalled separately, if you installed them for FFStudio.
+The Build Tools, Command Line Tools and CMake are uninstalled separately, if you installed them for GLim.
 
 ---
 
-## Using FFStudio
+## Using GLim
 
-Whenever FFStudio writes files (**Build FFGL**, **Export ISF**, or saving shader code), it asks where. Each dialog opens in the folder you chose last time for that kind of file (plugins, ISF files or shader code), also after you restart FFStudio, and the Queue and Studio tabs share these folders.
+Whenever GLim writes files (**Build FFGL**, **Export ISF**, or saving shader code), it asks where. Each dialog opens in the folder you chose last time for that kind of file (plugins, ISF files or shader code), also after you restart GLim, and the Queue and Studio tabs share these folders.
 
 ### Queue tab
 
@@ -134,13 +134,13 @@ In the queue, select rows with a click (Shift/Ctrl-click for several), or press 
 
 Open a shader with **+** (or paste one) and click **Analyze** (or press Ctrl+Enter; ⌘+Enter on macOS): it processes the code, loads it into the preview and measures its GPU load. After editing the code, Analyze processes it again; with the code unchanged it only measures. **Build FFGL (.dll)** (`.bundle` on macOS) then makes the plugin and **Export ISF (.fs)** the ISF file, as on the Queue tab. The disk button next to **+** saves the code as a `.txt` or `.fs` file. You get:
 - **Live preview.** Rendered on your GPU the same way the plugin renders it.
-  - **Fullscreen:** click **⛶**, double-click the preview, or press **Ctrl+F** (⌘F on macOS) to fill the monitor FFStudio is on; press **Esc**, **Ctrl+F** / ⌘F again, or double-click to return.
-  - **Output window (multi-monitor):** click **⧉** (left of ⛶) to show the live render in its own window, opened on another monitor if you have one. Move and resize it like any window; FFStudio stays usable, and slider changes show up live. Double-click it or press **Ctrl+F** / ⌘F (in it, or in FFStudio) to make it fullscreen on the monitor it's on; **Esc** goes back to the window. The **⧉** button is a toggle (highlighted while the window is open): press it again, or use the window's close button, to close it. While the output is fullscreen the button does nothing; press Esc first.
-  - **Sending to other apps (Send row, under the preview):** each button is off when FFStudio starts; click it to turn it on (highlighted) or off. They work together, and on their own: they keep sending when you switch shaders (← / →, the slideshow) or go to the Queue tab, with or without the output window. While one is on, the output window shows the same frames, scaled to fit. Turned on before a shader is loaded, sending starts with the first one.
-    - **Spout** (Windows) or **Syphon** (macOS) sends the shader loaded in the Studio tab to other apps on the same computer (Resolume, MadMapper, OBS, TouchDesigner, …) as a source named **FFStudio**, at 1920×1080, about 60 fps, GPU to GPU.
+  - **Fullscreen:** click **⛶**, double-click the preview, or press **Ctrl+F** (⌘F on macOS) to fill the monitor GLim is on; press **Esc**, **Ctrl+F** / ⌘F again, or double-click to return.
+  - **Output window (multi-monitor):** click **⧉** (left of ⛶) to show the live render in its own window, opened on another monitor if you have one. Move and resize it like any window; GLim stays usable, and slider changes show up live. Double-click it or press **Ctrl+F** / ⌘F (in it, or in GLim) to make it fullscreen on the monitor it's on; **Esc** goes back to the window. The **⧉** button is a toggle (highlighted while the window is open): press it again, or use the window's close button, to close it. While the output is fullscreen the button does nothing; press Esc first.
+  - **Sending to other apps (Send row, under the preview):** each button is off when GLim starts; click it to turn it on (highlighted) or off. They work together, and on their own: they keep sending when you switch shaders (← / →, the slideshow) or go to the Queue tab, with or without the output window. While one is on, the output window shows the same frames, scaled to fit. Turned on before a shader is loaded, sending starts with the first one.
+    - **Spout** (Windows) or **Syphon** (macOS) sends the shader loaded in the Studio tab to other apps on the same computer (Resolume, MadMapper, OBS, TouchDesigner, …) as a source named **GLim**, at 1920×1080, about 60 fps, GPU to GPU.
     - **Remote control:** the controls here and the shader's parameters can also be worked from TouchOSC on a phone, tablet or computer (see *Remote control* below).
-    - **NDI®** sends it over the network, to apps on this computer or others on the same network, as the source **COMPUTERNAME (FFStudio)**, at 30 fps. The menu beside it picks **1080p** (1920×1080) or **720p** (1280×720); changing it while sending switches straight away. NDI uses some CPU to compress the frames, more at 1080p. The first time, Windows Firewall asks whether FFStudio may use the network (allow it, or other computers won't see the source), and macOS asks for Local Network access. Receive it in Resolume (Sources → NDI), OBS (with the DistroAV plugin), or NDI Studio Monitor (part of the free NDI Tools).
-  - Both render at the window's resolution (up to 1920 wide, scaled up beyond that). The output draws on its own thread, so it keeps playing smoothly while FFStudio is busy (e.g. rebuilding the parameter list after a shader switch). While it's open, the small preview keeps running at a lower frame rate (about 10 fps) and follows shader switches; on Windows, FFStudio's own window pauses while you drag the output window.
+    - **NDI®** sends it over the network, to apps on this computer or others on the same network, as the source **COMPUTERNAME (GLim)**, at 30 fps. The menu beside it picks **1080p** (1920×1080) or **720p** (1280×720); changing it while sending switches straight away. NDI uses some CPU to compress the frames, more at 1080p. The first time, Windows Firewall asks whether GLim may use the network (allow it, or other computers won't see the source), and macOS asks for Local Network access. Receive it in Resolume (Sources → NDI), OBS (with the DistroAV plugin), or NDI Studio Monitor (part of the free NDI Tools).
+  - Both render at the window's resolution (up to 1920 wide, scaled up beyond that). The output draws on its own thread, so it keeps playing smoothly while GLim is busy (e.g. rebuilding the parameter list after a shader switch). While it's open, the small preview keeps running at a lower frame rate (about 10 fps) and follows shader switches; on Windows, GLim's own window pauses while you drag the output window.
   - **Queue playlist:** the **←** / **→** buttons under the preview (and the ← / → keys: anywhere in the Studio tab, unless you're typing in the code box or a text field or have clicked a slider (click anywhere else to release it); and in fullscreen or the output window) load the previous / next shader in the **Queue** (or in the selected rows, if several were selected when you switched to Studio) into the Studio tab. Each starts from the beginning with its saved settings, shaders that don't compile are skipped, and the list wraps around. The label next to them shows the position in the queue (e.g. "3 / 12"), or "not in queue" when the loaded shader isn't in it.
   - **Slideshow:** **Auto** (next to the ← / → buttons) steps to the next queue shader every few seconds; type the time in the box beside it (seconds, minimum 1, Enter to apply; default 10). After the last shader it loops back to the first. The button is highlighted while on, and the label counts down ("next in 4s"). Pausing the preview (⏸) holds the countdown; ← / → restart it. It keeps running in fullscreen and with the output window open, so it works as an unattended playlist on a second monitor. Press **Auto** again to stop.
   - Fullscreen and the output window always show the shader loaded in the Studio tab, so loading another shader (from the queue, **+**, or a drop) switches them too, and recompiling after a settings change updates them live. If the loaded shader doesn't compile, they keep showing the last one that did.
@@ -156,7 +156,7 @@ Open a shader with **+** (or paste one) and click **Analyze** (or press Ctrl+Ent
   - Reset a slider to the shader's own default: right-click it (on macOS also Control-click).
   - Nudge a slider with the keyboard: click it (its handle turns amber), then press **←** / **→** to step it by 1/100 of its range (1 for whole numbers). Click anywhere else to release it: ← / → then step through the queue again.
 - **GPU load.** Under the preview, a bar and readout show how hard the shader works your graphics card, e.g. **29% of 60 fps** and *4.81 ms/frame · ~208 fps max · 1920×1080*.
-  - It's the GPU time one frame takes, timed by the graphics card itself (so vsync, the screen and FFStudio's own work don't count), measured at 1920×1080 over about a second.
+  - It's the GPU time one frame takes, timed by the graphics card itself (so vsync, the screen and GLim's own work don't count), measured at 1920×1080 over about a second.
   - **Live** (highlighted while on) measures continuously: a new reading about every half second, so it follows slider moves and shader switches as you make them. It measures at 1920×1080 in the background (the preview itself stays small) and pauses while the preview isn't showing, e.g. on the Queue tab. It keeps the graphics card busy, so it's **off** by default: switching shaders (e.g. in a slideshow) then costs as little as possible, nothing is measured unless you press **Analyze**, and results already known (from **Analyze**, **Live**, or the queue's **Analyze**) still show. Turn it on for diagnostics or when comparing shaders. While Live is on, **Analyze** only processes changed code (Live does the measuring).
   - **% of 60 fps** is that time as a share of a 60 fps frame (16.7 ms): under 50% (green) leaves plenty of room; 50–100% (amber) is heavy; over 100% (red) means it can't run at 60 fps at 1080p on this computer, even on its own. In Resolume, layers and effects add up: two shaders at 40% each use about 80%.
   - **ms/frame** is the raw time; **fps max** is the highest frame rate the GPU could draw it at (1000 ÷ ms). The cost scales roughly with the number of pixels: 4K (3840×2160) costs about 4× as much as 1080p.
@@ -165,7 +165,7 @@ Open a shader with **+** (or paste one) and click **Analyze** (or press Ctrl+Ent
   - While the output window (or fullscreen) is open, measuring times the output itself, at its actual resolution, instead of running a separate 1080p measurement alongside it: continuously with **Live** on ("live in the output"), or for one second when you press **Analyze** ("measured in the output"). These are the output's real frame times, so a light shader can read higher here than measured at 1080p: at 60 fps with little to do, the card lowers its clocks.
   - CPU load isn't shown: shaders run entirely on the GPU, and the plugin's CPU work per frame is tiny.
   - Results depend on the graphics card (and, on laptops, whether it's plugged in). Measurements from the queue and from this tab are shared for the session.
-- **Save settings.** Writes `<shader>.ffstudio.json` next to the shader. **Build FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
+- **Save settings.** Writes `<shader>.glim.json` next to the shader. **Build FFGL** saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.
 
 ---
 
@@ -192,20 +192,20 @@ Supported features:
 By default every `iChannel` reads the clip, which makes the plugin an effect. Choose a different source with a comment line anywhere in the shader:
 
 ```glsl
-// ffstudio: iChannel1 = textures/rock.jpg   (image file, relative to the shader; embedded in the plugin)
-// ffstudio: iChannel2 = noise                (generated RGBA noise texture)
-// ffstudio: iChannel3 = audio                (live audio spectrum from the host)
-// ffstudio: iChannel0 = input                (the clip; the default)
+// glim: iChannel1 = textures/rock.jpg   (image file, relative to the shader; embedded in the plugin)
+// glim: iChannel2 = noise                (generated RGBA noise texture)
+// glim: iChannel3 = audio                (live audio spectrum from the host)
+// glim: iChannel0 = input                (the clip; the default)
 ```
 
-If an image file is missing, a noise texture is used and FFStudio warns you.
+If an image file is missing, a noise texture is used and GLim warns you.
 
 #### Sampler settings
 Like Shadertoy's per-channel settings, add `filter`, `wrap` and `vflip` after the source:
 
 ```glsl
-// ffstudio: iChannel1 = textures/pixels.png filter=nearest wrap=clamp
-// ffstudio: iChannel2 = textures/rock.jpg vflip=false
+// glim: iChannel1 = textures/pixels.png filter=nearest wrap=clamp
+// glim: iChannel2 = textures/rock.jpg vflip=false
 ```
 
 | Setting | Values | Default |
@@ -227,10 +227,10 @@ Either:
 // ==== Common ====
 ...
 // ==== Buffer A ====
-// ffstudio: iChannel0 = Buffer A     (feedback: reads its own previous frame)
+// glim: iChannel0 = Buffer A     (feedback: reads its own previous frame)
 void mainImage(...) { ... }
 // ==== Image ====
-// ffstudio: iChannel0 = Buffer A
+// glim: iChannel0 = Buffer A
 void mainImage(...) { ... }
 ```
 
@@ -261,10 +261,10 @@ These become native FFGL parameters:
 Top-level `const float/bool/vec3` values and `#define NAME 1.5` lines become sliders, toggles or color pickers. To leave one out, untick it in the Studio tab: it's compiled in as a constant at its current value. (The command line's `--no-params` still turns this off for a whole run.)
 - Math constants (PI, TAU, epsilons…) are skipped.
 - Constants that must stay constant (array sizes, `case` labels) are skipped.
-- If turning a constant into a slider would break compilation, FFStudio puts it back as a constant and tells you.
+- If turning a constant into a slider would break compilation, GLim puts it back as a constant and tells you.
 
 ### Built-in controls
-- **Speed** is added to every animated shader and scales time smoothly; changing it never makes the animation jump. If the shader already has its own "speed" control, FFStudio's is called **Time Scale** instead.
+- **Speed** is added to every animated shader and scales time smoothly; changing it never makes the animation jump. If the shader already has its own "speed" control, GLim's is called **Time Scale** instead.
 - **Sliders that multiply time** (`iTime * speed`, `TIME * rate`, `vec3(rx, ry, rz) * iTime`, also inside `#define`s) don't jump the animation either: the plugin keeps a running total of time × slider, so moving the slider changes how fast things move from that moment on. This also covers the shader's own speed controls. It applies to FFGL plugins and the preview; ISF hosts can't keep a running total, so in ISF exports these sliders (and Speed) still jump. Time that reaches the slider through a variable first (`float t = iTime; … t * speed`) isn't detected.
 - **Mouse X/Y** and **Mouse Click** are added when a shader uses the mouse.
 
@@ -280,7 +280,7 @@ Shaders in any dialect can use the host's tempo by reading these names (no decla
 Resolume sends its tempo to FFGL plugins. Until a host sends any, and in the preview, the plugin runs at 120 BPM. ISF hosts have no tempo input, so ISF exports get a **BPM** slider (default 120) and count beats from `TIME`.
 
 ### Alpha
-Shadertoy and GLSL Sandbox ignore output alpha, so FFStudio makes those plugins opaque. ISF shaders keep their alpha.
+Shadertoy and GLSL Sandbox ignore output alpha, so GLim makes those plugins opaque. ISF shaders keep their alpha.
 
 ## Building blocks
 
@@ -310,71 +310,71 @@ Every moving part has its own rate slider (Spin, Scroll, Pulse Rate …), and in
 
 ## Remote control (OSC, TouchOSC)
 
-FFStudio's Studio tab can be controlled from a phone, a tablet or another computer over the network, with OSC. It's always on: FFStudio listens on UDP port **8000** and sends what it's doing back on port **8001**. The log says so when FFStudio starts, with this computer's address: `OSC remote control: 192.168.1.20, port 8000 (feedback to port 8001)`. The first time, Windows Firewall asks whether FFStudio may use the network: allow it on private networks, or other devices can't reach it. macOS asks for Local Network access.
+GLim's Studio tab can be controlled from a phone, a tablet or another computer over the network, with OSC. It's always on: GLim listens on UDP port **8000** and sends what it's doing back on port **8001**. The log says so when GLim starts, with this computer's address: `OSC remote control: 192.168.1.20, port 8000 (feedback to port 8001)`. The first time, Windows Firewall asks whether GLim may use the network: allow it on private networks, or other devices can't reach it. macOS asks for Local Network access.
 
 It controls what's under the preview: play / pause, restart, ← / →, the slideshow (**Auto** and its time), the output window and fullscreen, Spout (Syphon on macOS), NDI and its size, and the loaded shader's parameters. Not the queue, **Build FFGL**, **Export ISF** or **Analyze**.
 
 You need [TouchOSC](https://hexler.net/touchosc) (by hexler, for Windows, macOS, iOS and Android). **TouchOSC layouts** are in the `touchosc` folder:
 
-- `FFStudio_desktop.tosc`: one landscape page, for TouchOSC on a computer or a tablet.
-- `FFStudio_phone.tosc`: for phones held upright (made for the Pixel 7a; fits other 20:9 phones). A **CONTROL** page, then the parameters, 8 to a page.
+- `GLim_desktop.tosc`: one landscape page, for TouchOSC on a computer or a tablet.
+- `GLim_phone.tosc`: for phones held upright (made for the Pixel 7a; fits other 20:9 phones). A **CONTROL** page, then the parameters, 8 to a page.
 
 To use one:
 
-1. In TouchOSC, open **Connections → OSC** and set up any connection (the layouts send and receive on all of them; other enabled connections get FFStudio's messages too, which other apps ignore): **UDP**, **Host** = the FFStudio computer's address (from the log; `127.0.0.1` when TouchOSC runs on the same computer), **Send Port** `8000`, **Receive Port** `8001`.
-2. Open the layout in TouchOSC and start the control surface (▶). To get it onto a phone or tablet, copy the `.tosc` file there (by cloud drive, email or USB) and open it from TouchOSC. TouchOSC keeps its own copy of a layout on each device: after a new version of FFStudio's layouts, copy the file to the phone or tablet again.
-3. The status line (under the shader name on the desktop layout, at the bottom on the phone) changes to **connected: FFStudio on COMPUTERNAME** within a couple of seconds. If it stays at *not connected*, check the address and ports, that both are on the same network, and the firewall.
+1. In TouchOSC, open **Connections → OSC** and set up any connection (the layouts send and receive on all of them; other enabled connections get GLim's messages too, which other apps ignore): **UDP**, **Host** = the GLim computer's address (from the log; `127.0.0.1` when TouchOSC runs on the same computer), **Send Port** `8000`, **Receive Port** `8001`.
+2. Open the layout in TouchOSC and start the control surface (▶). To get it onto a phone or tablet, copy the `.tosc` file there (by cloud drive, email or USB) and open it from TouchOSC. TouchOSC keeps its own copy of a layout on each device: after a new version of GLim's layouts, copy the file to the phone or tablet again.
+3. The status line (under the shader name on the desktop layout, at the bottom on the phone) changes to **connected: GLim on COMPUTERNAME** within a couple of seconds. If it stays at *not connected*, check the address and ports, that both are on the same network, and the firewall.
 
-On a Mac with tap to click turned on, TouchOSC on that Mac misses some taps on the trackpad (FFStudio never receives them; other macOS apps have the same problem). Press the trackpad down instead, or use a mouse.
+On a Mac with tap to click turned on, TouchOSC on that Mac misses some taps on the trackpad (GLim never receives them; other macOS apps have the same problem). Press the trackpad down instead, or use a mouse.
 
-The layout follows FFStudio: the switches light up as things are turned on (from the layout, in FFStudio or by the slideshow), and loading another shader fills in its parameter names, values and faders.
+The layout follows GLim: the switches light up as things are turned on (from the layout, in GLim or by the slideshow), and loading another shader fills in its parameter names, values and faders.
 
 **Parameters** take up to 24 slots, in the order of the Studio tab's list (without those kept as constants). Each value has a slot: a colour takes one per channel (R, G, B and, if it has one, A) and a point one per axis (X, Y). Unused slots are hidden. A fader covers the parameter's range (as set in the Studio tab); for a menu it steps through the options; a switch is on past the middle, and a trigger fires at the right-hand end. Moving a fader changes the value as the Studio tab's slider does, so it's saved with the shader's settings too. A shader with more than 24 values (rare) shows the first 24; the layout says e.g. *28 parameters: the first 24 are here*.
 
-**From other OSC apps** (Open Stage Control, Max, Lemur, …): send to UDP port 8000 at the FFStudio computer's address. Switches take `1` or `0` (no argument toggles); buttons act on a message with no argument or `1` (not on the `0` a button sends when it's released).
+**From other OSC apps** (Open Stage Control, Max, Lemur, …): send to UDP port 8000 at the GLim computer's address. Switches take `1` or `0` (no argument toggles); buttons act on a message with no argument or `1` (not on the `0` a button sends when it's released).
 
 | Address | Argument | What it does |
 | :-- | :-- | :-- |
-| `/ffstudio/play` | 1 / 0 | Play / pause |
-| `/ffstudio/restart` | | Restart the shader |
-| `/ffstudio/prev`, `/ffstudio/next` | | Previous / next shader in the queue (as ← / →) |
-| `/ffstudio/auto` | 1 / 0 | Slideshow on / off |
-| `/ffstudio/auto/seconds` | seconds | Slideshow time (minimum 1) |
-| `/ffstudio/auto/seconds/up`, `/down` | | Slideshow time one step longer / shorter (… 8, 10, 12, 15, 20 …) |
-| `/ffstudio/output` | 1 / 0 | Output window open / closed (closing works even when it's fullscreen) |
-| `/ffstudio/fullscreen` | 1 / 0 | Fullscreen, as ⛶ (the output window's, if it's open) |
-| `/ffstudio/spout` | 1 / 0 | Spout (Syphon on macOS) on / off |
-| `/ffstudio/ndi` | 1 / 0 | NDI on / off |
-| `/ffstudio/ndi/720p` | 1 / 0 | NDI at 1280×720 / 1920×1080 |
-| `/ffstudio/param/1` … `/24` | 0 … 1 | Parameter slot (as above) |
-| `/ffstudio/ping` | | Answered with `/ffstudio/pong` and the computer's name |
-| `/ffstudio/sync` | | Send the whole state again |
+| `/glim/play` | 1 / 0 | Play / pause |
+| `/glim/restart` | | Restart the shader |
+| `/glim/prev`, `/glim/next` | | Previous / next shader in the queue (as ← / →) |
+| `/glim/auto` | 1 / 0 | Slideshow on / off |
+| `/glim/auto/seconds` | seconds | Slideshow time (minimum 1) |
+| `/glim/auto/seconds/up`, `/down` | | Slideshow time one step longer / shorter (… 8, 10, 12, 15, 20 …) |
+| `/glim/output` | 1 / 0 | Output window open / closed (closing works even when it's fullscreen) |
+| `/glim/fullscreen` | 1 / 0 | Fullscreen, as ⛶ (the output window's, if it's open) |
+| `/glim/spout` | 1 / 0 | Spout (Syphon on macOS) on / off |
+| `/glim/ndi` | 1 / 0 | NDI on / off |
+| `/glim/ndi/720p` | 1 / 0 | NDI at 1280×720 / 1920×1080 |
+| `/glim/param/1` … `/24` | 0 … 1 | Parameter slot (as above) |
+| `/glim/ping` | | Answered with `/glim/pong` and the computer's name |
+| `/glim/sync` | | Send the whole state again |
 
-FFStudio sends its state to every address that has sent it a message in the last 30 seconds (send `/ffstudio/ping` now and then to keep it coming; the TouchOSC layouts do, every second), on port 8001 and on the port the message came from. The switches come back on their own addresses as `1` / `0`, each parameter slot as its `0 … 1` value, and these as text: `/ffstudio/shader` (the shader's name), `/ffstudio/queue` (e.g. `3 / 12 · next in 4s`), `/ffstudio/time`, `/ffstudio/auto/label` (e.g. `10 s`), `/ffstudio/spout/name` (`Spout` or `Syphon`), `/ffstudio/params` (how many parameters), `/ffstudio/param/<n>/name` and `/ffstudio/param/<n>/value` (both empty for an unused slot). Only what changes is sent again.
+GLim sends its state to every address that has sent it a message in the last 30 seconds (send `/glim/ping` now and then to keep it coming; the TouchOSC layouts do, every second), on port 8001 and on the port the message came from. The switches come back on their own addresses as `1` / `0`, each parameter slot as its `0 … 1` value, and these as text: `/glim/shader` (the shader's name), `/glim/queue` (e.g. `3 / 12 · next in 4s`), `/glim/time`, `/glim/auto/label` (e.g. `10 s`), `/glim/spout/name` (`Spout` or `Syphon`), `/glim/params` (how many parameters), `/glim/param/<n>/name` and `/glim/param/<n>/value` (both empty for an unused slot). Only what changes is sent again.
 
 
 ---
 
 ## Troubleshooting
 
-**Starting FFStudio**
-- **Windows protected your PC**, or an antivirus app removes FFStudio.exe: FFStudio isn't code-signed yet. Click **More info → Run anyway**; in the antivirus app, restore the file and allow it.
-- **macOS: "FFStudio can't be opened"** or **"is damaged and can't be opened"**: macOS blocks apps from outside the App Store that aren't notarized. Use **Open Anyway** (see *Installing on macOS*), or run `xattr -dr com.apple.quarantine /Applications/FFStudio.app` in Terminal.
-- **No preview, or the log says *GPU validation unavailable*:** FFStudio can't use your graphics card's OpenGL 4.1. Install the latest driver from NVIDIA, AMD or Intel (not just the one Windows Update installed). It doesn't work in a virtual machine or over Remote Desktop. On a laptop with two graphics chips, set FFStudio.exe to *High performance* in Windows *Settings → System → Display → Graphics*.
+**Starting GLim**
+- **Windows protected your PC**, or an antivirus app removes GLim.exe: GLim isn't code-signed yet. Click **More info → Run anyway**; in the antivirus app, restore the file and allow it.
+- **macOS: "GLim can't be opened"** or **"is damaged and can't be opened"**: macOS blocks apps from outside the App Store that aren't notarized. Use **Open Anyway** (see *Installing on macOS*), or run `xattr -dr com.apple.quarantine /Applications/GLim.app` in Terminal.
+- **No preview, or the log says *GPU validation unavailable*:** GLim can't use your graphics card's OpenGL 4.1. Install the latest driver from NVIDIA, AMD or Intel (not just the one Windows Update installed). It doesn't work in a virtual machine or over Remote Desktop. On a laptop with two graphics chips, set GLim.exe to *High performance* in Windows *Settings → System → Display → Graphics*.
 
 **Shaders and plugins**
 - **"Shader does not compile"**: the log lists the errors with line numbers from *your* file.
-- **Build FFGL says "No C++ compiler found" or "CMake not found":** install the build tools (see *Installing on Windows* or *Installing on macOS*) and restart FFStudio.
+- **Build FFGL says "No C++ compiler found" or "CMake not found":** install the build tools (see *Installing on Windows* or *Installing on macOS*) and restart GLim.
 - **Build failed**: the log shows the compiler's error lines.
-- **Plugin missing in Resolume**: check that the `.dll` (Windows) or `.bundle` (macOS) is in a folder Resolume scans, then restart Resolume. FFGL shows only the first 16 characters of a plugin name. FFStudio keeps those 16 characters unique within one batch.
-- **Settings aren't kept:** FFStudio saves them next to the shader, so the shader's folder must be writable (not inside a zip, a read-only drive or `Program Files`).
+- **Plugin missing in Resolume**: check that the `.dll` (Windows) or `.bundle` (macOS) is in a folder Resolume scans, then restart Resolume. FFGL shows only the first 16 characters of a plugin name. GLim keeps those 16 characters unique within one batch.
+- **Settings aren't kept:** GLim saves them next to the shader, so the shader's folder must be writable (not inside a zip, a read-only drive or `Program Files`).
 
 **Network (NDI and remote control)**
 - **Other computers don't see the NDI source, or TouchOSC stays *not connected*:**
   - Both devices must be on the same network. Guest and public Wi-Fi often keep devices apart.
-  - Windows: allow FFStudio through the firewall on private networks (*Windows Security → Firewall & network protection → Allow an app through firewall*), and check that your network is set to *Private* (*Settings → Network & internet*), not *Public*.
-  - macOS: turn FFStudio on in *System Settings → Privacy & Security → Local Network*.
-- **The log says *OSC remote control unavailable: UDP port 8000 is in use*:** another app (or a second copy of FFStudio) is using port 8000. Close it and restart FFStudio.
+  - Windows: allow GLim through the firewall on private networks (*Windows Security → Firewall & network protection → Allow an app through firewall*), and check that your network is set to *Private* (*Settings → Network & internet*), not *Public*.
+  - macOS: turn GLim on in *System Settings → Privacy & Security → Local Network*.
+- **The log says *OSC remote control unavailable: UDP port 8000 is in use*:** another app (or a second copy of GLim) is using port 8000. Close it and restart GLim.
 
 ## Reporting problems
 
@@ -383,16 +383,16 @@ Email problems, questions and suggestions to **[bzsqrl@gmail.com](mailto:bzsqrl@
 When something goes wrong, please send:
 
 - **What you did, what happened, and what you expected.**
-- **FFStudio's version:** it's in the title bar and the log's first line (e.g. `FFStudio 0.9.0-beta.1`).
+- **GLim's version:** it's in the title bar and the log's first line (e.g. `GLim 0.9.0-beta.2`).
 - **Your computer:** Windows or macOS version, and the `GPU: …` line from the log.
 - **The log:** click in it, press **Ctrl+A** then **Ctrl+C** (⌘A, ⌘C on macOS), and paste it into your message.
-- **The shader**, if it's about one: the shader file and its `.ffstudio.json`, if it has one.
+- **The shader**, if it's about one: the shader file and its `.glim.json`, if it has one.
 - A screenshot, if it's about how something looks.
 
-If FFStudio won't start at all, its self-test can show why. It converts and builds one shader and checks Spout or Syphon, NDI and remote control, without opening the window, and writes `selftest.log`:
+If GLim won't start at all, its self-test can show why. It converts and builds one shader and checks Spout or Syphon, NDI and remote control, without opening the window, and writes `selftest.log`:
 
-- **Windows:** in the folder with FFStudio.exe, type `powershell` in File Explorer's address bar and press Enter, then type `.\FFStudio.exe --selftest ` and a space, drag any shader file into the window (that types its path), type a space and `selftest`, and press Enter.
-- **macOS:** in Terminal, type `/Applications/FFStudio.app/Contents/MacOS/FFStudio --selftest ` and a space, drag any shader file into the window, type a space and `~/Desktop/selftest`, and press Return.
+- **Windows:** in the folder with GLim.exe, type `powershell` in File Explorer's address bar and press Enter, then type `.\GLim.exe --selftest ` and a space, drag any shader file into the window (that types its path), type a space and `selftest`, and press Enter.
+- **macOS:** in Terminal, type `/Applications/GLim.app/Contents/MacOS/GLim --selftest ` and a space, drag any shader file into the window, type a space and `~/Desktop/selftest`, and press Return.
 
 Send the `selftest.log` from the `selftest` folder (the plugin it builds there can be deleted).
 
@@ -415,26 +415,26 @@ Send the `selftest.log` from the `selftest` folder (the plugin it builds there c
 
 ### Running and packaging
 
-- **GUI:** `venv\Scripts\python src\main_gui.py` (macOS: `venv/bin/python src/main_gui.py`). It asks where to write plugins, ISF files and saved code, and remembers the folders in `prefs.json` (`ffstudio/prefs.py`) in `%APPDATA%\FFStudio` (macOS: `~/Library/Application Support/FFStudio`). The command line below writes to the project's `output` folder unless you pass `--out`.
-- **Packaged app:** `venv\Scripts\python compile.py` builds `dist\FFStudio.exe`; on macOS, `venv/bin/python compile.py` builds `dist/FFStudio.app` (Apple Silicon, signed ad hoc, not notarized). It also copies the rest of the package into `dist`: the `sample-shaders` and `touchosc` folders, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles) and `USER_MANUAL.html` (`tools/build_manual.py`, from this file). The version is `__version__` in `ffstudio/__init__.py`: it's shown in the title bar, the log and `selftest.log`, and stamped on FFStudio.exe (*Properties → Details*) and FFStudio.app. Headless check: `FFStudio.exe --selftest <shader> <dir>` (macOS: `FFStudio.app/Contents/MacOS/FFStudio --selftest <shader> <dir>`) writes `selftest.log` into `<dir>`.
+- **GUI:** `venv\Scripts\python src\main_gui.py` (macOS: `venv/bin/python src/main_gui.py`). It asks where to write plugins, ISF files and saved code, and remembers the folders in `prefs.json` (`glim/prefs.py`) in `%APPDATA%\GLim` (macOS: `~/Library/Application Support/GLim`). The command line below writes to the project's `output` folder unless you pass `--out`.
+- **Packaged app:** `venv\Scripts\python compile.py` builds `dist\GLim.exe`; on macOS, `venv/bin/python compile.py` builds `dist/GLim.app` (Apple Silicon, signed ad hoc, not notarized). It also copies the rest of the package into `dist`: the `sample-shaders` and `touchosc` folders, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles) and `USER_MANUAL.html` (`tools/build_manual.py`, from this file). The version is `__version__` in `glim/__init__.py`: it's shown in the title bar, the log and `selftest.log`, and stamped on GLim.exe (*Properties → Details*) and GLim.app. Headless check: `GLim.exe --selftest <shader> <dir>` (macOS: `GLim.app/Contents/MacOS/GLim --selftest <shader> <dir>`) writes `selftest.log` into `<dir>`.
 - **TouchOSC layouts:** edit `tools/build_touchosc.py` and run `venv\Scripts\python tools\build_touchosc.py`, or edit them in TouchOSC's editor.
 
 ### Command line
 
 ```
-venv\Scripts\python -m ffstudio <files or folders> --to ffgl|isf|both|check [--out DIR] [--no-params] [--test]
+venv\Scripts\python -m glim <files or folders> --to ffgl|isf|both|check [--out DIR] [--no-params] [--test]
 ```
 
 - `--to check` validates shaders without building anything.
-- `--test` loads each finished plugin in FFStudio's built-in test host and renders a few frames.
+- `--test` loads each finished plugin in GLim's built-in test host and renders a few frames.
 
-The command line runs from source only, not from FFStudio.exe or FFStudio.app.
+The command line runs from source only, not from GLim.exe or GLim.app.
 
 ---
 
 ## NDI
 
-NDI® is a registered trademark of Vizrt NDI AB. FFStudio uses the NDI® SDK (through the cyndilib library) to send video; it isn't made or endorsed by Vizrt NDI AB. NDI runtime: Copyright © 2023–2026 Vizrt NDI AB, all rights reserved; its licence notices ship with FFStudio (`cyndilib/wrapper/bin/*licenses*.txt`), and the terms NDI asks users to agree to are at the top of `THIRD_PARTY_NOTICES.txt`. More about NDI: [ndi.video](https://ndi.video/).
+NDI® is a registered trademark of Vizrt NDI AB. GLim uses the NDI® SDK (through the cyndilib library) to send video; it isn't made or endorsed by Vizrt NDI AB. NDI runtime: Copyright © 2023–2026 Vizrt NDI AB, all rights reserved; its licence notices ship with GLim (`cyndilib/wrapper/bin/*licenses*.txt`), and the terms NDI asks users to agree to are at the top of `THIRD_PARTY_NOTICES.txt`. More about NDI: [ndi.video](https://ndi.video/).
 
 ## Shader licensing
 
@@ -444,10 +444,10 @@ Shaders are the creative property of their authors.
 
 Keep credits, and respect non-commercial and share-alike terms.
 
-What you make with FFStudio is yours, but a shader's licence also applies to the plugins and ISF files made from it. The sample shaders say who wrote them and where they come from.
+What you make with GLim is yours, but a shader's licence also applies to the plugins and ISF files made from it. The sample shaders say who wrote them and where they come from.
 
-Plugins that FFStudio builds contain code from the FFGL SDK (and on Windows, GLEW). Their licences, in `THIRD_PARTY_NOTICES.txt`, ask that their notices go with any plugins you share.
+Plugins that GLim builds contain code from the FFGL SDK (and on Windows, GLEW). Their licences, in `THIRD_PARTY_NOTICES.txt`, ask that their notices go with any plugins you share.
 
 ## Privacy
 
-FFStudio doesn't collect any data and doesn't connect to the internet. It uses your local network only for NDI output and for remote control (OSC on UDP port 8000).
+GLim doesn't collect any data and doesn't connect to the internet. It uses your local network only for NDI output and for remote control (OSC on UDP port 8000).

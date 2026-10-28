@@ -14,7 +14,7 @@ import markdown
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-from ffstudio import __version__                                     # noqa: E402
+from glim import __version__                                     # noqa: E402
 
 ITEM = re.compile(r" *([-*] |\d+\. )")
 LIST_ITEM = re.compile(r"^( +)(?=[-*] |\d+\. )")        # a nested one
@@ -127,13 +127,13 @@ def main(out_dir):
 <body>
 <div class="page">
 <nav aria-label="Contents">
-<div class="title">FFStudio</div>
+<div class="title">GLim</div>
 <div class="version">Version {html.escape(__version__)}</div>
 <ul>{toc}</ul>
 </nav>
 <main>
 <h1>{html.escape(title)}</h1>
-<p class="subtitle">For FFStudio {html.escape(__version__)}</p>
+<p class="subtitle">For GLim {html.escape(__version__)}</p>
 {body}
 </main>
 </div>

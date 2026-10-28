@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Stained glass that won't sit still: Voronoi cells drift and swap shapes, lit from behind with glowing lead lines",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

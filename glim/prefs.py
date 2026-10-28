@@ -1,4 +1,4 @@
-"""FFStudio's own settings, kept between sessions in prefs.json in the user's
+"""GLim's own settings, kept between sessions in prefs.json in the user's
 config folder (paths.config_dir()): for now, the folders last chosen for
 built plugins, ISF exports and saved shader code.
 
@@ -53,4 +53,4 @@ def set_folder(kind, path):
     try:
         save(data)
     except OSError as e:            # remembering is a convenience; never block a build
-        print(f"FFStudio: couldn't save {FILE} ({e})")
+        print(f"GLim: couldn't save {FILE} ({e})")

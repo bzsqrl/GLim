@@ -1,12 +1,12 @@
 """Write THIRD_PARTY_NOTICES.txt: the terms NDI's licence asks users to agree
-to, and the licences of the third-party software that FFStudio's packaged app
-(FFStudio.exe or FFStudio.app) contains, as their licences require when the
+to, and the licences of the third-party software that GLim's packaged app
+(GLim.exe or GLim.app) contains, as their licences require when the
 app is distributed.
 
 Usage: venv\\Scripts\\python tools\\make_notices.py [OUT_DIR]   (default: dist)
 compile.py runs it after each build. It covers what this platform's build
 bundles: a package is listed when PyInstaller's record of the last build
-(build/FFStudio/PYZ-00.toc) contains it, so run it after compile.py.
+(build/GLim/PYZ-00.toc) contains it, so run it after compile.py.
 
 Licence texts come from the installed packages, from Python's own LICENSE.txt
 and Tcl's license.terms, from the repository (FFGL SDK, GLEW) and, for parts
@@ -21,7 +21,7 @@ from importlib import metadata
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-from ffstudio import __version__                                     # noqa: E402
+from glim import __version__                                     # noqa: E402
 
 LICENSES = os.path.join(ROOT, "tools", "licenses")
 WIN, MAC = sys.platform == "win32", sys.platform == "darwin"
@@ -52,8 +52,8 @@ COMPONENTS = [
     ("Spout", "Spout output (inside SpoutGL)", None, "SpoutGL", ["lic:spout.txt"], "win"),
     ("syphon-python", "Syphon output", "syphon-python", "syphon", ["dist:LICENSE*"], "mac"),
     ("Syphon framework", "Syphon output (inside syphon-python)", None, "syphon", ["lic:syphon.txt"], "mac"),
-    ("FFGL SDK", "the plugins FFStudio builds", None, None, ["repo:boilerplates/ffgl/LICENSE.md"], "all"),
-    ("GLEW", "the plugins FFStudio builds (Windows)", None, None, ["repo:deps/glew-2.2.0/LICENSE.txt"], "win"),
+    ("FFGL SDK", "the plugins GLim builds", None, None, ["repo:boilerplates/ffgl/LICENSE.md"], "all"),
+    ("GLEW", "the plugins GLim builds (Windows)", None, None, ["repo:deps/glew-2.2.0/LICENSE.txt"], "win"),
 ]
 
 # Where tools/licenses came from (each project's repository).
@@ -72,9 +72,9 @@ NDI_TERMS = """\
 NDI
 ---
 
-FFStudio includes the NDI® runtime, which belongs to Vizrt NDI AB. NDI's
+GLim includes the NDI® runtime, which belongs to Vizrt NDI AB. NDI's
 licence asks everyone who gets it to agree to the following. These terms
-apply to the NDI software inside FFStudio only:
+apply to the NDI software inside GLim only:
 
   - Don't modify the NDI software.
   - Don't reverse engineer, disassemble or recompile it, or the protocols it
@@ -82,15 +82,15 @@ apply to the NDI software inside FFStudio only:
   - Don't get around any of its technical limits.
   - Don't remove or change any of its copyright or other notices.
   - NDI and its licensors give no warranty, and as far as the law allows,
-    they aren't liable for any damage from using FFStudio.
-  - Follow United States export law: don't export FFStudio, or any part of
+    they aren't liable for any damage from using GLim.
+  - Follow United States export law: don't export GLim, or any part of
     it, in a way that breaks it.
-  - If you use FFStudio to make your own products that use NDI, follow the
+  - If you use GLim to make your own products that use NDI, follow the
     NDI SDK licence: keep them fully NDI-compatible, and include these NDI
     terms in your own licence.
 
 The NDI runtime is copyright (c) 2023-2026 Vizrt NDI AB. All rights reserved.
-NDI® is a registered trademark of Vizrt NDI AB. FFStudio isn't made or
+NDI® is a registered trademark of Vizrt NDI AB. GLim isn't made or
 endorsed by Vizrt NDI AB. More about NDI: https://ndi.video/
 
 The NDI SDK licence: https://ndi.link/ndisdk_license""".split("\n")
@@ -103,7 +103,7 @@ def read(path):
 
 def in_build(module):
     """Whether the last build bundles `module` (True when there's no record)."""
-    toc = os.path.join(ROOT, "build", "FFStudio", "PYZ-00.toc")
+    toc = os.path.join(ROOT, "build", "GLim", "PYZ-00.toc")
     if module is None or not os.path.isfile(toc):
         return True
     with open(toc, encoding="utf-8", errors="replace") as f:
@@ -192,9 +192,9 @@ def main(out_dir):
 
     rule = "=" * 78
     head = [
-        f"FFStudio {__version__}: third-party notices",
+        f"GLim {__version__}: third-party notices",
         "",
-        "FFStudio's own code is under the MIT License (LICENSE.txt). FFStudio also",
+        "GLim's own code is under the MIT License (LICENSE.txt). GLim also",
         "contains the software by others listed below, each used under the licence",
         "that follows its name. These notices are included as those licences require.",
         "",

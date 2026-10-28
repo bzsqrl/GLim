@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Build with:  venv\Scripts\python compile.py   (Windows: dist\FFStudio.exe)
-#              venv/bin/python compile.py       (macOS: dist/FFStudio.app)
+# Build with:  venv\Scripts\python compile.py   (Windows: dist\GLim.exe)
+#              venv/bin/python compile.py       (macOS: dist/GLim.app)
 import os
 import re
 import sys
@@ -8,9 +8,9 @@ from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, co
 
 MAC = sys.platform == 'darwin'
 
-# ffstudio/__init__.py's version, e.g. 0.9.0-beta.1; its numeric part for the
+# glim/__init__.py's version, e.g. 0.9.0-beta.2; its numeric part for the
 # exe's version resource and the Mac bundle.
-with open(os.path.join('ffstudio', '__init__.py'), encoding='utf-8') as f:
+with open(os.path.join('glim', '__init__.py'), encoding='utf-8') as f:
     VERSION = re.search(r'__version__ = "([^"]+)"', f.read()).group(1)
 NUMBERS = tuple(int(n) for n in VERSION.split('-')[0].split('.'))
 
@@ -51,7 +51,7 @@ a = Analysis(
         ('templates', 'templates'),
         ('assets/icon', 'assets/icon'),          # window icons (paths.icon_dir)
     ] + platform_datas + ndi_datas + ffgl_sdk,
-    hiddenimports=['ffstudio', 'glfw', 'OpenGL.GL'] + platform_imports + ndi_imports,
+    hiddenimports=['glim', 'glfw', 'OpenGL.GL'] + platform_imports + ndi_imports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -59,7 +59,7 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
-# PyOpenGL's wheel carries GLUT and GLE DLLs (and their licences); FFStudio
+# PyOpenGL's wheel carries GLUT and GLE DLLs (and their licences); GLim
 # uses neither (its windows are GLFW's), so leave them out.
 a.binaries = [b for b in a.binaries
               if not os.path.normpath(b[0]).startswith(os.path.join('OpenGL', 'DLLS'))]
@@ -75,7 +75,7 @@ if MAC:
         a.scripts,
         [],
         exclude_binaries=True,
-        name='FFStudio',
+        name='GLim',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -87,12 +87,12 @@ if MAC:
         codesign_identity=None,
         entitlements_file=None,
     )
-    coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='FFStudio')
+    coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='GLim')
     app = BUNDLE(
         coll,
-        name='FFStudio.app',
-        icon='assets/icon/FFStudio.icns',
-        bundle_identifier='com.ffstudio.app',
+        name='GLim.app',
+        icon='assets/icon/GLim.icns',
+        bundle_identifier='com.busysquirrel.glim',
         info_plist={
             'CFBundleShortVersionString': '.'.join(map(str, NUMBERS)),
             'CFBundleVersion': VERSION,
@@ -103,7 +103,7 @@ if MAC:
             # NDI finds and announces sources on the local network (Bonjour), which
             # macOS only allows once the user grants Local Network access.
             'NSLocalNetworkUsageDescription':
-                'FFStudio sends its output over NDI to other apps and computers on your network, '
+                'GLim sends its output over NDI to other apps and computers on your network, '
                 'and can be remote-controlled from them (OSC, e.g. TouchOSC).',
             'NSBonjourServices': ['_ndi._tcp'],
         },
@@ -114,11 +114,11 @@ else:
     version_resource = vi.VSVersionInfo(
         ffi=vi.FixedFileInfo(filevers=quad, prodvers=quad),
         kids=[vi.StringFileInfo([vi.StringTable('040904B0', [
-                  vi.StringStruct('ProductName', 'FFStudio'),
-                  vi.StringStruct('FileDescription', 'FFStudio'),
+                  vi.StringStruct('ProductName', 'GLim'),
+                  vi.StringStruct('FileDescription', 'GLim'),
                   vi.StringStruct('ProductVersion', VERSION),
                   vi.StringStruct('FileVersion', VERSION),
-                  vi.StringStruct('OriginalFilename', 'FFStudio.exe')])]),
+                  vi.StringStruct('OriginalFilename', 'GLim.exe')])]),
               vi.VarFileInfo([vi.VarStruct('Translation', [0x0409, 1200])])])
     exe = EXE(
         pyz,
@@ -126,8 +126,8 @@ else:
         a.binaries,
         a.datas,
         [],
-        name='FFStudio',
-        icon='assets/icon/FFStudio.ico',
+        name='GLim',
+        icon='assets/icon/GLim.ico',
         version=version_resource,
         debug=False,
         bootloader_ignore_signals=False,
