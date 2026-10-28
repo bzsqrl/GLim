@@ -61,7 +61,7 @@ Location: `output/test_batch_v2/`. It has 7 FFGL plugins, the matching ISF files
 
 # Test batch v3: sampler settings and tempo
 
-Location: `output/test_batch_v3/` (rebuild with `venv/bin/python -m ffstudio --to both --out output/test_batch_v3 tests/fixtures/shadertoy_sampler.txt tests/fixtures/shadertoy_buffer_sampler.txt tests/fixtures/shadertoy_tempo.txt`). It has 3 FFGL plugins and the matching ISF files.
+Location: `output/test_batch_v3/` (rebuild with `venv/bin/python -m glim --to both --out output/test_batch_v3 tests/fixtures/shadertoy_sampler.txt tests/fixtures/shadertoy_buffer_sampler.txt tests/fixtures/shadertoy_tempo.txt`). It has 3 FFGL plugins and the matching ISF files.
 
 | Plugin | What to check |
 | :-- | :-- |
@@ -75,7 +75,7 @@ Location: `output/test_batch_v3/` (rebuild with `venv/bin/python -m ffstudio --t
 
 # Test batch v4: smooth sliders and `#define` channels
 
-Location: `output/test_batch_v4/`. Rebuild it with the command in [MAC_UPDATE.md](MAC_UPDATE.md), step 4. It has 4 FFGL plugins and the matching ISF files. Windows: all four pass FFStudio's test host. macOS: all four pass the test host, and the user confirmed them in Resolume and MadMapper (2026-10-21). Resolume finds plugins in a saved set by their FFGL plugin ID, not their bundle ID: a set still loads a rebuilt plugin after its bundle ID changed (checked on macOS, 2026-10-23).
+Location: `output/test_batch_v4/`. Rebuild it with the command in [MAC_UPDATE.md](MAC_UPDATE.md), step 4. It has 4 FFGL plugins and the matching ISF files. Windows: all four pass GLim's test host. macOS: all four pass the test host, and the user confirmed them in Resolume and MadMapper (2026-10-21). Resolume finds plugins in a saved set by their FFGL plugin ID, not their bundle ID: a set still loads a rebuilt plugin after its bundle ID changed (checked on macOS, 2026-10-23).
 
 | Plugin | What to check |
 | :-- | :-- |

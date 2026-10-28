@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Building block effect: bend the clip with a moving displacement field (waves, noise, swirl, ripple or shattered cells), with optional RGB split along the bend",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Distortion Effect", "Building Block"],
   "INPUTS": [

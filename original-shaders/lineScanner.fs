@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Building block: scrolling stripes, rings or a grid of lines, with bending waves, random widths and per-line strobing",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Building Block"],
   "INPUTS": [

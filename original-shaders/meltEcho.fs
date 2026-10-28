@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Effect: the clip leaves hue-shifting echoes that melt along their own contours, drip and swirl, while fresh frames keep feeding in",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Stylize", "Psychedelic"],
   "INPUTS": [

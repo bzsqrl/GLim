@@ -1,5 +1,5 @@
 """
-FFStudio – Shader to FFGL Converter
+GLim – Shader to FFGL Converter
 main_gui.py – Queue-first layout with drag-and-drop batch processing.
 """
 import customtkinter as ctk
@@ -11,11 +11,11 @@ import tkinter as tk
 from tkinter import ttk
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from ffstudio import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: E402
-from ffstudio import __version__                                       # noqa: E402
-from ffstudio import convert as ffconvert                               # noqa: E402
-from ffstudio import settings as ffsettings                             # noqa: E402
-from ffstudio import prefs as ffprefs                                   # noqa: E402
+from glim import pipeline, emit_isf, build_ffgl, paths as ffpaths   # noqa: E402
+from glim import __version__                                       # noqa: E402
+from glim import convert as ffconvert                               # noqa: E402
+from glim import settings as ffsettings                             # noqa: E402
+from glim import prefs as ffprefs                                   # noqa: E402
 from editor_panel import EditorPanel, gpu_cache_key, toggle_command    # noqa: E402
 import ctk_fixes                                                       # noqa: E402
 import theme as T                                                      # noqa: E402
@@ -137,14 +137,14 @@ class QueueItem:
 # ---------------------------------------------------------------------------
 # Main application window
 # ---------------------------------------------------------------------------
-class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
+class GLimApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
         if _DND_AVAILABLE:
             ctk.set_appearance_mode("Dark")
         T.apply(self)                       # colours and fonts, before any widget
 
-        self.title(f"FFStudio {__version__}")
+        self.title(f"GLim {__version__}")
         # Fit the screen (minus taskbar), up to 1440x900.
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
         w, h = min(1440, sw - 60), min(900, sh - 110)
@@ -159,9 +159,9 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self._sort = (None, False)                # queue sorted by (column, descending)
         self._playlist_only = None                # Studio's ← / →: None = the whole queue, else these paths
         self._studio_entry = None                 # (queue, selection) when the Studio tab was last entered
-        self._source_stem = "FFStudioPlugin"   # for single-file tab
+        self._source_stem = "GLimPlugin"   # for single-file tab
         self._source_path = None
-        self.settings = {}                    # single-file tab: the shader's .ffstudio.json
+        self.settings = {}                    # single-file tab: the shader's .glim.json
         self._processed_code = None           # the code box text last loaded into the editor
 
         # The window colour, whether this is a CTk or a TkinterDnD window
@@ -193,21 +193,21 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.after(50, self._collect_garbage)
 
     def _set_icon(self):
-        """FFStudio's icon for its windows (title bar, taskbar, Alt+Tab; the Dock
+        """GLim's icon for its windows (title bar, taskbar, Alt+Tab; the Dock
         when run from source on macOS)."""
         d = ffpaths.icon_dir()
         try:
             if sys.platform == "win32":
-                self.iconbitmap(default=os.path.join(d, "FFStudio.ico"))
-            self._icon_photos = [tk.PhotoImage(file=os.path.join(d, "png", f"ffstudio_{s}.png"))
+                self.iconbitmap(default=os.path.join(d, "GLim.ico"))
+            self._icon_photos = [tk.PhotoImage(file=os.path.join(d, "png", f"glim_{s}.png"))
                                  for s in (16, 32, 48, 64, 128, 256)]
             self.iconphoto(True, *self._icon_photos)
         except Exception as e:          # icons are cosmetic; never block startup
-            print(f"FFStudio: window icon not set ({e})")
+            print(f"GLim: window icon not set ({e})")
 
     def _init_gpu(self):
         try:
-            from ffstudio import validate as V
+            from glim import validate as V
             with V.gpu() as ctx:
                 self.log(f"GPU: {ctx.renderer}")
         except Exception as e:
@@ -257,7 +257,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.textbox_log.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="ew")
         for tag, colour in (("ok", T.GREEN_TEXT), ("warn", T.AMBER_TEXT), ("error", T.RED_TEXT)):
             self.textbox_log.tag_config(tag, foreground=colour)
-        self.log(f"FFStudio {__version__}. System ready.")
+        self.log(f"GLim {__version__}. System ready.")
 
     # -----------------------------------------------------------------------
     # Queue tab
@@ -755,7 +755,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                          args=(items, EXTRACT_PARAMS, stop), daemon=True).start()
 
     def _measure_gpu_thread(self, items, extract_params, stop):
-        from ffstudio import validate as V
+        from glim import validate as V
         done = []
         for item in items:
             if stop.is_set():
@@ -789,7 +789,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         if not (item.iid and self.tree.exists(item.iid)):
             return
         if text is None:
-            from ffstudio import validate as V
+            from glim import validate as V
             load = V.load_text(item.gpu_ms)[0].replace(" of 60 fps", "")
             ms = f"{item.gpu_ms:.1f}" if item.gpu_ms >= 1 else f"{item.gpu_ms:.2f}"
             text = f"{load}  ·  {ms} ms" +("  ⚠" if item.gpu_ms > V.FRAME_60_MS else "")
@@ -808,7 +808,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
                     self._set_item_gpu(item)
         msg = f"Measured {len(done)} shader(s)" + (" (stopped)" if stop.is_set() else "")
         if done:
-            from ffstudio import validate as V
+            from glim import validate as V
             heavy = max(done, key=lambda i: i.gpu_ms)
             over = sum(i.gpu_ms > V.FRAME_60_MS for i in done)
             msg += (f". Heaviest: {heavy.fname} ({V.load_text(heavy.gpu_ms)[0]}, "
@@ -928,7 +928,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
     # -----------------------------------------------------------------------
     def _convert_and_build(self, code, name, path, output_dir, settings=None, extract_params=False):
         """Shared by queue and single-file builds. Returns (status, label).
-        settings=None uses the shader's saved .ffstudio.json. Runs on worker
+        settings=None uses the shader's saved .glim.json. Runs on worker
         threads, so callers pass extract_params (EXTRACT_PARAMS)."""
         log = self._gui_log
         try:
@@ -975,7 +975,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
             self.log("Processing shader code...")
         if not self.entry_plugin_name.get().strip():
             self.entry_plugin_name.delete(0, "end")
-            self.entry_plugin_name.insert(0, "FFStudioPlugin")
+            self.entry_plugin_name.insert(0, "GLimPlugin")
 
         try:
             if res is None:
@@ -1012,7 +1012,7 @@ class FFStudioApp(ctk.CTk if not _DND_AVAILABLE else TkinterDnD.Tk):
         self.log(f"Starting build… (to {output_dir})")
         self.btn_build_single.configure(state="disabled")
         code = self.textbox_code.get("1.0", "end-1c")
-        name = self.entry_plugin_name.get().strip() or "FFStudioPlugin"
+        name = self.entry_plugin_name.get().strip() or "GLimPlugin"
         path = self._source_path
         self._remember_plugin_name(name)
         if path:
@@ -1211,11 +1211,11 @@ def _selftest(shader, out_dir):
     """Headless check of a (packaged) build: convert, GPU-validate and build one
     shader, then start and stop each way of sending to other apps (the packaged
     libraries load). Writes selftest.log into out_dir.
-    Usage: FFStudio.exe --selftest <shader> <out_dir>"""
+    Usage: GLim.exe --selftest <shader> <out_dir>"""
     import traceback
-    from ffstudio import validate as V
+    from glim import validate as V
     os.makedirs(out_dir, exist_ok=True)
-    lines = [f"FFStudio {__version__}"]
+    lines = [f"GLim {__version__}"]
     try:
         code = open(shader, encoding="utf-8", errors="replace").read()
         res = pipeline.convert_ffgl(code, name=Path(shader).stem, path=shader)
@@ -1251,8 +1251,8 @@ if __name__ == "__main__":
         # Own taskbar entry and icon, also when run from source (not Python's).
         try:
             import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("FFStudio.FFStudio")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("GLim.GLim")
         except Exception:
             pass
-    app = FFStudioApp()
+    app = GLimApp()
     app.mainloop()

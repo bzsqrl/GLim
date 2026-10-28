@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "A mirrored kaleidoscope of glowing rings whose folds open and close like a flower over time",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

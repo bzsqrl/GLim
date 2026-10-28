@@ -5,7 +5,7 @@ import sys
 import os
 
 def seal_mac_app(app):
-    """Re-sign FFStudio.app ad hoc so `codesign --verify --deep --strict` passes.
+    """Re-sign GLim.app ad hoc so `codesign --verify --deep --strict` passes.
     PyInstaller signs the binaries but leaves the app without a resource seal,
     and Syphon.framework (from syphon-python's wheel, which can't hold symlinks)
     has real folders at its top level where a framework has symlinks into
@@ -27,7 +27,7 @@ def seal_mac_app(app):
 
 def package_files(root):
     """What goes in the zip with the app, written into dist/: the sample shaders,
-    FFStudio's own shaders, the TouchOSC layouts, the licence, the third-party
+    GLim's own shaders, the TouchOSC layouts, the licence, the third-party
     notices (for what this platform's build bundles) and the user manual as HTML."""
     dist = os.path.join(root, "dist")
     for folder in ("sample-shaders", "original-shaders", "touchosc"):
@@ -40,7 +40,7 @@ def package_files(root):
         subprocess.check_call([sys.executable, os.path.join(root, "tools", tool), dist], cwd=root)
 
 def build():
-    print("Starting FFStudio build process...")
+    print("Starting GLim build process...")
 
     # Check if pyinstaller is installed
     try:
@@ -51,21 +51,21 @@ def build():
 
     # Run pyinstaller using the .spec file (it handles Windows and macOS)
     print("Running PyInstaller...")
-    cmd = [sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm", "FFStudio.spec"]
+    cmd = [sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm", "GLim.spec"]
 
     root = os.path.dirname(os.path.abspath(__file__))
     try:
         subprocess.check_call(cmd, cwd=root)
         if sys.platform == "darwin":
             print("Sealing the app's code signature...")
-            seal_mac_app(os.path.join(root, "dist", "FFStudio.app"))
+            seal_mac_app(os.path.join(root, "dist", "GLim.app"))
         print("Writing the package files...")
         package_files(root)
         print("\nBuild successful!")
         if sys.platform == "darwin":
-            print("You can find FFStudio.app in the 'dist' folder.")
+            print("You can find GLim.app in the 'dist' folder.")
         else:
-            print("You can find FFStudio.exe in the 'dist' folder.")
+            print("You can find GLim.exe in the 'dist' folder.")
         print("The rest of the package (sample and original shaders, TouchOSC layouts, licence, notices, manual) is there too.")
     except subprocess.CalledProcessError as e:
         print(f"\nBuild failed with error: {e}")

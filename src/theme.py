@@ -1,4 +1,4 @@
-"""FFStudio's colours and fonts, in one place.
+"""GLim's colours and fonts, in one place.
 
 One family of dark surfaces, from the window to a button; one accent, for the
 main actions and for toggles that are on; and green / amber / red only where
@@ -125,7 +125,7 @@ def apply(root):
 def colour_title_bar(window):
     """Windows: a dark title bar in the window's colour (Windows 11; Windows 10
     gets the plain dark one). CustomTkinter only darkens its own CTk windows,
-    and FFStudio's window is TkinterDnD's when drag and drop is available."""
+    and GLim's window is TkinterDnD's when drag and drop is available."""
     if sys.platform != "win32":
         return
     try:

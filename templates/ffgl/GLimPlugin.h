@@ -7,33 +7,33 @@
 
 // ── Data-table types filled in by the generated ShaderData.h ────────────────
 
-enum FFMKind
+enum GLimKind
 {
-	FFM_K_FLOAT,
-	FFM_K_INT,
-	FFM_K_BOOL,
-	FFM_K_EVENT,
-	FFM_K_OPTION,
-	FFM_K_COLOR,     // def = {h, s, v, a}; glslComponents 3 or 4
-	FFM_K_POINT,     // def = {x, y}; min/max per axis
-	FFM_K_SPEED,     // CPU-only: scales the clock
-	FFM_K_MOUSE,     // CPU-only: feeds ffm_Mouse
-	FFM_K_MOUSECLICK,// CPU-only: feeds ffm_Mouse.zw sign
-	FFM_K_FFT        // FFGL buffer param filled with the host's audio spectrum
+	GLIM_K_FLOAT,
+	GLIM_K_INT,
+	GLIM_K_BOOL,
+	GLIM_K_EVENT,
+	GLIM_K_OPTION,
+	GLIM_K_COLOR,     // def = {h, s, v, a}; glslComponents 3 or 4
+	GLIM_K_POINT,     // def = {x, y}; min/max per axis
+	GLIM_K_SPEED,     // CPU-only: scales the clock
+	GLIM_K_MOUSE,     // CPU-only: feeds glim_Mouse
+	GLIM_K_MOUSECLICK,// CPU-only: feeds glim_Mouse.zw sign
+	GLIM_K_FFT        // FFGL buffer param filled with the host's audio spectrum
 };
 
-enum FFMSource
+enum GLimSource
 {
-	FFM_SRC_HOST,
-	FFM_SRC_TARGET,
-	FFM_SRC_NONE,
-	FFM_SRC_IMAGE,// embedded image (index into FFM_IMAGES)
-	FFM_SRC_AUDIO // audio texture; index = rows (1 = FFT, 2 = FFT + wave, Shadertoy layout)
+	GLIM_SRC_HOST,
+	GLIM_SRC_TARGET,
+	GLIM_SRC_NONE,
+	GLIM_SRC_IMAGE,// embedded image (index into GLIM_IMAGES)
+	GLIM_SRC_AUDIO // audio texture; index = rows (1 = FFT, 2 = FFT + wave, Shadertoy layout)
 };
 
-static const int FFM_FFT_SIZE = 512;
+static const int GLIM_FFT_SIZE = 512;
 
-struct FFMParamDef
+struct GLimParamDef
 {
 	const char* uniform;
 	const char* label;
@@ -51,15 +51,15 @@ struct FFMParamDef
 // time * sliders in the shader, kept as a running total (phase += scale * product
 // of the params' values * frame time) so moving a slider changes the rate
 // instead of jumping the animation.
-struct FFMPhaseDef
+struct GLimPhaseDef
 {
 	const char* uniform;
 	float scale; // product of hidden (constant) params
 	int count;   // live params multiplied in
-	int defs[ 4 ];// indices into FFM_PARAMS
+	int defs[ 4 ];// indices into GLIM_PARAMS
 };
 
-struct FFMSamplerDef
+struct GLimSamplerDef
 {
 	const char* name;
 	int source;
@@ -68,7 +68,7 @@ struct FFMSamplerDef
 	int wrap;  // -1 = the texture's own; else 0 clamp, 1 repeat
 };
 
-struct FFMImageDef
+struct GLimImageDef
 {
 	const char* name;
 	const unsigned char* data;// encoded PNG/JPG/BMP/TGA bytes, or nullptr for generated noise
@@ -79,7 +79,7 @@ struct FFMImageDef
 	int flip;                // load upright (Shadertoy vflip)
 };
 
-struct FFMTargetDef
+struct GLimTargetDef
 {
 	const char* name;
 	int persistent;
@@ -87,7 +87,7 @@ struct FFMTargetDef
 	int mipmap;// some pass reads it with a mipmap filter: rebuild mipmaps after rendering
 };
 
-struct FFMPassDef
+struct GLimPassDef
 {
 	int program;
 	int target;// -1 = host output
@@ -95,11 +95,11 @@ struct FFMPassDef
 
 // ── Plugin ──────────────────────────────────────────────────────────────────
 
-class FFStudioPlugin : public CFFGLPlugin
+class GLimPlugin : public CFFGLPlugin
 {
 public:
-	FFStudioPlugin();
-	~FFStudioPlugin();
+	GLimPlugin();
+	~GLimPlugin();
 
 	FFResult InitGL( const FFGLViewportStruct* vp ) override;
 	FFResult ProcessOpenGL( ProcessOpenGLStruct* pGL ) override;
@@ -117,7 +117,7 @@ public:
 private:
 	struct HostParam
 	{
-		int def; // index into FFM_PARAMS
+		int def; // index into GLIM_PARAMS
 		int sub; // component
 	};
 	struct Target
@@ -143,7 +143,7 @@ private:
 	GLuint blackTex = 0;
 	std::vector< GLuint > imageTex;
 	GLuint audioTex[ 3 ] = { 0, 0, 0 };// by row count
-	GLuint samplerObj[ 3 ][ 2 ] = {};   // [filter][wrap], for FFMSamplerDef overrides
+	GLuint samplerObj[ 3 ][ 2 ] = {};   // [filter][wrap], for GLimSamplerDef overrides
 	int fftParam         = -1;          // FFGL index of the FFT buffer param
 	void UpdateAudio();
 
@@ -155,7 +155,7 @@ private:
 	double realTime    = 0.0;
 
 	double clockTime = 0.0;
-	std::vector< double > phases;// FFM_PHASES running totals
+	std::vector< double > phases;// GLIM_PHASES running totals
 	float lastDelta  = 0.0f;
 	int frame        = 0;
 	bool hasLastTick = false;

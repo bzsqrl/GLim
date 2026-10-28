@@ -1,4 +1,4 @@
-# FFStudio Improvement Plan
+# GLim Improvement Plan
 
 *Written 2026-10-20 from a code review plus a compile audit of the 79 files in `sample-shaders/`.*
 
@@ -6,13 +6,13 @@
 
 **Phase 0 and most of Phase 1 are done.** Results on the 79 samples:
 - **All 79** convert, compile on the GPU, and render. The old pipeline managed 18.
-- **All 79** build into DLLs that load and render in FFStudio's test host.
+- **All 79** build into DLLs that load and render in GLim's test host.
 - **All 40** non-ISF samples export ISF that compiles in an ISF host emulator.
 
 Not yet checked inside Resolume or MadMapper.
 
 **New code layout:**
-- `ffstudio/`: the core library
+- `glim/`: the core library
   - `glsl.py`: tokenizer
   - `convert.py`: front-ends and transformations
   - `emit_ffgl.py`, `emit_isf.py`: output writers
@@ -36,19 +36,19 @@ Not yet checked inside Resolume or MadMapper.
 - **Multi-buffer Shadertoy:** Common plus Buffers A–D from sectioned text or Shadertoy JSON. These export to ISF `PASSES`.
 - **ISF `.vs` vertex shaders.**
 - **ISF round-trip regression test:** each export is re-imported and its render compared with the original. It found and fixed:
-  - uninitialised variables (FFStudio now zero-initialises them, as browsers do);
+  - uninitialised variables (GLim now zero-initialises them, as browsers do);
   - the ISF entry point when a file defines both `main()` and `mainImage()`;
   - user macros shadowing ISF built-ins;
   - `gl_FragColor` inside `#define` lines.
 - Test batch v2 is in `output/test_batch_v2`.
 
 **Phase 3 (GUI) and the Windows part of Phase 4 are done** (user confirmed batch v2):
-- **Live GPU preview** (`ffstudio/validate.Previewer`, shared with the offline renderer).
+- **Live GPU preview** (`glim/validate.Previewer`, shared with the offline renderer).
 - **Parameter editor:** expose/hide, label, range, default.
 - **Shadertoy channel pickers.**
-- **Per-shader settings** in `<shader>.ffstudio.json`, used by queue, CLI and ISF export. ISF sources get their headers rewritten from these settings.
+- **Per-shader settings** in `<shader>.glim.json`, used by queue, CLI and ISF export. ISF sources get their headers rewritten from these settings.
 - **Packaged `.exe` verified:**
-  - builds plugins headlessly (`FFStudio.exe --selftest <shader> <dir>`);
+  - builds plugins headlessly (`GLim.exe --selftest <shader> <dir>`);
   - GLEW is bundled;
   - the SDK is copied to a stable cache path so the workspace isn't reconfigured every launch.
 **macOS port done** (M1 Max, macOS 14, Resolume 7.21.3, MadMapper 6.0.1):
@@ -56,7 +56,7 @@ Not yet checked inside Resolume or MadMapper.
 - Plugins are universal (arm64 + x86_64) `.bundle`s, macOS 10.15+, each with its own bundle identifier, signed ad hoc. The binary is named after the bundle, because Resolume opens `Contents/MacOS/<bundle name>`.
 - Corpus: all 79 convert, compile and render on the Apple GPU. Plugins load in Resolume for Mac.
 - ISF exports no longer use `gl_FragCoord` (MadMapper on macOS puts its origin at the top). The corpus `--isf` run now fails an export with `FLIP` if its output depends on `gl_FragCoord`'s origin.
-- `FFStudio.spec` builds `dist/FFStudio.app` on macOS. It writes output to `~/Documents/FFStudio/output` and finds Homebrew's CMake when opened from Finder. Verified with `--selftest`.
+- `GLim.spec` builds `dist/GLim.app` on macOS. It writes output to `~/Documents/GLim/output` and finds Homebrew's CMake when opened from Finder. Verified with `--selftest`.
 - Not done: a universal or Intel build of the app itself (Homebrew Python is arm64 only), and Developer ID signing/notarization for distribution.
 
 **Done since the Mac port:**
@@ -65,14 +65,14 @@ Not yet checked inside Resolume or MadMapper.
 - **Windows sync of the Mac port** passed with no code changes (MSVC built the sampler and tempo C++ as is).
 - **`#define` channels:** Shadertoy channels used only inside macro bodies are now declared and wired (`ac835b5`).
 - **Queue rewrite** (`5a72770`, `100a29c`): a native `ttk.Treeview`, so 800+ files load in under a second. Type detection and queue ISF export run in the background. Build/Export Selected, Delete to remove, a right-click menu.
-- **Sliders multiplied by time no longer scrub in FFGL** (`2892180`): `time * slider` becomes a running total (`ffm_phaseN`, `FFM_PHASES`) that the plugin and preview keep. ISF exports keep the plain product. A hidden persistent-buffer version for ISF failed in MadMapper (several shaders blank; Speed still jumped) and was reverted.
+- **Sliders multiplied by time no longer scrub in FFGL** (`2892180`): `time * slider` becomes a running total (`glim_phaseN`, `GLIM_PHASES`) that the plugin and preview keep. ISF exports keep the plain product. A hidden persistent-buffer version for ISF failed in MadMapper (several shaders blank; Speed still jumped) and was reverted.
 - **Mac sync of the Windows work** (`MAC_UPDATE.md`) passed: corpus and fixtures match the Windows results, clang built the phase C++ as is, test batch v4 passes the test host and was confirmed in Resolume and MadMapper. The queue handles 790 files on macOS (rows in 0.1 s, types in ~7 s in the background). Added Control-click for the queue menu on macOS.
 - **Plugin identity on the Mac:** Resolume saves FFGL plugins by plugin ID (`uniqueTypeId`), not bundle ID, so changing a plugin's bundle ID doesn't affect saved sets (checked by swapping builds under a saved set).
 - **Studio parameter panel on the Mac** (`MAC_UPDATE.md` step 6, 2026-10-24): the flat Tk/ttk parameter rows and channel menus, GPU load (timer queries work on the M1 Max), the button click fixes and the output window all work on macOS with no changes.
-- **Syphon output on the Mac** (`MAC_UPDATE.md` section 9, 2026-10-24): works from source with no changes (1920×1080, right way up, 60 fps, with and without the output window, server gone when turned off). The packaged `FFStudio.app` sends to Resolume too. `compile.py` re-signs the app after PyInstaller (`seal_mac_app`), so `codesign --verify --deep --strict` passes, with the bundled `Syphon.framework` included.
-- **NDI output on the Mac** (`MAC_UPDATE.md` section 10, 2026-10-24): works with no changes, from source and from the packaged `FFStudio.app` in Resolume: 30 fps with no dropped frames, the right way up, at 1080p and 720p, alongside Syphon, with and without the output window. The app asks for Local Network access the first time.
+- **Syphon output on the Mac** (`MAC_UPDATE.md` section 9, 2026-10-24): works from source with no changes (1920×1080, right way up, 60 fps, with and without the output window, server gone when turned off). The packaged `GLim.app` sends to Resolume too. `compile.py` re-signs the app after PyInstaller (`seal_mac_app`), so `codesign --verify --deep --strict` passes, with the bundled `Syphon.framework` included.
+- **NDI output on the Mac** (`MAC_UPDATE.md` section 10, 2026-10-24): works with no changes, from source and from the packaged `GLim.app` in Resolume: 30 fps with no dropped frames, the right way up, at 1080p and 720p, alongside Syphon, with and without the output window. The app asks for Local Network access the first time.
 - **New look on the Mac** (`MAC_UPDATE.md` section 11, 2026-10-24): every check passed from source and in the packaged app. The UI uses the system font; code uses Menlo, as SF Mono isn't installed system-wide. The Studio log said "will export as <name>.dll" on the Mac too; it now names the `.bundle`.
-- **OSC remote control on the Mac** (`MAC_UPDATE.md` section 12, 2026-10-25): works with no changes, from source and in the packaged app, driven by scripted OSC over localhost and the network address. The TouchOSC layouts connect from the Mac and a phone. They now work on any TouchOSC connection, not just 10. Trackpad tap-to-click misses some taps in TouchOSC on the Mac; that's TouchOSC's input handling, not fixable from FFStudio, and the manual says so.
+- **OSC remote control on the Mac** (`MAC_UPDATE.md` section 12, 2026-10-25): works with no changes, from source and in the packaged app, driven by scripted OSC over localhost and the network address. The TouchOSC layouts connect from the Mac and a phone. They now work on any TouchOSC connection, not just 10. Trackpad tap-to-click misses some taps in TouchOSC on the Mac; that's TouchOSC's input handling, not fixable from GLim, and the manual says so.
 - **Beta package on the Mac** (`MAC_UPDATE.md` section 13, 2026-10-27): version, licence, notices, HTML manual and a test zip all check out. `tools/make_notices.py` now finds Homebrew Tcl/Tk 9's licence files (the Mac build stopped without them) and lists only the licence sources a build uses.
 - **Queue Reset Status:** sets built/failed rows (or just the selected ones) back to Pending, so a queue can be converted again without reloading it.
 
@@ -118,7 +118,7 @@ Smaller issues:
 - Format detection reads only the first 2 KB, so files with long license headers can be misdetected.
 
 ### 2.3 The FFGL runtime template has bugs, even when the shader compiles
-- **Effects get no input image.** `/* FFM_FX_TEXTURE_BIND */` is never replaced, so the host texture is never bound, and `MaxUV` is never set (it stays `0,0`, so every sample reads one texel).
+- **Effects get no input image.** `/* GLIM_FX_TEXTURE_BIND */` is never replaced, so the host texture is never bound, and `MaxUV` is never set (it stays `0,0`, so every sample reads one texel).
 - **Time is fake.** It goes up by `0.016` each frame instead of following the clock, so speed changes with frame rate. `iTimeDelta` is never sent (the code sets `fTimeDelta`, which isn't a uniform).
 - **The Speed slider makes the animation jump.** It's applied as `iTime = fTime * Speed`, so moving the slider jumps the shader backwards or forwards in time. It should add up scaled time on the CPU each frame instead.
 - **`long` (dropdown) params can't work.** A float is sent to a `uniform int`, which is a GL error and the value never changes. They should be `ParamOption` dropdowns with the ISF labels.
@@ -153,7 +153,7 @@ Smaller issues:
 ## 4. Phased roadmap
 
 ### Phase 0: Test harness *(a prototype already exists)*
-- Turn the audit script into `tests/` plus a CLI (`ffstudio convert <file> --to ffgl|isf [--check]`).
+- Turn the audit script into `tests/` plus a CLI (`glim convert <file> --to ffgl|isf [--check]`).
 - Pass/fail report per sample covering parse, FFGL compile, ISF compile, and render-not-black.
 - Keep a scoreboard so every later change is measured against the 18/79 baseline.
 
@@ -178,7 +178,7 @@ Smaller issues:
 - Clear per-shader diagnostics in the queue (with the reason) instead of a generic "Build failed".
 
 ### Phase 4: Build and packaging
-- Short term: compile the FFGL SDK once and cache it, and use a per-user build/cache folder (`%LOCALAPPDATA%\FFStudio`). Always clean up.
+- Short term: compile the FFGL SDK once and cache it, and use a per-user build/cache folder (`%LOCALAPPDATA%\GLim`). Always clean up.
 - Longer term: a **prebuilt, data-driven runtime plugin**. The shader, params and textures are stored as data inside a ready-made DLL (Windows resource) or bundle (Mac `Resources/`, then an ad-hoc codesign). End users wouldn't need MSVC/CMake/Xcode, and builds would take under a second.
 - Merge the Mac port back into one codebase with platform-specific build backends.
 - Update the bundled FFGL SDK snapshot (currently dated 2023-06) to the latest `resolume/ffgl` master.

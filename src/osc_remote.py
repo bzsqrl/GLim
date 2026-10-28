@@ -1,13 +1,13 @@
 """Remote control of the Studio tab over the network with OSC (e.g. TouchOSC).
 
-Always on: FFStudio listens on UDP port PORT. A client is any address that has
-sent it a message; FFStudio sends it the Studio tab's state, and again whenever
+Always on: GLim listens on UDP port PORT. A client is any address that has
+sent it a message; GLim sends it the Studio tab's state, and again whenever
 something changes, to FEEDBACK_PORT on that address (and to the port the message
 came from, when that's another). A client that has sent nothing for
-CLIENT_TIMEOUT_S gets no more (the TouchOSC layouts send /ffstudio/ping every
+CLIENT_TIMEOUT_S gets no more (the TouchOSC layouts send /glim/ping every
 second).
 
-Addresses (all under /ffstudio). Switches take 1 / 0 (no argument: toggle);
+Addresses (all under /glim). Switches take 1 / 0 (no argument: toggle);
 buttons act on a message with no argument or with a value of 1 (not on the 0 a
 button sends when released):
 
@@ -33,9 +33,9 @@ import socket
 import threading
 import time
 
-PORT = 8000                 # FFStudio listens here (TouchOSC: the connection's send port)
+PORT = 8000                 # GLim listens here (TouchOSC: the connection's send port)
 FEEDBACK_PORT = 8001        # and replies here (TouchOSC: the connection's receive port)
-PREFIX = "/ffstudio"
+PREFIX = "/glim"
 SLOTS = 24                  # parameter slots in the TouchOSC layouts (enough for 78 of
                             # the 79 sample shaders)
 TICK_MS = 30                # main thread: handle messages, send what changed
@@ -163,13 +163,13 @@ class OscRemote:
         c["seen"] = now
         c["ports"] = {FEEDBACK_PORT, port}
         if address == PREFIX + "/ping":
-            self._send(c, ip, PREFIX + "/pong", f"FFStudio on {socket.gethostname()}")
+            self._send(c, ip, PREFIX + "/pong", f"GLim on {socket.gethostname()}")
             return
         if address == PREFIX + "/sync":
             c["sent"].clear()
             return
         # Hold back this address's feedback to this client while it's moving the
-        # control, then send the actual state (e.g. a switch FFStudio didn't turn on).
+        # control, then send the actual state (e.g. a switch GLim didn't turn on).
         c["held"][address] = now
         c["sent"].pop(address, None)
         try:

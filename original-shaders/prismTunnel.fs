@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Fly down an endless tunnel that morphs between round and square, its striped walls twisting and the vanishing point swaying",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

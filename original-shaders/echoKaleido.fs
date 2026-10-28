@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Fractal feedback: every frame the last one is folded into a kaleidoscope, scaled and offset, so a few moving rings are copied into ever smaller echoes that form a morphing fractal mandala",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

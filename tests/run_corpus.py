@@ -25,8 +25,8 @@ import traceback
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from ffstudio import pipeline, validate as V  # noqa: E402
-from ffstudio.convert import ConvertError     # noqa: E402
+from glim import pipeline, validate as V  # noqa: E402
+from glim.convert import ConvertError     # noqa: E402
 
 
 def main():
@@ -103,7 +103,7 @@ def main():
 
 
 def _check_isf(code, stem, path, out_dir):
-    from ffstudio import convert as C, emit_isf, isf_host
+    from glim import convert as C, emit_isf, isf_host
     ir = C.convert(code, name=stem, path=path)
     if ir.dialect == "isf":
         return {"status": "n/a"}

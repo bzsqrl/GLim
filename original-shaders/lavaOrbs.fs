@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Eight gooey orbs orbit, merge and pull apart, their skins shimmering like soap film",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

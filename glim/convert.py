@@ -185,7 +185,7 @@ def _build_program(code, ir, path, extract_params, exclude, promote_ints, direct
 
 def _vertex_prelude(vs_code, ir):
     """Turn an ISF .vs vertex shader into code run per pixel: its varyings
-    become globals and main() becomes ffm_vs_main()."""
+    become globals and main() becomes glim_vs_main()."""
     vs_code = vs_code.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
     toks = G.tokenize(vs_code)
     _normalize(toks, ir)
@@ -201,7 +201,7 @@ def _vertex_prelude(vs_code, ir):
             if j < len(sig):
                 toks[sig[j]].text = ""
         elif t.kind == "ident" and t.text == "gl_Position":
-            t.text = "ffm_vsPosition"
+            t.text = "glim_vsPosition"
     varyings = set()
     for it in G.analyze(toks):
         if it.kind == "decl":
@@ -212,10 +212,10 @@ def _vertex_prelude(vs_code, ir):
             if "uniform" in it.qualifiers:
                 _replace_range(toks, it.start, it.end, "")
         elif it.kind == "func" and it.name == "main":
-            toks[it.name_idx].text = "ffm_vs_main"
+            toks[it.name_idx].text = "glim_vs_main"
     aliases = {}
     _map_distinctive_names(G.tokenize(G.untokenize(toks)), ir, aliases)
-    code = "vec4 ffm_vsPosition;\n// ── from ISF vertex shader (.vs) ──\n" + G.untokenize(toks)
+    code = "vec4 glim_vsPosition;\n// ── from ISF vertex shader (.vs) ──\n" + G.untokenize(toks)
     return {"code": code, "aliases": aliases, "varyings": varyings}
 
 
@@ -256,7 +256,7 @@ def _convert_project(code, name, path, extract_params, promote_ints, exclude):
     buffers = [p for p in passes if p.name.startswith("Buffer")]
     # Targets first so every program knows the buffer sampler names.
     for p in buffers:
-        ir.passes.append(Pass(target="ffm_buf" + p.name[-1], persistent=True, float=True))
+        ir.passes.append(Pass(target="glim_buf" + p.name[-1], persistent=True, float=True))
 
     def sampler_for(spec, pass_name, ch, opts):
         kind = spec[0]
@@ -264,26 +264,26 @@ def _convert_project(code, name, path, extract_params, promote_ints, exclude):
         if kind == "buffer":
             if not any(b.name == "Buffer " + spec[1] for b in buffers):
                 ir.warnings.append(f"{pass_name} iChannel{ch} reads Buffer {spec[1]}, which doesn't exist.")
-                return _add_image(ir, Image("ffm_none", "none"))
+                return _add_image(ir, Image("glim_none", "none"))
             if not suffix:
-                return "ffm_buf" + spec[1]
-            return _add_image(ir, _apply_sampler(Image(f"ffm_buf{spec[1]}{suffix}", "target",
-                                                       target="ffm_buf" + spec[1]), opts))
+                return "glim_buf" + spec[1]
+            return _add_image(ir, _apply_sampler(Image(f"glim_buf{spec[1]}{suffix}", "target",
+                                                       target="glim_buf" + spec[1]), opts))
         if kind == "input":
-            return _add_image(ir, _apply_sampler(Image("ffm_input" + suffix, "host", 0), opts))
+            return _add_image(ir, _apply_sampler(Image("glim_input" + suffix, "host", 0), opts))
         if kind == "audio":
-            return _add_image(ir, Image("ffm_audio", "audio", rows=2, isf_type="audioFFT"))
+            return _add_image(ir, Image("glim_audio", "audio", rows=2, isf_type="audioFFT"))
         if kind == "noise":
-            return _add_image(ir, _apply_sampler(Image("ffm_noise" + suffix, "imported", repeat=True), opts))
+            return _add_image(ir, _apply_sampler(Image("glim_noise" + suffix, "imported", repeat=True), opts))
         if kind == "file":
             # One base name per file; each sampler setting adds its own suffix.
             if spec[1] not in tex_names:
                 if not os.path.isfile(spec[1]):
                     ir.warnings.append(f"{pass_name} iChannel{ch} image '{spec[1]}' not found; using noise.")
-                tex_names[spec[1]] = f"ffm_tex{len(tex_names)}"
+                tex_names[spec[1]] = f"glim_tex{len(tex_names)}"
             return _add_image(ir, _apply_sampler(Image(tex_names[spec[1]] + suffix, "imported", path=spec[1],
                                                        repeat=True), opts))
-        return _add_image(ir, Image("ffm_none", "none"))
+        return _add_image(ir, Image("glim_none", "none"))
 
     tex_names = {}
     prefix = (common.code + "\n") if common else ""
@@ -306,7 +306,7 @@ def _convert_project(code, name, path, extract_params, promote_ints, exclude):
         if p.name == "Image":
             ir.passes.append(Pass(program=len(ir.programs) - 1))
         else:
-            next(x for x in ir.passes if x.target == "ffm_buf" + p.name[-1]).program = len(ir.programs) - 1
+            next(x for x in ir.passes if x.target == "glim_buf" + p.name[-1]).program = len(ir.programs) - 1
     _finish(ir, None)
     return ir
 
@@ -434,9 +434,9 @@ def _normalize(toks, ir):
 
     declared = G.declared_names(toks)
     renames = {}
-    # FFStudio reserves the ffm_ prefix for its host layer (e.g. re-imported exports).
+    # GLim reserves the glim_ prefix for its host layer (e.g. re-imported exports).
     for nm in declared:
-        if nm.startswith("ffm_"):
+        if nm.startswith("glim_"):
             renames[nm] = "user_" + nm
     # A user variable called 'texture' collides with the texture() builtin we map to.
     if "texture" in declared:
@@ -546,7 +546,7 @@ def _map_varyings(toks, ir, skip=()):
         for x in q:
             G.blank(toks, it.qual_idx[x], it.qual_idx[x])
         ir.warnings.append(
-            f"Varying(s) {', '.join(names)} came from a vertex shader that FFStudio cannot run; "
+            f"Varying(s) {', '.join(names)} came from a vertex shader that GLim cannot run; "
             f"they will be zero.")
 
 
@@ -568,11 +568,11 @@ def _map_distinctive_names(toks, ir, aliases):
             aliases[nm] = sym
 
 
-_CHANNEL_DIRECTIVE = re.compile(r"//\s*@?ffstudio\s*:?\s*(iChannel[0-3])\s*=\s*(.+?)\s*$", re.I | re.M)
+_CHANNEL_DIRECTIVE = re.compile(r"//\s*@?glim\s*:?\s*(iChannel[0-3])\s*=\s*(.+?)\s*$", re.I | re.M)
 
 
 def channel_directives(code):
-    """`// ffstudio: iChannel1 = rock.jpg` lines -> {channel: value}."""
+    """`// glim: iChannel1 = rock.jpg` lines -> {channel: value}."""
     return {m.group(1): m.group(2) for m in _CHANNEL_DIRECTIVE.finditer(code)}
 
 
@@ -589,7 +589,7 @@ def split_channel_options(value):
 
 def sampler_options(sampler):
     """Shadertoy sampler dict ({"filter": "nearest", "wrap": "repeat", "vflip": "false"})
-    -> the subset FFStudio supports, normalised."""
+    -> the subset GLim supports, normalised."""
     out = {}
     f = str(sampler.get("filter", "")).lower().strip("\"'")
     w = str(sampler.get("wrap", "")).lower().strip("\"'")
@@ -1133,7 +1133,7 @@ def _all_local_decls(toks, start, end):
 
 def _hoist_globals(toks, dynamic):
     """Globals whose initialisers aren't constant expressions are split:
-    the declaration stays, the assignment moves into ffm_init()."""
+    the declaration stays, the assignment moves into glim_init()."""
     hoisted = []
     items = G.analyze(toks)
     global_consts = set()
@@ -1203,15 +1203,15 @@ def _entry_point(toks, ir):
     funcs = {it.name: it for it in items if it.kind == "func"}
     if "main" in funcs and ir.dialect != "shadertoy":
         # ISF/GLSL: main() is the entry; any mainImage() is just a helper it calls.
-        toks[funcs["main"].name_idx].text = "ffm_main"
+        toks[funcs["main"].name_idx].text = "glim_main"
         return "main"
     if "mainImage" in funcs:
         entry = "mainImage"
         if "main" in funcs:
-            toks[funcs["main"].name_idx].text = "ffm_unused_main"
+            toks[funcs["main"].name_idx].text = "glim_unused_main"
     elif "main" in funcs:
         entry = "main"
-        toks[funcs["main"].name_idx].text = "ffm_main"
+        toks[funcs["main"].name_idx].text = "glim_main"
     else:
         raise ConvertError("No main() or mainImage() function found.")
     if entry == "main" and ir.dialect == "shadertoy":
@@ -1222,18 +1222,18 @@ def _entry_point(toks, ir):
 def _rename_frag_outputs(toks):
     for t in toks:
         if t.kind == "preproc":
-            t.text = re.sub(r"\bgl_FragColor\b", "ffm_FragColor", t.text)
-            t.text = re.sub(r"\bgl_FragData\s*\[\s*0\s*\]", "ffm_FragColor", t.text)
+            t.text = re.sub(r"\bgl_FragColor\b", "glim_FragColor", t.text)
+            t.text = re.sub(r"\bgl_FragData\s*\[\s*0\s*\]", "glim_FragColor", t.text)
     sig = G.significant(toks)
     for pos, k in enumerate(sig):
         t = toks[k]
         if t.kind != "ident":
             continue
         if t.text == "gl_FragColor":
-            t.text = "ffm_FragColor"
+            t.text = "glim_FragColor"
         elif t.text == "gl_FragData" and pos + 3 < len(sig) and toks[sig[pos + 1]].text == "[" \
                 and toks[sig[pos + 2]].text == "0" and toks[sig[pos + 3]].text == "]":
-            t.text = "ffm_FragColor"
+            t.text = "glim_FragColor"
             for j in (1, 2, 3):
                 toks[sig[pos + j]].text = ""
     # Fragment outputs declared by the user (`out vec4 fragColor;`) in main-style code.
@@ -1241,7 +1241,7 @@ def _rename_frag_outputs(toks):
         if it.kind == "decl" and "out" in it.qualifiers and it.type == "vec4" and len(it.decls) == 1:
             nm = it.decls[0].name
             _replace_range(toks, it.start, it.end, "")
-            G.rename_idents(toks, {nm: "ffm_FragColor"})
+            G.rename_idents(toks, {nm: "glim_FragColor"})
 
 
 # ── Plugin kind / labels ─────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "A cyclic cellular automaton: random noise organises itself into rotating spiral waves of colour, smoothed into flowing light",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

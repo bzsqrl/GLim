@@ -7,14 +7,14 @@ import shutil
 from . import glsl as G
 
 ISF_SYMBOLS = {
-    "time": "(TIME * ffmSpeed)", "timedelta": "TIMEDELTA", "frame": "FRAMEINDEX",
+    "time": "(TIME * glimSpeed)", "timedelta": "TIMEDELTA", "frame": "FRAMEINDEX",
     "date": "DATE", "resolution2": "RENDERSIZE", "resolution3": "vec3(RENDERSIZE, 1.0)",
-    "mouse_px": "ffm_Mouse", "mouse_norm2": "ffmMouse", "mouse_px2": "(ffmMouse * RENDERSIZE)",
-    "passindex": "PASSINDEX", "fragnorm": "isf_FragNormCoord", "surfacepos": "ffm_SurfacePos",
+    "mouse_px": "glim_Mouse", "mouse_norm2": "glimMouse", "mouse_px2": "(glimMouse * RENDERSIZE)",
+    "passindex": "PASSINDEX", "fragnorm": "isf_FragNormCoord", "surfacepos": "glim_SurfacePos",
     "surfacesize": "vec2(RENDERSIZE.x / RENDERSIZE.y, 1.0)", "samplerate": "44100.0",
-    "framerate": "60.0", "channelres": "ffm_ChannelRes", "channeltime": "ffm_ChannelTime",
+    "framerate": "60.0", "channelres": "glim_ChannelRes", "channeltime": "glim_ChannelTime",
     # ISF hosts send no tempo, so a BPM slider drives it from TIME.
-    "bpm": "ffmBPM", "beat": "(TIME * ffmBPM / 60.0)", "barphase": "fract(TIME * ffmBPM / 240.0)",
+    "bpm": "glimBPM", "beat": "(TIME * glimBPM / 60.0)", "barphase": "fract(TIME * glimBPM / 240.0)",
 }
 BEAT_SYMBOLS = {"bpm", "beat", "barphase"}
 
@@ -93,15 +93,15 @@ def emit(ir, source_code=None):
                 defines.append(f"const {p.glsl_type} {p.name} = {glsl_literal(p)};")
             continue
         if p.kind == "speed":
-            inputs.append({"NAME": "ffmSpeed", "LABEL": "Speed", "TYPE": "float",
+            inputs.append({"NAME": "glimSpeed", "LABEL": "Speed", "TYPE": "float",
                            "DEFAULT": p.default, "MIN": p.min, "MAX": p.max})
         elif p.kind == "mouse":
-            inputs.append({"NAME": "ffmMouse", "LABEL": "Mouse", "TYPE": "point2D",
+            inputs.append({"NAME": "glimMouse", "LABEL": "Mouse", "TYPE": "point2D",
                            "DEFAULT": list(p.default), "MIN": [0.0, 0.0], "MAX": [1.0, 1.0]})
         elif p.kind == "fft":
             pass                      # ISF hosts supply audio through the audio input itself
         elif p.kind == "mouseclick":
-            inputs.append({"NAME": "ffmMouseClick", "LABEL": "Mouse Click", "TYPE": "bool",
+            inputs.append({"NAME": "glimMouseClick", "LABEL": "Mouse Click", "TYPE": "bool",
                            "DEFAULT": bool(p.default)})
         elif p.kind == "float":
             inputs.append({"NAME": p.name, "LABEL": lab, "TYPE": "float",
@@ -132,7 +132,7 @@ def emit(ir, source_code=None):
     header = {
         "ISFVSN": "2",
         "DESCRIPTION": ir.meta.get("description") or ir.name,
-        "CREDIT": ir.meta.get("credit") or "Converted with FFStudio",
+        "CREDIT": ir.meta.get("credit") or "Converted with GLim",
         "CATEGORIES": cats,
         "INPUTS": inputs,
     }
@@ -143,7 +143,7 @@ def emit(ir, source_code=None):
     for pr in ir.programs:
         aliases.update(pr.aliases)
     if BEAT_SYMBOLS & set(aliases.values()):
-        inputs.append({"NAME": "ffmBPM", "LABEL": "BPM", "TYPE": "float",
+        inputs.append({"NAME": "glimBPM", "LABEL": "BPM", "TYPE": "float",
                        "DEFAULT": 120.0, "MIN": 40.0, "MAX": 240.0})
     for name, sym in sorted(aliases.items()):
         expr = ISF_SYMBOLS[sym]
@@ -152,9 +152,9 @@ def emit(ir, source_code=None):
         defines.append(f"#define {name} {expr}")
     # ISF has no state to keep a running total in, so phases are the plain
     # product again (moving those sliders jumps the animation, as in the source).
-    # Named ffmPhaseN like the other ISF-side names (ffm_ is reserved on re-import).
+    # Named glimPhaseN like the other ISF-side names (glim_ is reserved on re-import).
     time_expr = ISF_SYMBOLS["time"] if has_speed else "TIME"
-    phase_renames = {ph.name: ph.name.replace("ffm_phase", "ffmPhase") for ph in ir.phases}
+    phase_renames = {ph.name: ph.name.replace("glim_phase", "glimPhase") for ph in ir.phases}
     for ph in ir.phases:
         defines.append(f"#define {phase_renames[ph.name]} ({' * '.join(ph.params)} * {time_expr})")
 
@@ -181,7 +181,7 @@ def emit(ir, source_code=None):
     # sets with ISF's bottom-left origin.
     frag_coord = any(p.entry == "mainImage" for p in ir.programs) or \
         any(t.kind == "ident" and t.text == "gl_FragCoord" for t in toks)
-    G.rename_idents(toks, {"ffm_FragColor": "gl_FragColor", "gl_FragCoord": "ffm_FragCoord"})
+    G.rename_idents(toks, {"glim_FragColor": "gl_FragColor", "gl_FragCoord": "glim_FragCoord"})
     code = _portable_textures(G.untokenize(toks), image_names, repeat_names, nearest_names)
     toks = G.tokenize(code)
     G.rename_idents(toks, image_renames)
@@ -192,30 +192,30 @@ def emit(ir, source_code=None):
     setup = []
     for n in sorted(nearest_names):
         img = image_renames.get(n, n)
-        globals_.append(f"vec2 ffm_nearest_{n}(vec2 uv) {{ vec2 s = IMG_SIZE({img}); "
+        globals_.append(f"vec2 glim_nearest_{n}(vec2 uv) {{ vec2 s = IMG_SIZE({img}); "
                         f"return (floor(uv * s) + 0.5) / s; }}")
     if frag_coord:
-        globals_.append("vec4 ffm_FragCoord;")
-        setup.append("ffm_FragCoord = vec4(isf_FragNormCoord * RENDERSIZE, gl_FragCoord.zw);")
+        globals_.append("vec4 glim_FragCoord;")
+        setup.append("glim_FragCoord = vec4(isf_FragNormCoord * RENDERSIZE, gl_FragCoord.zw);")
     if "mouse_px" in used:
-        globals_.append("vec4 ffm_Mouse;")
-        setup.append("ffm_Mouse = vec4(ffmMouse * RENDERSIZE, (ffmMouseClick ? 1.0 : -1.0) * ffmMouse * RENDERSIZE);")
+        globals_.append("vec4 glim_Mouse;")
+        setup.append("glim_Mouse = vec4(glimMouse * RENDERSIZE, (glimMouseClick ? 1.0 : -1.0) * glimMouse * RENDERSIZE);")
     if "surfacepos" in used:
-        globals_.append("vec2 ffm_SurfacePos;")
-        setup.append("ffm_SurfacePos = (isf_FragNormCoord - 0.5) * vec2(RENDERSIZE.x / RENDERSIZE.y, 1.0);")
+        globals_.append("vec2 glim_SurfacePos;")
+        setup.append("glim_SurfacePos = (isf_FragNormCoord - 0.5) * vec2(RENDERSIZE.x / RENDERSIZE.y, 1.0);")
     if "channelres" in used:
-        globals_.append("vec3 ffm_ChannelRes[4];")
+        globals_.append("vec3 glim_ChannelRes[4];")
     if "channeltime" in used:
-        globals_.append("float ffm_ChannelTime[4];")
+        globals_.append("float glim_ChannelTime[4];")
         for i in range(4):
-            setup.append(f"ffm_ChannelTime[{i}] = TIME;")
+            setup.append(f"glim_ChannelTime[{i}] = TIME;")
 
     def channel_res(prog):
         lines = []
         for i in range(4):
             ch = prog.channels[i] if prog.channels else ("inputImage" if host_imgs else None)
             ch = image_renames.get(ch, ch)
-            lines.append(f"ffm_ChannelRes[{i}] = vec3(" + (f"IMG_SIZE({ch})" if ch else "RENDERSIZE") + ", 1.0);")
+            lines.append(f"glim_ChannelRes[{i}] = vec3(" + (f"IMG_SIZE({ch})" if ch else "RENDERSIZE") + ", 1.0);")
         return lines
 
     hoisted = []
@@ -228,16 +228,16 @@ def emit(ir, source_code=None):
                 hoisted.append(line)
 
     out = ["/*" + json.dumps(header, indent=4) + "*/", ""]
-    out += ["// ── FFStudio compatibility layer ──"] + defines + globals_ + [""]
+    out += ["// ── GLim compatibility layer ──"] + defines + globals_ + [""]
     out.append(code.rstrip("\n"))
     out.append("")
-    out.append("// ── FFStudio entry ──")
-    out.append("void ffm_init() {")
+    out.append("// ── GLim entry ──")
+    out.append("void glim_init() {")
     out += [f"    {h}" for h in hoisted]
     out.append("}")
     out.append("void main() {")
     out += [f"    {x}" for x in setup]
-    out.append("    ffm_init();")
+    out.append("    glim_init();")
     multi = len(ir.passes) > 1
     for i, ps in enumerate(ir.passes):
         prog = ir.programs[ps.program]
@@ -248,9 +248,9 @@ def emit(ir, source_code=None):
             out += [ind + x for x in channel_res(prog)]
         entry = entries[ps.program]["entry"]
         if prog.entry == "mainImage":
-            out.append(f"{ind}vec4 ffm_c = vec4(0.0, 0.0, 0.0, 1.0);")
-            out.append(f"{ind}{entry}(ffm_c, ffm_FragCoord.xy);")
-            out.append(f"{ind}gl_FragColor = ffm_c;")
+            out.append(f"{ind}vec4 glim_c = vec4(0.0, 0.0, 0.0, 1.0);")
+            out.append(f"{ind}{entry}(glim_c, glim_FragCoord.xy);")
+            out.append(f"{ind}gl_FragColor = glim_c;")
         else:
             out.append(f"{ind}gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);")
             out.append(f"{ind}{entry}();")
@@ -266,7 +266,7 @@ def _merge_programs(programs):
     """Combine programs into one source. Returns (code, [{entry, renames}])."""
     if len(programs) == 1:
         pr = programs[0]
-        return pr.code, [{"entry": "mainImage" if pr.entry == "mainImage" else "ffm_main", "renames": {}}]
+        return pr.code, [{"entry": "mainImage" if pr.entry == "mainImage" else "glim_main", "renames": {}}]
     offset = programs[0].line_offset
     common = "\n".join(programs[0].code.split("\n")[:offset])
     parts = [common]
@@ -283,7 +283,7 @@ def _merge_programs(programs):
                     renames[d.name] = f"{d.name}_p{k}"
         G.rename_idents(toks, renames)
         parts.append(f"// ── {pr.label or 'pass ' + str(k)} ──\n" + G.untokenize(toks))
-        entry = "mainImage" if pr.entry == "mainImage" else "ffm_main"
+        entry = "mainImage" if pr.entry == "mainImage" else "glim_main"
         entries.append({"entry": renames.get(entry, entry), "renames": renames})
     return "\n".join(parts), entries
 
@@ -305,7 +305,7 @@ def _portable_textures(code, image_names, repeat_names=(), nearest_names=()):
                     t.text = "IMG_NORM_PIXEL"
                     pre, post = "", ""
                     if arg.text in nearest_names:   # snap to texel centres
-                        pre, post = f"ffm_nearest_{arg.text}(", ")"
+                        pre, post = f"glim_nearest_{arg.text}(", ")"
                     if arg.text in repeat_names:    # ISF hosts clamp; emulate GL_REPEAT
                         pre, post = pre + "fract(", post + ")"
                     toks[commas[0]].text = ", " + pre
@@ -360,5 +360,5 @@ def apply_settings_to_isf(source, ir):
     body = source[hdr[2]:]
     out = "/*" + json.dumps(header, indent=4) + "*/\n"
     if consts:
-        out += "\n// ── constants set in FFStudio ──\n" + "\n".join(consts) + "\n"
+        out += "\n// ── constants set in GLim ──\n" + "\n".join(consts) + "\n"
     return out + body

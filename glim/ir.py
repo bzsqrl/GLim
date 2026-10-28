@@ -17,7 +17,7 @@ class Param:
     pixel_space: bool = False # point2D: value is in pixels (ISF default when MIN/MAX absent)
     origin: str = "isf"       # isf | const | define | uniform | synthetic
     hidden: bool = False      # user chose not to expose it: compiled in as a constant
-    source_default: object = None  # the shader's own default, before .ffstudio.json overrides
+    source_default: object = None  # the shader's own default, before .glim.json overrides
 
     def display(self):
         return self.label or humanize(self.name)
@@ -52,9 +52,9 @@ class Pass:
 @dataclass
 class Program:
     code: str                 # transformed user code (line-preserving)
-    entry: str                # "main" (renamed to ffm_main) or "mainImage"
+    entry: str                # "main" (renamed to glim_main) or "mainImage"
     aliases: dict = field(default_factory=dict)   # name -> host symbol key
-    hoisted: list = field(default_factory=list)   # assignment statements for ffm_init()
+    hoisted: list = field(default_factory=list)   # assignment statements for glim_init()
     force_opaque: bool = False
     label: str = ""           # pass name for multi-program shaders ("Buffer A")
     line_offset: int = 0      # lines of shared code (Common) prepended before the pass
@@ -67,7 +67,7 @@ class Phase:
     """time * (float params) in the shader, replaced by a running total the host
     keeps (total += product of the params' values * frame time). Moving one of
     those sliders then changes the rate instead of jumping the animation."""
-    name: str                 # uniform the shader reads, e.g. ffm_phase0
+    name: str                 # uniform the shader reads, e.g. glim_phase0
     params: tuple             # param names multiplied together (repeats allowed)
 
 
@@ -91,7 +91,7 @@ class ShaderIR:
         for ph in self.phases:
             if ph.params == key:
                 return ph.name
-        self.phases.append(Phase(f"ffm_phase{len(self.phases)}", key))
+        self.phases.append(Phase(f"glim_phase{len(self.phases)}", key))
         return self.phases[-1].name
 
     def param(self, name):

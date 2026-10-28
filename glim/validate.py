@@ -14,8 +14,8 @@ _lock = threading.RLock()
 VERTEX = """#version 410 core
 layout( location = 0 ) in vec4 vPosition;
 layout( location = 1 ) in vec2 vUV;
-out vec2 ffm_uv;
-void main() { gl_Position = vPosition; ffm_uv = vUV; }
+out vec2 glim_uv;
+void main() { gl_Position = vPosition; glim_uv = vUV; }
 """
 
 _ERR_RES = [
@@ -46,7 +46,7 @@ class _Context:
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 1)
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, True)
-        self.win = glfw.create_window(64, 64, "ffstudio-validate", None, None)
+        self.win = glfw.create_window(64, 64, "glim-validate", None, None)
         if not self.win:
             raise ValidatorUnavailable("Could not create an OpenGL 4.1 core context")
         glfw.make_context_current(self.win)
@@ -385,24 +385,24 @@ class Previewer:
             gl.glViewport(0, 0, w, h)
             prog = self.progs[ps.program]
             gl.glUseProgram(prog)
-            _u(gl, prog, "ffm_Resolution", 2, (w, h))
-            _u(gl, prog, "ffm_Time", 1, (sim_time,))
-            _u(gl, prog, "ffm_TimeDelta", 1, (dt,))
+            _u(gl, prog, "glim_Resolution", 2, (w, h))
+            _u(gl, prog, "glim_Time", 1, (sim_time,))
+            _u(gl, prog, "glim_TimeDelta", 1, (dt,))
             for ph, v in zip(ir.phases, self.phases):
                 _u(gl, prog, ph.name, 1, (v,))
-            _ui(gl, prog, "ffm_Frame", self.frame)
-            _ui(gl, prog, "ffm_PassIndex", pi)
+            _ui(gl, prog, "glim_Frame", self.frame)
+            _ui(gl, prog, "glim_PassIndex", pi)
             beat = sim_time * 120.0 / 60.0     # the plugin's tempo when the host sends none
-            _u(gl, prog, "ffm_BPM", 1, (120.0,))
-            _u(gl, prog, "ffm_Beat", 1, (beat,))
-            _u(gl, prog, "ffm_BarPhase", 1, (beat / 4.0 - math.floor(beat / 4.0),))
-            _u(gl, prog, "ffm_Date", 4, (2026.0, 9.0, 20.0, 43200.0 + sim_time))
+            _u(gl, prog, "glim_BPM", 1, (120.0,))
+            _u(gl, prog, "glim_Beat", 1, (beat,))
+            _u(gl, prog, "glim_BarPhase", 1, (beat / 4.0 - math.floor(beat / 4.0),))
+            _u(gl, prog, "glim_Date", 4, (2026.0, 9.0, 20.0, 43200.0 + sim_time))
             mx, my = (0.0, 0.0)
             if mouse:
                 mv = self.value(*mouse)
                 mx, my = mv[0] * w, mv[1] * h
             down = bool(click and self.value(*click))
-            _u(gl, prog, "ffm_Mouse", 4, (mx, my, mx if down else -mx, my if down else -my))
+            _u(gl, prog, "glim_Mouse", 4, (mx, my, mx if down else -mx, my if down else -my))
             for live in named.values():
                 _set_param(gl, prog, live, w, h)
             unit = 0
@@ -662,7 +662,7 @@ class OutputView:
     """A window that shows a Previewer's output. It shares textures with the
     validation context, so frames go to the screen without a CPU copy.
 
-    windowed=False: fullscreen on the monitor nearest `near` (FFStudio's), closed
+    windowed=False: fullscreen on the monitor nearest `near` (GLim's), closed
     by Esc, Ctrl+F (⌘F) or a double-click.
     windowed=True: a normal window ("output window"), on another monitor when
     there is one, that can be moved and resized. Double-click or Ctrl+F toggles
@@ -671,7 +671,7 @@ class OutputView:
     Left / Right set `nav` (playlist). Create, use and close inside gpu(), on
     the main thread."""
 
-    TITLE = "FFStudio output  (double-click or Ctrl+F: fullscreen, ←/→: queue)"
+    TITLE = "GLim output  (double-click or Ctrl+F: fullscreen, ←/→: queue)"
 
     def __init__(self, near=None, windowed=False, max_width=1920):
         import glfw
@@ -689,7 +689,7 @@ class OutputView:
                             (glfw.OPENGL_FORWARD_COMPAT, True), (glfw.AUTO_ICONIFY, False)):
             glfw.window_hint(hint, value)
         if windowed:
-            # On another monitor when there is one, else next to FFStudio.
+            # On another monitor when there is one, else next to GLim.
             # Compare by address: each GLFW call returns new ctypes pointer objects.
             addr = lambda m: ctypes.cast(m, ctypes.c_void_p).value
             others = [m for m in glfw.get_monitors() if addr(m) != addr(home)]
@@ -771,8 +771,8 @@ class OutputView:
             glfw.set_window_attrib(self.win, glfw.FLOATING, True)    # above the taskbar
             glfw.set_window_pos(self.win, *glfw.get_monitor_pos(mon))
             glfw.set_window_size(self.win, w, h + 1)
-        # No focus change here: going fullscreen from FFStudio (Ctrl+F there) leaves
-        # the keyboard with FFStudio. A newly opened view takes focus in __init__.
+        # No focus change here: going fullscreen from GLim (Ctrl+F there) leaves
+        # the keyboard with GLim. A newly opened view takes focus in __init__.
 
     def set_fullscreen(self, on):
         """Output window only: fullscreen on the monitor it's on, or back to the window."""
@@ -843,7 +843,7 @@ class OutputView:
         # Not on macOS: there GLFW and Tk share one event queue, and Tk's loop already
         # delivers this window's events. glfwPollEvents would also take Tk's events off
         # the queue and send them on itself, past Tk's own handling, so clicks on
-        # FFStudio's buttons (Output, fullscreen) were sometimes lost.
+        # GLim's buttons (Output, fullscreen) were sometimes lost.
         if sys.platform != "darwin":
             self.glfw.poll_events()
         # Act outside the callbacks: changing the window from inside them isn't safe.
@@ -914,7 +914,7 @@ class OutputView:
         gl.glDeleteFramebuffers(1, [self.fbo])
         glfw.make_context_current(self.ctx.win)
         # Show the cursor before destroying the window: on macOS the hidden cursor
-        # otherwise stays hidden over FFStudio afterwards.
+        # otherwise stays hidden over GLim afterwards.
         glfw.set_input_mode(self.win, glfw.CURSOR, glfw.CURSOR_NORMAL)
         glfw.poll_events()
         glfw.destroy_window(self.win)
@@ -957,7 +957,7 @@ class HeadlessView:
 # Sharing frames with other apps on the same computer: Spout on Windows, Syphon
 # on macOS (Resolume, MadMapper, OBS, TouchDesigner, ... receive them).
 SENDER_KIND = {"win32": "Spout", "darwin": "Syphon"}.get(sys.platform)
-SENDER_NAME = "FFStudio"
+SENDER_NAME = "GLim"
 SEND_SIZE = (1920, 1080)
 
 
@@ -983,7 +983,7 @@ class FrameSender:
                 raise RuntimeError(f"Syphon needs the syphon-python package ({e})")
             # On the current context: GLFW makes it the current NSOpenGLContext.
             # Unnamed: receivers list a Syphon server as "<app> - <name>", so the
-            # app name alone ("FFStudio") is the label, not "FFStudio - FFStudio".
+            # app name alone ("GLim") is the label, not "GLim - GLim".
             self._syphon = syphon.SyphonOpenGLServer("")
         else:
             raise RuntimeError("Spout / Syphon output needs Windows or macOS")
@@ -1014,7 +1014,7 @@ NDI_FPS = 30
 
 
 class NdiSender:
-    """Publishes Previewer frames as the NDI source "<computer> (FFStudio)", at
+    """Publishes Previewer frames as the NDI source "<computer> (GLim)", at
     NDI_FPS. NDI takes CPU memory, so each sent frame is flipped (NDI images are
     top-down) and scaled on the GPU into the sender's own buffer, then read back
     asynchronously into one of two pixel-pack buffers; the frame read back last
@@ -1099,7 +1099,7 @@ class NdiSender:
 
 
 def _set_window_icon(glfw, win):
-    """FFStudio's icon on the output window (title bar, taskbar). macOS windows
+    """GLim's icon on the output window (title bar, taskbar). macOS windows
     have no icons; the app's Dock icon is used there."""
     if sys.platform == "darwin":
         return
@@ -1108,7 +1108,7 @@ def _set_window_icon(glfw, win):
         from PIL import Image
         from . import paths
         d = os.path.join(paths.icon_dir(), "png")
-        glfw.set_window_icon(win, 3, [Image.open(os.path.join(d, f"ffstudio_{s}.png")).convert("RGBA")
+        glfw.set_window_icon(win, 3, [Image.open(os.path.join(d, f"glim_{s}.png")).convert("RGBA")
                                       for s in (16, 32, 48)])
     except Exception:
         pass                                       # cosmetic

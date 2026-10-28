@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Building block effect: recolour the clip by its brightness: a three-colour gradient map, a rainbow map, a hue rotation or a solarize, with cycling, banding and posterizing",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Color Effect", "Building Block"],
   "INPUTS": [

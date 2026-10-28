@@ -1,6 +1,6 @@
 """Right-hand panel of the Studio tab: live preview, channel sources and
 the parameter editor. Edits are written into a settings dict (the shader's
-.ffstudio.json); changes that alter the GLSL ask the app to recompile."""
+.glim.json); changes that alter the GLSL ask the app to recompile."""
 import math
 import os
 import sys
@@ -12,7 +12,7 @@ from tkinter import colorchooser, ttk
 import customtkinter as ctk
 from PIL import Image, ImageTk
 
-from ffstudio import settings as S
+from glim import settings as S
 
 import fast_widgets as W
 import theme as T
@@ -146,7 +146,7 @@ class EditorPanel(ctk.CTkFrame):
         self._output_btn_open = False
         self._fullscreen_btn_on = False
         self.preview.bind("<Double-Button-1>", lambda e: self._toggle_fullscreen())
-        # Esc in FFStudio also leaves fullscreen (e.g. with the output on another monitor).
+        # Esc in GLim also leaves fullscreen (e.g. with the output on another monitor).
         top = self.winfo_toplevel()
         top.bind("<Escape>", lambda e: self._escape_output(), add="+")
         # Ctrl+F (⌘F on macOS) toggles fullscreen while the Studio tab is showing.
@@ -163,7 +163,7 @@ class EditorPanel(ctk.CTkFrame):
                                      text_color=T.DIM)
         self.lbl_time.pack(side="left", padx=4)
         # Sending to other apps (see "Spout / Syphon / NDI" below): all off at start.
-        from ffstudio import validate as V
+        from glim import validate as V
         send_row = ctk.CTkFrame(left, fg_color="transparent")
         send_row.pack(fill="x", padx=8, pady=(6, 0))
         self.send_buttons = {}
@@ -275,7 +275,7 @@ class EditorPanel(ctk.CTkFrame):
 
     def _open_previewer(self):
         try:
-            from ffstudio import validate as V
+            from glim import validate as V
             with V.gpu():
                 self.previewer = V.Previewer(self.res.ir, self.res.ffgl_glsl, PREVIEW_W, PREVIEW_H)
                 if self._input_image:
@@ -290,7 +290,7 @@ class EditorPanel(ctk.CTkFrame):
             return
         self._sync_output()
         if any(self.send_on.values()) and not self._fs:   # turned on before a shader was loaded
-            from ffstudio import validate as V
+            from glim import validate as V
             self._start_output(V.HeadlessView())
 
     def _sync_output(self):
@@ -298,7 +298,7 @@ class EditorPanel(ctk.CTkFrame):
         here: switch it to the new previewer's shader, sharing its slider values."""
         if not self._fs or not self.previewer:
             return
-        from ffstudio import validate as V
+        from glim import validate as V
         view, old = self._fs["view"], self._fs["pv"]
         try:
             with V.gpu():                   # the output thread renders only while holding this
@@ -316,7 +316,7 @@ class EditorPanel(ctk.CTkFrame):
     def _close_previewer(self):
         if self.previewer:
             try:
-                from ffstudio import validate as V
+                from glim import validate as V
                 with V.gpu():
                     self.previewer.close()
             except Exception:
@@ -358,7 +358,7 @@ class EditorPanel(ctk.CTkFrame):
     # tab (see _sync_output); Left/Right in it step through the queue (step_queue).
 
     def _fs_previewer(self, view, res):
-        from ffstudio import validate as V
+        from glim import validate as V
         sizes = [self._send_size(k) for k, on in self.send_on.items() if on]
         size = _largest(sizes) if sizes else (view.render_size() or (960, 540))
         pv = V.Previewer(res.ir, res.ffgl_glsl, *size)
@@ -369,11 +369,11 @@ class EditorPanel(ctk.CTkFrame):
         return pv
 
     def enter_fullscreen(self, windowed=False):
-        """Show the preview fullscreen on FFStudio's monitor (Esc returns), or with
+        """Show the preview fullscreen on GLim's monitor (Esc returns), or with
         windowed=True in an output window that can go fullscreen on another monitor."""
         if (self._fs and self._fs["view"].win) or not self.previewer:
             return
-        from ffstudio import validate as V
+        from glim import validate as V
         top = self.winfo_toplevel()
         near = (top.winfo_rootx() + top.winfo_width() // 2, top.winfo_rooty() + top.winfo_height() // 2)
         try:
@@ -390,7 +390,7 @@ class EditorPanel(ctk.CTkFrame):
     def _start_output(self, view):
         """Start the output thread, drawing into view: a window, or a HeadlessView
         when only Spout / Syphon / NDI is sending. False if it couldn't start."""
-        from ffstudio import validate as V
+        from glim import validate as V
         pv = None
         try:
             with V.gpu():
@@ -445,9 +445,9 @@ class EditorPanel(ctk.CTkFrame):
             self.btn_fullscreen.configure(fg_color=fg, hover_color=hover)
 
     def _escape_output(self):
-        """Esc in FFStudio: the output window leaves fullscreen; plain fullscreen closes."""
+        """Esc in GLim: the output window leaves fullscreen; plain fullscreen closes."""
         if self._fs:
-            from ffstudio import validate as V
+            from glim import validate as V
             with V.window_lock():
                 self._fs["view"].escape()
 
@@ -462,15 +462,15 @@ class EditorPanel(ctk.CTkFrame):
     # starts with the next one.
 
     def _send_label(self, kind):
-        from ffstudio import validate as V
+        from glim import validate as V
         return V.SENDER_KIND if kind == "spout" else "NDI"
 
     def _send_size(self, kind):
-        from ffstudio import validate as V
+        from glim import validate as V
         return V.SEND_SIZE if kind == "spout" else V.NDI_SIZES[self.ndi_size]
 
     def toggle_sending(self, kind="spout"):
-        from ffstudio import validate as V
+        from glim import validate as V
         self._set_sending(kind, not self.send_on[kind])
         if not self.send_on[kind]:
             return
@@ -501,7 +501,7 @@ class EditorPanel(ctk.CTkFrame):
 
     def _close_sender(self, kind):
         """Stop one sender on the running output. True if there was one."""
-        from ffstudio import validate as V
+        from glim import validate as V
         sender = self._fs["senders"].get(kind)
         if not sender:
             return False
@@ -515,7 +515,7 @@ class EditorPanel(ctk.CTkFrame):
 
     def _open_sender(self, kind):
         """Start sending from the running output (main thread)."""
-        from ffstudio import validate as V
+        from glim import validate as V
         try:
             with V.gpu():
                 if kind == "spout":
@@ -548,7 +548,7 @@ class EditorPanel(ctk.CTkFrame):
             return None
 
     def _arrow_key(self, direction):
-        """← / → in FFStudio: the previous / next queue shader, while the Studio tab
+        """← / → in GLim: the previous / next queue shader, while the Studio tab
         is showing, unless the focus is on a widget that uses the arrows itself (a
         focused slider steps its value instead; its own binding stops this one).
         A hidden widget with the focus (the queue list, after a tab switch) doesn't count."""
@@ -582,7 +582,7 @@ class EditorPanel(ctk.CTkFrame):
     def step_queue(self, direction):
         """Load the previous / next shader in the queue that compiles into this tab
         (the output follows). Wraps around; starts at either end if the current
-        shader isn't in the queue. The ← / → buttons and keys (in FFStudio and the output)."""
+        shader isn't in the queue. The ← / → buttons and keys (in GLim and the output)."""
         paths = self.get_playlist()
         self._update_queue_label()
         if not paths:
@@ -633,7 +633,7 @@ class EditorPanel(ctk.CTkFrame):
         return self._remote
 
     def remote_state(self):
-        from ffstudio import validate as V
+        from glim import validate as V
         if self.shader_path:
             shader = os.path.splitext(os.path.basename(self.shader_path))[0]
         else:
@@ -674,7 +674,7 @@ class EditorPanel(ctk.CTkFrame):
         if bool(on) == self._fullscreen_btn_on:
             return
         if self._fs and self._fs["view"].win:
-            from ffstudio import validate as V
+            from glim import validate as V
             with V.window_lock():
                 self._fs["view"].toggle()
         elif on:
@@ -745,9 +745,9 @@ class EditorPanel(ctk.CTkFrame):
 
     def _toggle_fullscreen(self, _e=None):
         """⛶, Ctrl+F, double-click: with the output window open, toggle its
-        fullscreen; otherwise open / close fullscreen on FFStudio's monitor."""
+        fullscreen; otherwise open / close fullscreen on GLim's monitor."""
         if self._fs and self._fs["view"].win:
-            from ffstudio import validate as V
+            from glim import validate as V
             with V.window_lock():
                 self._fs["view"].toggle()      # plain fullscreen: marks it closed
         elif self.winfo_viewable():         # only from the Studio tab
@@ -765,7 +765,7 @@ class EditorPanel(ctk.CTkFrame):
         if not self._fs["senders"]:
             self._stop_output()
             return
-        from ffstudio import validate as V
+        from glim import validate as V
         try:
             with V.gpu():
                 view, self._fs["view"] = self._fs["view"], V.HeadlessView()
@@ -789,7 +789,7 @@ class EditorPanel(ctk.CTkFrame):
         fs["stop"].set()
         if fs.get("thread"):
             fs["thread"].join(timeout=2)
-        from ffstudio import validate as V
+        from glim import validate as V
         try:
             with V.gpu():
                 for sender in fs["senders"].values():
@@ -840,7 +840,7 @@ class EditorPanel(ctk.CTkFrame):
         if not (self.previewer and self.winfo_ismapped()):
             return
         try:
-            from ffstudio import validate as V
+            from glim import validate as V
             speed = self._speed()
             if self.playing:
                 self.sim_time += dt * speed
@@ -893,7 +893,7 @@ class EditorPanel(ctk.CTkFrame):
         """Main thread, while the output is open: its window events (GLFW requires
         the main thread for them), Left/Right, and the time readout. The small
         preview pauses meanwhile."""
-        from ffstudio import validate as V
+        from glim import validate as V
         fs = self._fs
         if fs["error"]:
             self.log(f"Output stopped: {fs['error']}")
@@ -942,7 +942,7 @@ class EditorPanel(ctk.CTkFrame):
         the UI, so rebuilding the parameter widgets after a shader switch (up to a
         second for big shaders) doesn't stall the output. Holds gpu() per frame;
         the shader it draws is whatever fs holds (switched under the same lock)."""
-        from ffstudio import validate as V
+        from glim import validate as V
         last = time.perf_counter()
         due = None                          # when the next frame is due, if not paced by vsync
         small_t = 0.0                       # when the small preview was last drawn
@@ -1040,7 +1040,7 @@ class EditorPanel(ctk.CTkFrame):
         worker thread, with the slider values at the start of each run, until the
         shader, Live or the output changes (_bench_gen). Pauses while the preview
         isn't showing (e.g. the Queue tab), so the GPU isn't kept busy for nothing."""
-        from ffstudio import validate as V
+        from glim import validate as V
         gen, res = self._bench_gen, self.res
         live = lambda: gen == self._bench_gen
 
@@ -1100,7 +1100,7 @@ class EditorPanel(ctk.CTkFrame):
             self._fs["sample_until"] = time.perf_counter() + GPU_SAMPLE_S
             self._show_gpu(None, "measuring in the output…")
             return
-        from ffstudio import validate as V
+        from glim import validate as V
         self._bench_gen += 1
         gen, res, values = self._bench_gen, self.res, self._values()
         key = gpu_cache_key(res, values)
@@ -1127,7 +1127,7 @@ class EditorPanel(ctk.CTkFrame):
 
     def _show_gpu(self, r, note):
         """r: a benchmark result ({"ms", "size"}) or None (note says why)."""
-        from ffstudio import validate as V
+        from glim import validate as V
         bar = self.gpu_bar
         bar.delete("all")
         if not r:
@@ -1191,7 +1191,7 @@ class EditorPanel(ctk.CTkFrame):
     def _channel_value(self, im):
         """(source, sampler options) for a channel: the saved setting, else what
         the shader's own directives produced."""
-        from ffstudio.convert import split_channel_options
+        from glim.convert import split_channel_options
         saved = self.settings.get("channels", {}).get(im.name)
         if saved is not None:
             return split_channel_options(saved)

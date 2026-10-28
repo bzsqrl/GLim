@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Building block: a tunable noise texture (smooth, ridged, turbulent or cellular) that drifts and evolves; threshold it into a mask or use it as a soft wash",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Building Block"],
   "INPUTS": [

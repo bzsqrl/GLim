@@ -1,6 +1,6 @@
 # Updating the Mac build after the Windows work
 
-These steps bring a Mac checkout up to date with the work done on Windows, check the new features on macOS and rebuild `FFStudio.app`. Run the commands in Terminal from the FFStudio folder (the git checkout). If you're Claude on the Mac helping with this, read "Context" first.
+These steps bring a Mac checkout up to date with the work done on Windows, check the new features on macOS and rebuild `GLim.app`. Run the commands in Terminal from the GLim folder (the git checkout). If you're Claude on the Mac helping with this, read "Context" first.
 
 ## Context
 
@@ -13,9 +13,9 @@ Commits since the Mac was last in sync (`6e47677`, "Add Windows update instructi
 | `ac835b5` | Shadertoy channels used only inside a `#define` (`#define FFT(a) texture(iChannel1, …)`) are now declared and wired. Before, these failed with `undefined variable "iChannel1"`. | Shared converter code. |
 | `5a72770` | The queue is now a native `ttk.Treeview` instead of one CustomTkinter widget per row. 800+ files load in under a second, where before they froze the window and left rows blank. File types are detected in the background, and the queue's **Export ISF** runs off the UI thread. The build log keeps its last 5,000 lines. New: **Build Selected / Export Selected**, Delete/Backspace to remove, a right-click menu, and double-click to open a file. | **GUI, never run on macOS.** The list uses the `clam` ttk theme with custom colours and the font "Segoe UI", which macOS replaces with a fallback. |
 | `100a29c` | Queue review fixes: worker threads no longer read Tk variables, rows removed mid-build are skipped, and right-click is bound to `<Button-2>` on macOS. | The `<Button-2>` binding is Mac-only. It may already be on this Mac if it was committed there. |
-| `2892180` | **Sliders multiplied by time no longer scrub.** `iTime * speed`, `vec3(rx, ry, rz) * iTime` and the like become running totals (`ffm_phaseN`). The plugin keeps them (`FFM_PHASES`), adding slider × frame time every frame. ISF exports still use the plain product, so they still jump in ISF hosts. | **New C++ in `templates/ffgl/Plugin.cpp` and `FFStudioPlugin.h`, never compiled with clang.** |
+| `2892180` | **Sliders multiplied by time no longer scrub.** `iTime * speed`, `vec3(rx, ry, rz) * iTime` and the like become running totals (`glim_phaseN`). The plugin keeps them (`GLIM_PHASES`), adding slider × frame time every frame. ISF exports still use the plain product, so they still jump in ISF hosts. | **New C++ in `templates/ffgl/Plugin.cpp` and `GLimPlugin.h`, never compiled with clang.** |
 
-The new C++ is small and should be portable: a `std::vector<double>` of totals, a loop over `FFM_PHASES` in `ProcessOpenGL`, and one `glUniform1f` per total per pass.
+The new C++ is small and should be portable: a `std::vector<double>` of totals, a loop over `GLIM_PHASES` in `ProcessOpenGL`, and one `glUniform1f` per total per pass.
 
 The GUI is the most likely place for Mac-specific problems. See step 6.
 
@@ -67,33 +67,33 @@ Two fixtures are new:
 
 ## 4. Build test batch v4
 
-This compiles the new plugin C++ with clang, then loads each plugin in FFStudio's test host. The first build reconfigures the cached workspace (`~/Library/Caches/FFStudio`), because the runtime template changed. That takes about a minute.
+This compiles the new plugin C++ with clang, then loads each plugin in GLim's test host. The first build reconfigures the cached workspace (`~/Library/Caches/GLim`), because the runtime template changed. That takes about a minute.
 
 ```bash
-venv/bin/python -m ffstudio --to both --test --out output/test_batch_v4 \
+venv/bin/python -m glim --to both --test --out output/test_batch_v4 \
   tests/fixtures/shadertoy_rate_params.txt tests/fixtures/shadertoy_define_channel.txt \
   tests/corpus/bare_fractalSymetry.txt tests/corpus/bare_lopyfrac3dOrthofractalEvolution.txt
 ```
 
 **Expected:** for each shader, a `✓ … .fs` line, then a `✓ … .bundle` line followed by `test host: OK`; at the end, `4/4 converted.` (On Windows, the same command gave four `.dll` files, all `test host: OK`.)
 
-If `tests/corpus/` on this Mac no longer has the two `bare_` files, take them from git: `git checkout -- tests/corpus/bare_fractalSymetry.txt tests/corpus/bare_lopyfrac3dOrthofractalEvolution.txt`. (The test shaders moved from `sample-shaders/` to `tests/corpus/` on 2026-10-27; `sample-shaders/` now holds the CC0 shaders that ship with FFStudio.)
+If `tests/corpus/` on this Mac no longer has the two `bare_` files, take them from git: `git checkout -- tests/corpus/bare_fractalSymetry.txt tests/corpus/bare_lopyfrac3dOrthofractalEvolution.txt`. (The test shaders moved from `sample-shaders/` to `tests/corpus/` on 2026-10-27; `sample-shaders/` now holds the CC0 shaders that ship with GLim.)
 
-If CMake complains about the existing workspace, delete `~/Library/Caches/FFStudio` and run the command again.
+If CMake complains about the existing workspace, delete `~/Library/Caches/GLim` and run the command again.
 
-## 5. Package FFStudio.app
+## 5. Package GLim.app
 
 ```bash
 venv/bin/python compile.py
-dist/FFStudio.app/Contents/MacOS/FFStudio --selftest tests/fixtures/shadertoy_rate_params.txt /tmp/ffm_selftest
-cat /tmp/ffm_selftest/selftest.log
+dist/GLim.app/Contents/MacOS/GLim --selftest tests/fixtures/shadertoy_rate_params.txt /tmp/glim_selftest
+cat /tmp/glim_selftest/selftest.log
 ```
 
 **Expected:** the log ends with `built …shadertoy_rate_params.bundle`.
 
 ## 6. Check the GUI (the new queue)
 
-Open `dist/FFStudio.app`, or run `venv/bin/python src/main_gui.py`. In the **Queue** tab:
+Open `dist/GLim.app`, or run `venv/bin/python src/main_gui.py`. In the **Queue** tab:
 
 | Check | What should happen |
 |---|---|
@@ -134,10 +134,10 @@ Load the four `.fs` files from `output/test_batch_v4`. They should render like t
 
 ## 9. Syphon output
 
-The **Spout** button on Windows is **Syphon** on macOS (next to ⛶ in the Studio tab). Turned on, it publishes the Studio tab's shader as the Syphon server "FFStudio" at 1920×1080, with or without the output window. On Windows, Spout passed every check (`validate.FrameSender`, `EditorPanel.toggle_sending`). On the Mac it needs:
+The **Spout** button on Windows is **Syphon** on macOS (next to ⛶ in the Studio tab). Turned on, it publishes the Studio tab's shader as the Syphon server "GLim" at 1920×1080, with or without the output window. On Windows, Spout passed every check (`validate.FrameSender`, `EditorPanel.toggle_sending`). On the Mac it needs:
 
 1. `venv/bin/pip install -r requirements.txt` (adds `syphon-python[opengl]` and PyObjC; its wheel needs macOS 12 or later).
-2. From source (`venv/bin/python src/main_gui.py`): load a shader, click **Syphon** (it turns amber, and the log says `Syphon: sending "FFStudio" at 1920x1080`). In Resolume, add the **Syphon** source "FFStudio"; or use Syphon's Simple Client.
+2. From source (`venv/bin/python src/main_gui.py`): load a shader, click **Syphon** (it turns amber, and the log says `Syphon: sending "GLim" at 1920x1080`). In Resolume, add the **Syphon** source "GLim"; or use Syphon's Simple Client.
 
 | Check | What should happen |
 |---|---|
@@ -145,20 +145,20 @@ The **Spout** button on Windows is **Syphon** on macOS (next to ⛶ in the Studi
 | No window | It keeps sending on the Queue tab, and when switching shaders (← / →, Auto). |
 | Output window | Opening **⧉** while sending shows the same frames; closing it keeps sending. Turning Syphon off with the window open keeps the window. |
 | Off | Syphon off: the source disappears from the receiver. |
-| FFStudio.app | The same works in the packaged app (the spec bundles the Syphon framework via `collect_data_files('syphon')`). |
+| GLim.app | The same works in the packaged app (the spec bundles the Syphon framework via `collect_data_files('syphon')`). |
 
 **Checked on the Mac (2026-10-24, M1 Max, macOS 14.8, syphon-python 0.2.0), from source, with no code changes:** the GUI was driven by a script and a separate Syphon client received the frames. Every row above passed: 1920×1080, the right way up (`is_flipped` stays False), 60 fps sent and received; sending carries on from the Queue tab, across shader switches and while the output window opens, closes and reopens; Syphon off with the window open keeps the window, and the server is gone within about 2 s. Creating the server on GLFW's context works.
 
-**FFStudio.app:** builds with the Syphon framework, passes `--selftest`, and its Syphon output works in Resolume (checked 2026-10-24). `compile.py` then repairs the app's ad-hoc signature (`seal_mac_app`): PyInstaller left the app without a resource seal, and `Syphon.framework` (from a wheel, which can't hold symlinks) with real folders where a framework has symlinks. Now `codesign --verify --deep --strict dist/FFStudio.app` passes.
+**GLim.app:** builds with the Syphon framework, passes `--selftest`, and its Syphon output works in Resolume (checked 2026-10-24). `compile.py` then repairs the app's ad-hoc signature (`seal_mac_app`): PyInstaller left the app without a resource seal, and `Syphon.framework` (from a wheel, which can't hold symlinks) with real folders where a framework has symlinks. Now `codesign --verify --deep --strict dist/GLim.app` passes.
 
 If creating the server fails, the log says `Syphon unavailable: …` and the button turns off. The likely spot is the context: `syphon.SyphonOpenGLServer(name)` uses the current NSOpenGLContext, which GLFW should have made current inside `gpu()`.
 
 ## 10. NDI output
 
-The Studio tab's controls for sending now sit in a **Send** row under the preview: **Syphon**, **NDI**, and the NDI size menu (**1080p** / **720p**). NDI sends the shader as "<Mac name> (FFStudio)" at 30 fps over the network (`validate.NdiSender`: the frame is flipped and scaled on the GPU, read back asynchronously through two pixel buffers, and sent with cyndilib). On Windows every check passed (30 fps, no dropped frames, the right way up, at both sizes, alongside Spout, with and without the output window); the Mac needs:
+The Studio tab's controls for sending now sit in a **Send** row under the preview: **Syphon**, **NDI**, and the NDI size menu (**1080p** / **720p**). NDI sends the shader as "<Mac name> (GLim)" at 30 fps over the network (`validate.NdiSender`: the frame is flipped and scaled on the GPU, read back asynchronously through two pixel buffers, and sent with cyndilib). On Windows every check passed (30 fps, no dropped frames, the right way up, at both sizes, alongside Spout, with and without the output window); the Mac needs:
 
 1. `venv/bin/pip install -r requirements.txt` (adds `cyndilib`, which bundles the NDI runtime, and numpy).
-2. From source: load a shader, click **NDI** (highlighted; the log says `NDI: sending "FFStudio" at 1920x1080, 30 fps.`). Receive it in Resolume (**Sources → NDI**) or NDI Video Monitor.
+2. From source: load a shader, click **NDI** (highlighted; the log says `NDI: sending "GLim" at 1920x1080, 30 fps.`). Receive it in Resolume (**Sources → NDI**) or NDI Video Monitor.
 
 | Check | What should happen |
 |---|---|
@@ -166,10 +166,10 @@ The Studio tab's controls for sending now sit in a **Send** row under the previe
 | With Syphon | Both on: both receivers get the shader (Syphon at 60 fps, NDI at 30). Turning one off leaves the other. |
 | No window | It keeps sending on the Queue tab and across shader switches, and with the output window opened and closed. |
 | Off | The NDI source disappears from the receiver. |
-| Self-test | `FFStudio --selftest <shader> <dir>` writes `sender Syphon: ok` and `sender NDI: ok` to `selftest.log`. |
-| FFStudio.app | The same works in the packaged app. The first time, macOS asks for **Local Network** access (the spec's `NSLocalNetworkUsageDescription` / `NSBonjourServices`); allow it. If NDI sends from source but not from the app, that permission is the first suspect (System Settings → Privacy & Security → Local Network). `compile.py`'s signing step must still verify with cyndilib's `libndi` included. |
+| Self-test | `GLim --selftest <shader> <dir>` writes `sender Syphon: ok` and `sender NDI: ok` to `selftest.log`. |
+| GLim.app | The same works in the packaged app. The first time, macOS asks for **Local Network** access (the spec's `NSLocalNetworkUsageDescription` / `NSBonjourServices`); allow it. If NDI sends from source but not from the app, that permission is the first suspect (System Settings → Privacy & Security → Local Network). `compile.py`'s signing step must still verify with cyndilib's `libndi` included. |
 
-**Checked on the Mac (2026-10-24, M1 Max, macOS 14.8, cyndilib 0.1.3), with no code changes:** every row passed. From source, a script drove the GUI while separate NDI and Syphon receivers watched: the right way up at 1920×1080, and 1280×720 after choosing **720p** while sending; 30 fps with no dropped frames by NDI's own counters (each send about 0.5 ms); alongside Syphon at 60 fps, and turning Syphon off left NDI sending; sending carried on from the Queue tab, across a shader switch and while the output window opened and closed; the source was gone about 2 s after NDI was turned off. The self-test reports both senders `ok`, in the packaged app too. `FFStudio.app` bundles `libndi` and its licence files, still passes `codesign --verify --deep --strict`, and sends to Resolume (after allowing Local Network access), where the source is listed as "<Mac name> (FFStudio)". The app is now 71 MB (was 52 MB), mostly for numpy.
+**Checked on the Mac (2026-10-24, M1 Max, macOS 14.8, cyndilib 0.1.3), with no code changes:** every row passed. From source, a script drove the GUI while separate NDI and Syphon receivers watched: the right way up at 1920×1080, and 1280×720 after choosing **720p** while sending; 30 fps with no dropped frames by NDI's own counters (each send about 0.5 ms); alongside Syphon at 60 fps, and turning Syphon off left NDI sending; sending carried on from the Queue tab, across a shader switch and while the output window opened and closed; the source was gone about 2 s after NDI was turned off. The self-test reports both senders `ok`, in the packaged app too. `GLim.app` bundles `libndi` and its licence files, still passes `codesign --verify --deep --strict`, and sends to Resolume (after allowing Local Network access), where the source is listed as "<Mac name> (GLim)". The app is now 71 MB (was 52 MB), mostly for numpy.
 
 ## 11. New look, Analyze, ← / →
 
@@ -187,7 +187,7 @@ Fonts are the first one installed from a list per platform. On macOS the UI uses
 | Studio top row | **+** (open a file) on the left; **Analyze**, **Build FFGL**, **Export ISF** on the right. There is no Process Code button: **Analyze** (and ⌘+Enter) processes the code when it changed, then measures the GPU load. |
 | ← / → | Straight after switching to Studio (tab button, Shift+Tab or a double-click in the queue), with no output window, ← / → step through the queue. Not while typing in the code box or a text field, or after clicking a slider (it steps instead); clicking anywhere else releases those, and the arrows step the queue again. The code box's scrollbar keeps its focus. |
 | Quick tab switch | Shift+Tab twice quickly leaves the tab it lands on showing, not blank (`_Tabs.set` no longer hides tabs 100 ms later). |
-| FFStudio.app | The same in the packaged app. |
+| GLim.app | The same in the packaged app. |
 
 If a font comes out wrong (e.g. `.AppleSystemUIFont` not accepted by this Tk), change the macOS lists in `theme._UI_FAMILIES` / `theme._MONO_FAMILIES`.
 
@@ -195,73 +195,73 @@ If a font comes out wrong (e.g. `.AppleSystemUIFont` not accepted by this Tk), c
 
 ## 12. OSC remote control (TouchOSC)
 
-FFStudio now listens for OSC on UDP port 8000 and sends feedback to port 8001 (`src/osc_remote.py`, always on; the USER_MANUAL's *Remote control* section has the addresses). TouchOSC layouts are in `touchosc/` (`tools/build_touchosc.py` makes them). It needs python-osc:
+GLim now listens for OSC on UDP port 8000 and sends feedback to port 8001 (`src/osc_remote.py`, always on; the USER_MANUAL's *Remote control* section has the addresses). TouchOSC layouts are in `touchosc/` (`tools/build_touchosc.py` makes them). It needs python-osc:
 
 1. `venv/bin/pip install -r requirements.txt` (adds `python-osc`).
-2. Start FFStudio from source: the log says `OSC remote control: <address>, port 8000 (feedback to port 8001).`
-3. In TouchOSC (on the Mac, an iPad or a phone), set any connection to UDP, host = the Mac's address (`127.0.0.1` on the Mac itself), send port 8000, receive port 8001, and open `touchosc/FFStudio_desktop.tosc` or `FFStudio_phone.tosc`.
+2. Start GLim from source: the log says `OSC remote control: <address>, port 8000 (feedback to port 8001).`
+3. In TouchOSC (on the Mac, an iPad or a phone), set any connection to UDP, host = the Mac's address (`127.0.0.1` on the Mac itself), send port 8000, receive port 8001, and open `touchosc/GLim_desktop.tosc` or `GLim_phone.tosc`.
 
 | Check | What should happen |
 |---|---|
-| Connection | The layout's status line says **connected: FFStudio on <Mac name>**. |
-| Transport | PLAY / RESTART / PREV / NEXT and the slideshow (AUTO, - / +) work and light up as in FFStudio. |
+| Connection | The layout's status line says **connected: GLim on <Mac name>**. |
+| Transport | PLAY / RESTART / PREV / NEXT and the slideshow (AUTO, - / +) work and light up as in GLim. |
 | Output | OUTPUT WINDOW and FULLSCREEN open and close them; the **Syphon** button (its label says Syphon on macOS) and NDI turn sending on and off. |
 | Parameters | The shader's parameter names, values and faders appear; moving a fader moves the Studio tab's slider, and the other way round; switching shaders refills them. |
-| FFStudio.app | The same in the packaged app. macOS asks for Local Network access the first time (the spec's `NSLocalNetworkUsageDescription` now mentions remote control): allow it, or a phone can't reach the app. `--selftest` writes `osc: ok`. |
+| GLim.app | The same in the packaged app. macOS asks for Local Network access the first time (the spec's `NSLocalNetworkUsageDescription` now mentions remote control): allow it, or a phone can't reach the app. `--selftest` writes `osc: ok`. |
 
-**Checked on the Mac (2026-10-25, M1 Max, macOS 14.8, python-osc 1.10.2), with no code changes:** a script sent real OSC over UDP to FFStudio from source, to `127.0.0.1` and to the Mac's network address, and listened on port 8001: the log line, `/ping` → `/pong FFStudio on <Mac name>`, `/spout/name` = Syphon; PREV / NEXT (not on a button's release), PLAY, RESTART, AUTO and its seconds stepped and lit up; OUTPUT WINDOW, FULLSCREEN, Syphon, NDI and 720p switched with feedback; `/param/1` moved the slider, a slider change came back on `/param/1`, and switching shaders refilled the names. The packaged app writes `osc: ok`, passes `codesign --verify --deep --strict`, and answered the same messages from another process (Syphon and NDI on / off). Not yet checked: the TouchOSC layouts themselves, and a phone or iPad reaching the packaged app (the Local Network prompt).
+**Checked on the Mac (2026-10-25, M1 Max, macOS 14.8, python-osc 1.10.2), with no code changes:** a script sent real OSC over UDP to GLim from source, to `127.0.0.1` and to the Mac's network address, and listened on port 8001: the log line, `/ping` → `/pong GLim on <Mac name>`, `/spout/name` = Syphon; PREV / NEXT (not on a button's release), PLAY, RESTART, AUTO and its seconds stepped and lit up; OUTPUT WINDOW, FULLSCREEN, Syphon, NDI and 720p switched with feedback; `/param/1` moved the slider, a slider change came back on `/param/1`, and switching shaders refilled the names. The packaged app writes `osc: ok`, passes `codesign --verify --deep --strict`, and answered the same messages from another process (Syphon and NDI on / off). Not yet checked: the TouchOSC layouts themselves, and a phone or iPad reaching the packaged app (the Local Network prompt).
 
 **TouchOSC on the Mac (2026-10-25):** the layouts connect from TouchOSC on the Mac and on a phone. Two findings:
 
-- **Only connection 10 worked.** The layouts sent and received only on connection 10. `tools/build_touchosc.py` now uses all ten connections (mask `1111111111`, and the script's `CONN`), so any connection can be set to FFStudio. The layouts were regenerated. Checked: the phone works on connection 1 (once the new layout was copied to it; TouchOSC keeps its own copy on each device).
-- **Trackpad taps go missing** with the desktop layout in TouchOSC on the same Mac. Pressing the trackpad down works, and so does the phone. An OSC monitor in place of FFStudio showed that a missed tap sends nothing at all. This happened with PLAY (a toggle) as well as NEXT (momentary). Making the buttons toggles didn't help either: many taps still sent nothing. So it's TouchOSC's handling of macOS tap-to-click, which neither FFStudio nor the layout can fix. The USER_MANUAL says to press the trackpad down instead, or use a mouse.
+- **Only connection 10 worked.** The layouts sent and received only on connection 10. `tools/build_touchosc.py` now uses all ten connections (mask `1111111111`, and the script's `CONN`), so any connection can be set to GLim. The layouts were regenerated. Checked: the phone works on connection 1 (once the new layout was copied to it; TouchOSC keeps its own copy on each device).
+- **Trackpad taps go missing** with the desktop layout in TouchOSC on the same Mac. Pressing the trackpad down works, and so does the phone. An OSC monitor in place of GLim showed that a missed tap sends nothing at all. This happened with PLAY (a toggle) as well as NEXT (momentary). Making the buttons toggles didn't help either: many taps still sent nothing. So it's TouchOSC's handling of macOS tap-to-click, which neither GLim nor the layout can fix. The USER_MANUAL says to press the trackpad down instead, or use a mouse.
 
 ## 13. Beta package: version, licence, notices, HTML manual
 
-FFStudio now has a version number (`__version__` in `ffstudio/__init__.py`, `0.9.0-beta.1`), shown in the title bar, the log's first line and `selftest.log`; `FFStudio.spec` sets the app's `CFBundleShortVersionString` (`0.9.0`) and `CFBundleVersion` (`0.9.0-beta.1`) from it. After building, `compile.py` writes the package's documents into `dist/`: `LICENSE.txt` (copied from the repo), `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles, read from PyInstaller's `build/FFStudio/PYZ-00.toc`) and `USER_MANUAL.html` (`tools/build_manual.py`). The spec also leaves out PyOpenGL's GLUT/GLE DLLs (Windows only; nothing changes on the Mac).
+GLim now has a version number (`__version__` in `glim/__init__.py`, `0.9.0-beta.1`), shown in the title bar, the log's first line and `selftest.log`; `GLim.spec` sets the app's `CFBundleShortVersionString` (`0.9.0`) and `CFBundleVersion` (`0.9.0-beta.1`) from it. After building, `compile.py` writes the package's documents into `dist/`: `LICENSE.txt` (copied from the repo), `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles, read from PyInstaller's `build/GLim/PYZ-00.toc`) and `USER_MANUAL.html` (`tools/build_manual.py`). The spec also leaves out PyOpenGL's GLUT/GLE DLLs (Windows only; nothing changes on the Mac).
 
 1. `venv/bin/pip install -r requirements.txt` (adds `markdown`, for `build_manual.py`).
 2. `venv/bin/python compile.py`.
 
 | Check | What should happen |
 |---|---|
-| Build | `compile.py` ends with "The rest of the package (sample shaders, TouchOSC layouts, licence, notices, manual) is there too."; `dist/` has `FFStudio.app`, `sample-shaders/` (99 CC0 shaders), `touchosc/`, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt`, `USER_MANUAL.html`. *(Since 2026-10-27, `compile.py` copies `sample-shaders/` and `touchosc/` too.)* |
+| Build | `compile.py` ends with "The rest of the package (sample shaders, TouchOSC layouts, licence, notices, manual) is there too."; `dist/` has `GLim.app`, `sample-shaders/` (99 CC0 shaders), `touchosc/`, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt`, `USER_MANUAL.html`. *(Since 2026-10-27, `compile.py` copies `sample-shaders/` and `touchosc/` too.)* |
 | Notices | `THIRD_PARTY_NOTICES.txt` starts with the NDI terms, and its contents list has Python 3.12, Tcl/Tk (from its `license.terms`), **syphon-python** and **Syphon framework**, and no SpoutGL, Spout or GLEW. If `make_notices.py` stops with "no licence file for dist:LICENSE* (syphon-python)", the wheel has no licence file: find syphon-python's licence in its repository, save it as `tools/licenses/syphon-python.txt`, and change its entry in `COMPONENTS` to `lic:syphon-python.txt`. |
 | Manual | `USER_MANUAL.html` opens in Safari with the contents on the left, follows light / dark mode, and its nested lists (e.g. under *Studio tab → Live preview*) are indented. |
-| Version | The title bar says **FFStudio 0.9.0-beta.1**; Finder's *Get Info* on FFStudio.app shows version 0.9.0; `--selftest` writes `FFStudio 0.9.0-beta.1` as `selftest.log`'s first line. |
-| Zip | Make the Mac zip on the Mac: put FFStudio.app, `touchosc/`, `sample-shaders/`, `USER_MANUAL.html`, `LICENSE.txt` and the Mac `THIRD_PARTY_NOTICES.txt` (all in `dist/` after a build) in one folder and compress it with Finder (*Compress*) or `ditto -c -k --keepParent <folder> <zip>`. Unzip a copy elsewhere and check that the app still opens and `codesign --verify --deep --strict` passes. |
+| Version | The title bar says **GLim 0.9.0-beta.1**; Finder's *Get Info* on GLim.app shows version 0.9.0; `--selftest` writes `GLim 0.9.0-beta.1` as `selftest.log`'s first line. |
+| Zip | Make the Mac zip on the Mac: put GLim.app, `touchosc/`, `sample-shaders/`, `USER_MANUAL.html`, `LICENSE.txt` and the Mac `THIRD_PARTY_NOTICES.txt` (all in `dist/` after a build) in one folder and compress it with Finder (*Compress*) or `ditto -c -k --keepParent <folder> <zip>`. Unzip a copy elsewhere and check that the app still opens and `codesign --verify --deep --strict` passes. |
 
-**Checked on the Mac (2026-10-27, M1 Max, macOS 14.8):** every row passed, after two fixes to `tools/make_notices.py`. (1) The first build stopped at "Tcl/Tk's license.terms not found": Homebrew's Tcl/Tk 9.1 keeps Tcl's `license.terms` at the top of its prefix and Tk's (the one naming Apple) in `lib/tk9.1/demos`, not in the library folders the tool looked in; it now looks there too, and the notices carry both. (2) The list of sources at the end named every file in `tools/licenses`, so the Mac notices mentioned Spout (and Windows' would mention Syphon); it now lists only the files used. The notices start with the NDI terms and list Python 3.12.15, Tcl/Tk, syphon-python 0.2.0 and the Syphon framework, with no SpoutGL, Spout or GLEW. The manual opens in Safari with the contents on the left, in dark mode, with nested lists indented. The title bar says FFStudio 0.9.0-beta.1, Finder's version is 0.9.0, `selftest.log` starts with `FFStudio 0.9.0-beta.1`, and the Studio tab's new Save button suggests the shader's name with its extension and saves the code unchanged. A test zip made with `ditto` (30 MB) unpacked elsewhere still passes `codesign --verify --deep --strict` and the self-test (Syphon, NDI and OSC `ok`). The app is still 71 MB, and the plugins it builds are universal (x86_64 and arm64).
+**Checked on the Mac (2026-10-27, M1 Max, macOS 14.8):** every row passed, after two fixes to `tools/make_notices.py`. (1) The first build stopped at "Tcl/Tk's license.terms not found": Homebrew's Tcl/Tk 9.1 keeps Tcl's `license.terms` at the top of its prefix and Tk's (the one naming Apple) in `lib/tk9.1/demos`, not in the library folders the tool looked in; it now looks there too, and the notices carry both. (2) The list of sources at the end named every file in `tools/licenses`, so the Mac notices mentioned Spout (and Windows' would mention Syphon); it now lists only the files used. The notices start with the NDI terms and list Python 3.12.15, Tcl/Tk, syphon-python 0.2.0 and the Syphon framework, with no SpoutGL, Spout or GLEW. The manual opens in Safari with the contents on the left, in dark mode, with nested lists indented. The title bar says GLim 0.9.0-beta.1, Finder's version is 0.9.0, `selftest.log` starts with `GLim 0.9.0-beta.1`, and the Studio tab's new Save button suggests the shader's name with its extension and saves the code unchanged. A test zip made with `ditto` (30 MB) unpacked elsewhere still passes `codesign --verify --deep --strict` and the self-test (Syphon, NDI and OSC `ok`). The app is still 71 MB, and the plugins it builds are universal (x86_64 and arm64).
 
 ## 14. Sample shaders, package folders, save locations
 
 Three changes from Windows (2026-10-27):
-- `sample-shaders/` now holds the 99 CC0 Shadertoy shaders that ship with FFStudio (each starts with its Shadertoy link, author and licence). The old test shaders moved to `tests/corpus/`, which `tests/run_corpus.py` now uses by default.
+- `sample-shaders/` now holds the 99 CC0 Shadertoy shaders that ship with GLim (each starts with its Shadertoy link, author and licence). The old test shaders moved to `tests/corpus/`, which `tests/run_corpus.py` now uses by default.
 - `compile.py` also copies `sample-shaders/` and `touchosc/` into `dist/`, so a build leaves the whole package there.
-- Build FFGL, Export ISF and the Studio tab's save button always ask where to write (Queue and Studio tabs alike). Each dialog opens in the folder last chosen for that kind of file (plugins, ISF files, shader code), kept in `~/Library/Application Support/FFStudio/prefs.json`. With nothing remembered yet, plugins start in `~/Documents/Resolume Arena/Extra Effects` if it exists, else Documents. The app no longer writes to `~/Documents/FFStudio/output` (the command line still uses the project's `output/` unless given `--out`).
+- Build FFGL, Export ISF and the Studio tab's save button always ask where to write (Queue and Studio tabs alike). Each dialog opens in the folder last chosen for that kind of file (plugins, ISF files, shader code), kept in `~/Library/Application Support/GLim/prefs.json`. With nothing remembered yet, plugins start in `~/Documents/Resolume Arena/Extra Effects` if it exists, else Documents. The app no longer writes to `~/Documents/GLim/output` (the command line still uses the project's `output/` unless given `--out`).
 
 Run `venv/bin/python compile.py`, then check:
 
 | Check | Expected |
 |---|---|
 | Corpus | `venv/bin/python tests/run_corpus.py --isf` gives OK=67, STATIC=12 of 79; with `--dir sample-shaders`, OK=99 of 99. |
-| Package | `dist/` has `sample-shaders/` (99 files) and `touchosc/` (2 layouts) next to FFStudio.app. |
-| Build folder | In FFStudio.app, **Build FFGL** in the Studio tab opens a folder dialog (in Extra Effects, or Documents). Choose a folder: the plugin goes there. Build again: the dialog opens in that folder. Cancel: nothing is built. |
+| Package | `dist/` has `sample-shaders/` (99 files) and `touchosc/` (2 layouts) next to GLim.app. |
+| Build folder | In GLim.app, **Build FFGL** in the Studio tab opens a folder dialog (in Extra Effects, or Documents). Choose a folder: the plugin goes there. Build again: the dialog opens in that folder. Cancel: nothing is built. |
 | Queue | **Build FFGL** and **Export ISF** on the Queue tab ask once per batch; the build dialog opens in the folder chosen in the Studio tab. |
-| Across sessions | Quit and reopen FFStudio: each dialog (build, Export ISF, save) opens in the folder chosen last. `prefs.json` lists them under `folders`. |
+| Across sessions | Quit and reopen GLim: each dialog (build, Export ISF, save) opens in the folder chosen last. `prefs.json` lists them under `folders`. |
 | Documents access | If macOS asks for access to Documents, **Allow** works and building still succeeds. |
 
-**Checked on the Mac (2026-10-27, M1 Max, macOS 14.8), from source and in the build:** the corpus gives OK=67, STATIC=12 of 79, the fixtures 6 / 6, and `--dir sample-shaders` OK=99 of 99 (ISF OK=99). `compile.py` leaves `sample-shaders/` (99) and `touchosc/` (2) in `dist/`; the app passes the self-test and `codesign --verify --deep --strict` (71 MB). The folder logic was driven from source with the dialogs stubbed to record where they opened: the first Studio build opened in `~/Documents/Resolume Arena/Extra Effects` and the plugin went to the folder chosen; the next build opened there; Cancel built nothing and left Build FFGL usable; the Queue's Build FFGL asked once for two shaders, opening in the Studio tab's last folder; Queue Export ISF asked once (in Documents, with nothing remembered); Save opened in the shader's folder, then in the folder saved to last; `prefs.json` in `~/Library/Application Support/FFStudio` listed all three under `folders`. Still to check by hand in FFStudio.app: the real macOS folder dialogs and the Documents prompt.
+**Checked on the Mac (2026-10-27, M1 Max, macOS 14.8), from source and in the build:** the corpus gives OK=67, STATIC=12 of 79, the fixtures 6 / 6, and `--dir sample-shaders` OK=99 of 99 (ISF OK=99). `compile.py` leaves `sample-shaders/` (99) and `touchosc/` (2) in `dist/`; the app passes the self-test and `codesign --verify --deep --strict` (71 MB). The folder logic was driven from source with the dialogs stubbed to record where they opened: the first Studio build opened in `~/Documents/Resolume Arena/Extra Effects` and the plugin went to the folder chosen; the next build opened there; Cancel built nothing and left Build FFGL usable; the Queue's Build FFGL asked once for two shaders, opening in the Studio tab's last folder; Queue Export ISF asked once (in Documents, with nothing remembered); Save opened in the shader's folder, then in the folder saved to last; `prefs.json` in `~/Library/Application Support/GLim` listed all three under `folders`. Still to check by hand in GLim.app: the real macOS folder dialogs and the Documents prompt.
 
 **Plugin names from the sample shaders:** every file starts with `stoy_cc0_mrange_`, which is 16 characters, exactly what FFGL shows of a plugin name. So in Resolume every sample plugin is named `stoy_cc0_mrange_`, and in one batch the rest become `stoy_cc0_mrang_2`, `_3`, … (`build_ffgl.unique_plugin_name`); the queue build here named northernJourney's plugin `stoy_cc0_mrang_2.bundle`. Not Mac-specific.
 
-**Fixed (2026-10-27):** the sample files are renamed to their short names (`stoy_cc0_mrange_rainbowWheel.txt` → `rainbowWheel.txt`); each file's header still gives its Shadertoy link, author (mrange) and licence (CC0). `--dir sample-shaders` still gives OK=99 of 99 (ISF OK=99), and `python -m ffstudio sample-shaders --to ffgl --test` builds all 99 plugins, each loading in the test host. Two pairs shared their first 16 characters (`logarithmicSpiralSpheres` / `logarithmicSpiralsTweaked`, `tunnelingThroughApollianFrac` / `tunnelingThroughGoldenFractal`), so the second of each is renamed: `spiralsTweaked.txt` and `goldenTunnel.txt`. Now every sample's first 16 characters are unique (ignoring case), and a batch build of all 99 names no plugin `_2`.
+**Fixed (2026-10-27):** the sample files are renamed to their short names (`stoy_cc0_mrange_rainbowWheel.txt` → `rainbowWheel.txt`); each file's header still gives its Shadertoy link, author (mrange) and licence (CC0). `--dir sample-shaders` still gives OK=99 of 99 (ISF OK=99), and `python -m glim sample-shaders --to ffgl --test` builds all 99 plugins, each loading in the test host. Two pairs shared their first 16 characters (`logarithmicSpiralSpheres` / `logarithmicSpiralsTweaked`, `tunnelingThroughApollianFrac` / `tunnelingThroughGoldenFractal`), so the second of each is renamed: `spiralsTweaked.txt` and `goldenTunnel.txt`. Now every sample's first 16 characters are unique (ignoring case), and a batch build of all 99 names no plugin `_2`.
 
 **Intermittent ISF differences:** on some runs, `--dir sample-shaders` reports a small ISF difference (DIFF3 to DIFF48) for `nothingComplicated` and sometimes `sorryForTheBanding`, and OK on others. The folder from before the renames does the same, so it isn't from them; it looks like `cc0_anotherBusShader`'s intermittent DIFFn in the corpus.
 
 ## 15. Original shaders
 
-`original-shaders/` holds 30 ISF shaders written for FFStudio (20 on 2026-10-27, 10 building blocks on 2026-10-28). Six use persistent buffers (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`), two of them at reduced size (`"WIDTH": "$WIDTH/2"` and `$WIDTH/4`); `meltEcho` is an effect. `compile.py` now copies the folder into `dist/` with `sample-shaders/`, so it goes in the zip too.
+`original-shaders/` holds 30 ISF shaders written for GLim (20 on 2026-10-27, 10 building blocks on 2026-10-28). Six use persistent buffers (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`), two of them at reduced size (`"WIDTH": "$WIDTH/2"` and `$WIDTH/4`); `meltEcho` is an effect. `compile.py` now copies the folder into `dist/` with `sample-shaders/`, so it goes in the zip too.
 
 | Check | Expected |
 |---|---|
@@ -269,11 +269,26 @@ Run `venv/bin/python compile.py`, then check:
 | Package | After `venv/bin/python compile.py`, `dist/` has `original-shaders/` (30 `.fs` files) next to `sample-shaders/`. |
 | Building blocks | Ten of the 30 (added 2026-10-28) are building blocks: sources with a **Transparent** switch (`shapeForge`, `lineScanner`, `gridMatrix`, `radialBurst`, `noiseField`) and effects (`kaleidoMirror`, `tileShift`, `colorMapper`, `displaceWarp`, `feedbackTrails`). In Resolume, a source with Transparent on shows the layers below through its background. |
 | Zip | The Mac zip (section 13) includes `original-shaders/` as well. |
-| Feedback | In FFStudio.app, `feedbackSwirl`, `reactionBloom` and `cyclicWaves` fill in over a few seconds instead of staying black or noisy; `cyclicWaves` forms spiral waves, and **Clear** / **Reseed** restarts them. |
+| Feedback | In GLim.app, `feedbackSwirl`, `reactionBloom` and `cyclicWaves` fill in over a few seconds instead of staying black or noisy; `cyclicWaves` forms spiral waves, and **Clear** / **Reseed** restarts them. |
+
+## 16. Renamed to GLim
+
+FFStudio is now **GLim**, at version 0.9.0-beta.2 (2026-10-28). Do the Mac steps in [RENAME_TO_GLIM.md](RENAME_TO_GLIM.md) first: pull, rename the folder, recreate the venv, then rebuild. The rename also changed the Mac bundle ID, the plugin bundle IDs and the prefix in generated code, none of which has run on macOS yet.
+
+| Check | Expected |
+|---|---|
+| App | `dist/GLim.app` opens with **GLim 0.9.0-beta.2** in the title bar. The Dock and Finder show the new glimmer-star icon; if Finder still shows the old one, run `killall Dock`. macOS asks again to allow local-network access (for NDI), because the bundle ID is new (`com.busysquirrel.glim`). |
+| Signature | `codesign --verify --deep --strict dist/GLim.app` prints nothing. |
+| Plugin bundle IDs | Build a plugin you already use in a Resolume set, under the same name. Its `Contents/Info.plist` has `CFBundleIdentifier` `com.busysquirrel.glim.plugin.…`. Replace the old bundle in Resolume's plugin folder (don't keep both), open the set, and the clip still uses the plugin with its parameters. If it doesn't, note it here and keep using the old bundle for now. |
+| Generated code | `tests/run_corpus.py --isf` passes on the samples, `original-shaders` and `tests/fixtures` (the uniforms are now `glim_…`). |
+| Syphon | In Resolume, the Syphon source is listed as **GLim**. |
+| NDI | The NDI source is listed as **&lt;computer&gt; (GLim)**. |
+| OSC | TouchOSC with `touchosc/GLim_desktop.tosc` connects and shows the shader name (the addresses are now `/glim/…`). |
+| Output folder | Plugins built from GLim.app go to `~/Documents/GLim/output`. |
 
 ## If something fails
 
-- **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `FFStudioPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.
+- **Build failures (step 4):** most likely clang errors in `templates/ffgl/Plugin.cpp` or `GLimPlugin.h`. Fix them in `templates/ffgl/`, not in the cached workspace, which is overwritten on every build. The Windows build must keep working: if the fix can't be portable, use `#ifdef`, as `Plugin.cpp` already does for `localtime_s`.
 - **GUI problems (step 6):** these are in `src/main_gui.py`, in `_build_queue_tab` (styling and bindings) and the queue methods below it. Keep Mac-only changes behind `sys.platform == "darwin"`, as the `<Button-2>` binding is.
 
 Commit fixes on a branch, then merge into `main` and push, so they can be pulled back on Windows. Update `IMPROVEMENT_PLAN.md` and `TESTING_CHECKLIST.md` with the results.

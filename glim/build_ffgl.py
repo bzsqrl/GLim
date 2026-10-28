@@ -81,15 +81,15 @@ def _glew_root(log):
 
 
 # What to install, for a computer without the build tools (e.g. a copy of
-# FFStudio.exe on another PC): the compiler can't be bundled with the app.
+# GLim.exe on another PC): the compiler can't be bundled with the app.
 MSVC_HELP = ("No C++ compiler found. Building plugins needs Microsoft's C++ compiler: install the free "
              "Build Tools for Visual Studio from https://visualstudio.microsoft.com/visual-cpp-build-tools/ "
              "and tick the \"Desktop development with C++\" workload (it includes CMake), "
-             "then restart FFStudio. (Export ISF works without it.)")
+             "then restart GLim. (Export ISF works without it.)")
 CMAKE_HELP = {
     "win32": ("CMake not found. Building plugins needs CMake: install it from https://cmake.org/download/ "
               "(Windows x64 Installer, with \"Add CMake to the PATH\"), or add \"C++ CMake tools for "
-              "Windows\" in the Visual Studio Installer, then restart FFStudio."),
+              "Windows\" in the Visual Studio Installer, then restart GLim."),
     "darwin": "CMake not found (install it with: brew install cmake).",
 }
 _vs_found = []                      # Visual Studio installs with the C++ compiler, once found
@@ -175,7 +175,7 @@ def _stable_sdk_dir():
     if not getattr(sys, "frozen", False):
         return src
     dst = os.path.join(paths.cache_dir(), "ffgl_sdk")
-    stamp = os.path.join(dst, ".ffstudio_stamp")
+    stamp = os.path.join(dst, ".glim_stamp")
     marker = str(os.path.getsize(os.path.join(src, "CMakeLists.txt")))
     if not (os.path.isfile(stamp) and open(stamp).read() == marker):
         if os.path.exists(dst):
@@ -248,10 +248,10 @@ def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None
         for obj in glob.glob(os.path.join(bdir, "**", "Plugin.obj"), recursive=True) + \
                 glob.glob(os.path.join(bdir, "**", "Plugin.cpp.o"), recursive=True):
             os.remove(obj)
-        product = os.path.join(bdir, "Release", "FFStudioPlugin.dll")
+        product = os.path.join(bdir, "Release", "GLimPlugin.dll")
         before = os.path.getmtime(product) if os.path.exists(product) else None
         log("Compiling plugin…")
-        _run(["cmake", "--build", bdir, "--config", "Release", "--target", "FFStudioPlugin"], ws, log, cancel_event)
+        _run(["cmake", "--build", bdir, "--config", "Release", "--target", "GLimPlugin"], ws, log, cancel_event)
         if sys.platform == "win32" and before is not None and os.path.getmtime(product) == before:
             raise BuildError("Build reported success but the plugin binary was not updated.")
 
@@ -260,9 +260,9 @@ def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None
             dst = os.path.join(out_dir, safe_name(plugin_name) + ".dll")
             shutil.copy2(src, dst)
         else:
-            src = os.path.join(bdir, "Release", "FFStudioPlugin.bundle")
+            src = os.path.join(bdir, "Release", "GLimPlugin.bundle")
             if not os.path.isdir(src):
-                src = os.path.join(bdir, "FFStudioPlugin.bundle")
+                src = os.path.join(bdir, "GLimPlugin.bundle")
             dst = os.path.join(out_dir, safe_name(plugin_name) + ".bundle")
             if os.path.exists(dst):
                 shutil.rmtree(dst)
@@ -272,7 +272,7 @@ def build(ir, glsl_list, plugin_name, out_dir=None, log=print, cancel_event=None
 
 
 def _set_bundle_identity(bundle, plugin_name, log, cancel_event):
-    """Every build copies the same FFStudioPlugin.bundle, so give each copy its
+    """Every build copies the same GLimPlugin.bundle, so give each copy its
     own identifier and name (macOS caches bundles by identifier), then re-sign
     ad hoc because editing Info.plist breaks the linker's signature.
 
@@ -281,8 +281,8 @@ def _set_bundle_identity(bundle, plugin_name, log, cancel_event):
     plist = os.path.join(bundle, "Contents", "Info.plist")
     exe = os.path.splitext(os.path.basename(bundle))[0]
     macos = os.path.join(bundle, "Contents", "MacOS")
-    os.rename(os.path.join(macos, "FFStudioPlugin"), os.path.join(macos, exe))
-    ident = "com.ffstudio.plugin." + safe_name(plugin_name) + "." + emit_ffgl.plugin_id(plugin_name)
+    os.rename(os.path.join(macos, "GLimPlugin"), os.path.join(macos, exe))
+    ident = "com.busysquirrel.glim.plugin." + safe_name(plugin_name) + "." + emit_ffgl.plugin_id(plugin_name)
     for key, value in (("CFBundleIdentifier", ident), ("CFBundleName", plugin_name[:15]),
                        ("CFBundleExecutable", exe), ("CFBundlePackageType", "BNDL")):
         _run(["plutil", "-replace", key, "-string", value, plist], bundle, log, cancel_event)

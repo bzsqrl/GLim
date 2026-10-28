@@ -1,14 +1,15 @@
-"""Draw the FFStudio icon and write every format the app needs:
+"""Draw the GLim icon and write every format the app needs:
 
-    assets/icon/FFStudio.png         1024 px logo
-    assets/icon/FFStudio.ico         Windows (16-256 px; small sizes drawn separately)
-    assets/icon/FFStudio.icns        macOS (Apple's icon grid: the tile has a margin)
-    assets/icon/png/ffstudio_N.png   window icons for Tk / GLFW
+    assets/icon/GLim.png         1024 px logo
+    assets/icon/GLim.ico         Windows (16-256 px; small sizes drawn separately)
+    assets/icon/GLim.icns        macOS (Apple's icon grid: the tile has a margin)
+    assets/icon/png/glim_N.png   window icons for Tk / GLFW
 
-Design: a dark rounded tile (FFStudio's own background) with "FF" split into
-cyan and magenta copies that add up to white where they overlap, like an RGB
-split in a VJ mix. Only Pillow is needed:  python assets/icon/make_icon.py
+Design: a dark rounded tile (GLim's own background) with a four-point glimmer
+star and smaller twinkles, split into cyan and magenta copies that add up to
+white where they overlap, like an RGB split in a VJ mix. Only Pillow is needed:  python assets/icon/make_icon.py
 """
+import math
 import os
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
@@ -50,28 +51,34 @@ def render(size, margin=0.06):
         tile = Image.composite(Image.new("RGB", (S, S), (255, 255, 255)), tile,
                                ImageChops.multiply(edge, fade).point(lambda v: v * 0.10))
 
-    # Letters, in tile units; on the pixel grid for small sizes.
-    def px(v):                                    # tile fraction -> supersampled px
-        v = inset + v * T
-        return round(v / ss) * ss if small else v
-    h = 0.50                                      # letter height
-    stroke = h * (0.25 if small else 0.20)
-    w = h * 0.62
-    gap = 0.07
-    x0 = (1 - (2 * w + gap)) / 2
-    y0 = (1 - h) / 2
-    letters = Image.new("L", (S, S), 0)
-    d = ImageDraw.Draw(letters)
-    for x in (x0, x0 + w + gap):
-        d.rectangle((px(x), px(y0), px(x + stroke) - 1, px(y0 + h) - 1), fill=255)                  # stem
-        d.rectangle((px(x), px(y0), px(x + w) - 1, px(y0 + stroke) - 1), fill=255)                  # top arm
-        d.rectangle((px(x), px(y0 + h * 0.44), px(x + w * 0.82) - 1, px(y0 + h * 0.44 + stroke) - 1),
-                    fill=255)                                                                    # middle arm
+    # Sparkles, in tile units: a four-point star with concave sides (a
+    # superellipse with exponent k > 1), a fainter diagonal one behind it, and
+    # two small ones. Small sizes keep only the main star, so it stays crisp.
+    def star(cx, cy, r, k, turn=0.0, n=160):
+        pts = []
+        for i in range(n):
+            t = 2 * math.pi * i / n
+            c, s_ = math.cos(t), math.sin(t)
+            x = r * math.copysign(abs(c) ** k, c)
+            y = r * math.copysign(abs(s_) ** k, s_)
+            xr = x * math.cos(turn) - y * math.sin(turn)
+            yr = x * math.sin(turn) + y * math.cos(turn)
+            pts.append((inset + (cx + xr) * T, inset + (cy + yr) * T))
+        return pts
+    sparkle = Image.new("L", (S, S), 0)
+    d = ImageDraw.Draw(sparkle)
+    if small:
+        d.polygon(star(0.5, 0.5, 0.42, 3.2), fill=255)
+    else:
+        d.polygon(star(0.45, 0.55, 0.22, 5.0, math.pi / 4), fill=150)
+        d.polygon(star(0.45, 0.55, 0.38, 4.2), fill=255)
+        d.polygon(star(0.77, 0.23, 0.12, 4.0), fill=235)
+        d.polygon(star(0.80, 0.80, 0.07, 3.6), fill=200)
 
     # RGB split: cyan up-left, magenta down-right; added, the overlap is white.
-    off = ss * max(1, round(size * 0.022)) if small else S * 0.022
+    off = ss * max(1, round(size * 0.016)) if small else S * 0.012
     def tinted(dx, dy, rgb):
-        m = ImageChops.offset(letters, round(dx), round(dy))
+        m = ImageChops.offset(sparkle, round(dx), round(dy))
         return Image.merge("RGB", [m.point(lambda v, c=c: v * c // 255) for c in rgb])
     split = ImageChops.add(tinted(-off, -off * 0.4, CYAN), tinted(off, off * 0.4, MAGENTA))
     if not small:
@@ -87,21 +94,21 @@ def render(size, margin=0.06):
 def main():
     os.makedirs(os.path.join(HERE, "png"), exist_ok=True)
     logo = render(1024)
-    logo.save(os.path.join(HERE, "FFStudio.png"))
+    logo.save(os.path.join(HERE, "GLim.png"))
 
     ico_sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
     imgs = [render(s) for s in ico_sizes]
-    imgs[-1].save(os.path.join(HERE, "FFStudio.ico"), sizes=[(s, s) for s in ico_sizes],
+    imgs[-1].save(os.path.join(HERE, "GLim.ico"), sizes=[(s, s) for s in ico_sizes],
                   append_images=imgs[:-1])
     for s, im in zip(ico_sizes, imgs):
         if s in (16, 24, 32, 48, 64, 128, 256):
-            im.save(os.path.join(HERE, "png", f"ffstudio_{s}.png"))
+            im.save(os.path.join(HERE, "png", f"glim_{s}.png"))
 
     # macOS: on Apple's grid the tile is 824 of 1024 px, so a ~10% margin.
     mac = render(1024, margin=0.0977)
-    mac.save(os.path.join(HERE, "FFStudio.icns"),
+    mac.save(os.path.join(HERE, "GLim.icns"),
              append_images=[render(s, margin=0.0977) for s in (16, 32, 64, 128, 256, 512)])
-    print("wrote FFStudio.png, FFStudio.ico, FFStudio.icns and png/")
+    print("wrote GLim.png, GLim.ico, GLim.icns and png/")
 
 
 if __name__ == "__main__":

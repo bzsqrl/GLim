@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Building block effect: mirror the clip left/right, top/bottom, into four, or into a spinning kaleidoscope, choosing which part of the clip lands in the centre",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Stylize", "Building Block"],
   "INPUTS": [

@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Three grids of overlapping circles turn against each other, weaving flower-of-life patterns and moire interference",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

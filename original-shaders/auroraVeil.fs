@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Six curtains of aurora light ripple and shimmer over a starry sky, each one drifting on its own currents",
-  "CREDIT": "FFStudio original",
+  "CREDIT": "GLim original",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [
