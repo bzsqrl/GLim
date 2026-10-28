@@ -273,7 +273,7 @@ Run `venv/bin/python compile.py`, then check:
 
 ## 16. Renamed to GLim
 
-FFStudio is now **GLim**, at version 0.9.0-beta.2 (2026-10-28). Do the Mac steps in [RENAME_TO_GLIM.md](RENAME_TO_GLIM.md) first: pull, rename the folder, recreate the venv, then rebuild. The rename also changed the Mac bundle ID, the plugin bundle IDs and the prefix in generated code, none of which has run on macOS yet.
+FFStudio is now **GLim**, at version 0.9.0-beta.2 (2026-10-28). Before these checks, the Mac steps were: point git at `bzsqrl/GLim` and pull, rename the folder, recreate the venv, delete the old FFStudio cache and prefs, then rebuild. The rename also changed the Mac bundle ID, the plugin bundle IDs and the prefix in generated code.
 
 | Check | Expected |
 |---|---|
@@ -285,6 +285,8 @@ FFStudio is now **GLim**, at version 0.9.0-beta.2 (2026-10-28). Do the Mac steps
 | NDI | The NDI source is listed as **&lt;computer&gt; (GLim)**. |
 | OSC | TouchOSC with `touchosc/GLim_desktop.tosc` connects and shows the shader name (the addresses are now `/glim/…`). |
 | Output folder | Plugins built from GLim.app go to `~/Documents/GLim/output`. |
+
+**Checked on the Mac (2026-10-28, M1 Max, macOS 14.8):** every row passed, with no code changes. The corpus gives `sample-shaders` OK=99 of 99 (ISF OK=99), `original-shaders` OK=30 of 30, and the fixtures OK=6, STATIC=6. `GLim.app` has bundle ID `com.busysquirrel.glim`, passes `codesign --verify --deep --strict`, and its self-test writes `GLim 0.9.0-beta.2`, builds `shapeForge.bundle` (`com.busysquirrel.glim.plugin.shapeForge.ROQT`) and reports Syphon, NDI and OSC `ok`. A rebuilt plugin replaced the old FFStudio bundle under a saved Resolume set and kept its parameters. The Mac zip `GLim-0.9.0-beta.2-mac.zip` (30 MB, made with `ditto`) unpacked elsewhere passes the same signature check and self-test. The rename is finished on both machines, so `RENAME_TO_GLIM.md` has been deleted.
 
 ## If something fails
 

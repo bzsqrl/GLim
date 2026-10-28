@@ -75,7 +75,7 @@ Location: `output/test_batch_v3/` (rebuild with `venv/bin/python -m glim --to bo
 
 # Test batch v4: smooth sliders and `#define` channels
 
-Location: `output/test_batch_v4/`. Rebuild it with the command in [MAC_UPDATE.md](MAC_UPDATE.md), step 4. It has 4 FFGL plugins and the matching ISF files. Windows: all four pass GLim's test host. macOS: all four pass the test host, and the user confirmed them in Resolume and MadMapper (2026-10-21). Resolume finds plugins in a saved set by their FFGL plugin ID, not their bundle ID: a set still loads a rebuilt plugin after its bundle ID changed (checked on macOS, 2026-10-23).
+Location: `output/test_batch_v4/`. Rebuild it with the command in [MAC_UPDATE.md](MAC_UPDATE.md), step 4. It has 4 FFGL plugins and the matching ISF files. Windows: all four pass GLim's test host. macOS: all four pass the test host, and the user confirmed them in Resolume and MadMapper (2026-10-21). Resolume finds plugins in a saved set by their FFGL plugin ID, not their bundle ID: a set still loads a rebuilt plugin after its bundle ID changed (checked on macOS, 2026-10-23). The same held after the rename to GLim: a plugin rebuilt with the `com.busysquirrel.glim.plugin.…` bundle ID replaced its FFStudio build under a saved set, with its parameters (macOS, 2026-10-28).
 
 | Plugin | What to check |
 | :-- | :-- |
