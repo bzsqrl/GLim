@@ -80,12 +80,13 @@ thead tr:only-child th:empty { display: none; }
 <nav aria-label="Contents">
 <div class="title">GLim</div>
 <div class="version">Version 0.9.0-beta.3</div>
-<ul><li><a href="#whats-in-the-package">What's in the package</a></li><li><a href="#system-requirements">System requirements</a></li><li><a href="#installing-on-windows">Installing on Windows</a></li><li><a href="#installing-on-macos">Installing on macOS</a></li><li><a href="#first-launch">First launch</a></li><li><a href="#updating-and-uninstalling">Updating and uninstalling</a></li><li><a href="#using-glim">Using GLim</a></li><li><a href="#supported-inputs">Supported inputs</a></li><li><a href="#parameters">Parameters</a></li><li><a href="#building-blocks">Building blocks</a></li><li><a href="#remote-control-osc-touchosc">Remote control (OSC, TouchOSC)</a></li><li><a href="#troubleshooting">Troubleshooting</a></li><li><a href="#reporting-problems">Reporting problems</a></li><li><a href="#running-from-source-developers">Running from source (developers)</a></li><li><a href="#ndi">NDI</a></li><li><a href="#shader-licensing">Shader licensing</a></li><li><a href="#privacy">Privacy</a></li></ul>
+<ul><li><a href="#whats-in-the-package">What's in the package</a></li><li><a href="#system-requirements">System requirements</a></li><li><a href="#installing-on-windows">Installing on Windows</a></li><li><a href="#installing-on-macos">Installing on macOS</a></li><li><a href="#first-launch">First launch</a></li><li><a href="#updating-and-uninstalling">Updating and uninstalling</a></li><li><a href="#shaders-from-other-people">Shaders from other people</a></li><li><a href="#using-glim">Using GLim</a></li><li><a href="#supported-inputs">Supported inputs</a></li><li><a href="#parameters">Parameters</a></li><li><a href="#building-blocks">Building blocks</a></li><li><a href="#remote-control-osc-touchosc">Remote control (OSC, TouchOSC)</a></li><li><a href="#troubleshooting">Troubleshooting</a></li><li><a href="#reporting-problems">Reporting problems</a></li><li><a href="#running-from-source-developers">Running from source (developers)</a></li><li><a href="#ndi">NDI</a></li><li><a href="#privacy">Privacy</a></li></ul>
 </nav>
 <main>
 <h1>GLim User Manual</h1>
 <p class="subtitle">For GLim 0.9.0-beta.3</p>
-<p><strong>GLim</strong> plays GLSL shaders live and turns them into plugins for your VJ software. It takes ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.</p>
+<p><strong>GLim</strong> plays GLSL shaders live and turns them into plugins for your VJ software. It reads fragment shaders written in the ISF, Shadertoy and GLSL Sandbox formats, and plain GLSL.</p>
+<p>GLim comes with 18 shaders you can use however you like. Shaders written by other people keep their authors' licences, including in the plugins and ISF files you make from them: see <em>Shaders from other people</em> before you use one.</p>
 <p><strong>Play shaders live</strong></p>
 <ul>
 <li><strong>Playlists:</strong> drop a folder of shaders on the <strong>Queue</strong> tab, then step through them with <strong>←</strong> / <strong>→</strong>, or click <strong>Auto</strong> to play them as a slideshow that changes every few seconds and loops.</li>
@@ -209,6 +210,22 @@ thead tr:only-child th:empty { display: none; }
 <li>the <code>.glim.json</code> settings files next to your shaders.</li>
 </ul>
 <p>The Build Tools, Command Line Tools and CMake are uninstalled separately, if you installed them for GLim.</p>
+<h2 id="shaders-from-other-people">Shaders from other people</h2>
+<p>Shaders you find online belong to the people who wrote them. GLim converts the code but doesn't change who owns it: a shader's licence also covers the plugins and ISF files you make from it, and performing with them.</p>
+<p>Before you use someone else's shader in a show, or share what you build from it:</p>
+<ul>
+<li><strong>Find its licence.</strong> It's usually in a comment at the top of the code, or on the page you got the shader from.<ul>
+<li>Code on Shadertoy is under <strong>CC BY-NC-SA 3.0</strong> unless its author says otherwise.</li>
+<li>ISF and GLSL Sandbox shaders vary.</li>
+<li>Code with no licence at all isn't free to reuse: ask its author.</li>
+</ul>
+</li>
+<li><strong>Respect non-commercial terms.</strong> Many shaders may not be used commercially, and commercial use can include paid gigs and commissioned visuals. If you're not sure, ask the author.</li>
+<li><strong>Respect share-alike terms.</strong> If you share something made from a share-alike shader, share it under the same licence.</li>
+<li><strong>Keep the credit.</strong> Leave the author's name and link in the code. GLim keeps the code's comments, so a credit at the top stays with your plugin and ISF file. An ISF shader's <code>CREDIT</code> (and the author and link from a Shadertoy JSON export) also becomes the plugin's About text and the exported ISF file's <code>CREDIT</code>. For other shaders, the exported ISF file says <em>Converted with GLim</em>: put the author's name there before you share it.</li>
+</ul>
+<p>What you make with GLim is yours, apart from what belongs to the shader's author. The shaders that come with GLim are public domain (CC0), so the plugins and ISF files you make from them are free to use and share.</p>
+<p>Plugins that GLim builds also contain code from the FFGL SDK (and on Windows, GLEW). Their licences, in <code>THIRD_PARTY_NOTICES.txt</code>, ask that their notices go with any plugins you share.</p>
 <hr />
 <h2 id="using-glim">Using GLim</h2>
 <p>Whenever GLim writes files (<strong>Build FFGL</strong>, <strong>Export ISF</strong>, or saving shader code), it asks where. Each dialog opens in the folder you chose last time for that kind of file (plugins, ISF files or shader code), also after you restart GLim, and the Queue and Studio tabs share these folders.</p>
@@ -667,15 +684,6 @@ void mainImage(...) { ... }
 <hr />
 <h2 id="ndi">NDI</h2>
 <p>NDI® is a registered trademark of Vizrt NDI AB. GLim uses the NDI® SDK (through the cyndilib library) to send video; it isn't made or endorsed by Vizrt NDI AB. NDI runtime: Copyright © 2023–2026 Vizrt NDI AB, all rights reserved; its licence notices ship with GLim (<code>cyndilib/wrapper/bin/*licenses*.txt</code>), and the terms NDI asks users to agree to are at the top of <code>THIRD_PARTY_NOTICES.txt</code>. More about NDI: <a href="https://ndi.video/" target="_blank" rel="noopener">ndi.video</a>.</p>
-<h2 id="shader-licensing">Shader licensing</h2>
-<p>Shaders are the creative property of their authors.</p>
-<ul>
-<li>Shadertoy code defaults to <strong>CC BY-NC-SA 3.0</strong> unless the code says otherwise.</li>
-<li>ISF and GLSL Sandbox shaders vary.</li>
-</ul>
-<p>Keep credits, and respect non-commercial and share-alike terms.</p>
-<p>What you make with GLim is yours, but a shader's licence also applies to the plugins and ISF files made from it. The shaders that come with GLim are public domain (CC0), so the plugins and ISF files you make from them are free to use and share.</p>
-<p>Plugins that GLim builds contain code from the FFGL SDK (and on Windows, GLEW). Their licences, in <code>THIRD_PARTY_NOTICES.txt</code>, ask that their notices go with any plugins you share.</p>
 <h2 id="privacy">Privacy</h2>
 <p>GLim doesn't collect any data and doesn't connect to the internet. It uses your local network only for NDI output and for remote control (OSC on UDP port 8000).</p>
 </main>

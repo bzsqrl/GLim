@@ -1,6 +1,8 @@
 # GLim User Manual
 
-**GLim** plays GLSL shaders live and turns them into plugins for your VJ software. It takes ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.
+**GLim** plays GLSL shaders live and turns them into plugins for your VJ software. It reads fragment shaders written in the ISF, Shadertoy and GLSL Sandbox formats, and plain GLSL.
+
+GLim comes with 18 shaders you can use however you like. Shaders written by other people keep their authors' licences, including in the plugins and ISF files you make from them: see *Shaders from other people* before you use one.
 
 **Play shaders live**
 
@@ -105,6 +107,24 @@ GLim saves each shader's settings (slider values, ranges, names) in a `<shader>.
 - the `.glim.json` settings files next to your shaders.
 
 The Build Tools, Command Line Tools and CMake are uninstalled separately, if you installed them for GLim.
+
+## Shaders from other people
+
+Shaders you find online belong to the people who wrote them. GLim converts the code but doesn't change who owns it: a shader's licence also covers the plugins and ISF files you make from it, and performing with them.
+
+Before you use someone else's shader in a show, or share what you build from it:
+
+- **Find its licence.** It's usually in a comment at the top of the code, or on the page you got the shader from.
+  - Code on Shadertoy is under **CC BY-NC-SA 3.0** unless its author says otherwise.
+  - ISF and GLSL Sandbox shaders vary.
+  - Code with no licence at all isn't free to reuse: ask its author.
+- **Respect non-commercial terms.** Many shaders may not be used commercially, and commercial use can include paid gigs and commissioned visuals. If you're not sure, ask the author.
+- **Respect share-alike terms.** If you share something made from a share-alike shader, share it under the same licence.
+- **Keep the credit.** Leave the author's name and link in the code. GLim keeps the code's comments, so a credit at the top stays with your plugin and ISF file. An ISF shader's `CREDIT` (and the author and link from a Shadertoy JSON export) also becomes the plugin's About text and the exported ISF file's `CREDIT`. For other shaders, the exported ISF file says *Converted with GLim*: put the author's name there before you share it.
+
+What you make with GLim is yours, apart from what belongs to the shader's author. The shaders that come with GLim are public domain (CC0), so the plugins and ISF files you make from them are free to use and share.
+
+Plugins that GLim builds also contain code from the FFGL SDK (and on Windows, GLEW). Their licences, in `THIRD_PARTY_NOTICES.txt`, ask that their notices go with any plugins you share.
 
 ---
 
@@ -423,18 +443,6 @@ The command line runs from source only, not from GLim.exe or GLim.app.
 ## NDI
 
 NDI® is a registered trademark of Vizrt NDI AB. GLim uses the NDI® SDK (through the cyndilib library) to send video; it isn't made or endorsed by Vizrt NDI AB. NDI runtime: Copyright © 2023–2026 Vizrt NDI AB, all rights reserved; its licence notices ship with GLim (`cyndilib/wrapper/bin/*licenses*.txt`), and the terms NDI asks users to agree to are at the top of `THIRD_PARTY_NOTICES.txt`. More about NDI: [ndi.video](https://ndi.video/).
-
-## Shader licensing
-
-Shaders are the creative property of their authors.
-- Shadertoy code defaults to **CC BY-NC-SA 3.0** unless the code says otherwise.
-- ISF and GLSL Sandbox shaders vary.
-
-Keep credits, and respect non-commercial and share-alike terms.
-
-What you make with GLim is yours, but a shader's licence also applies to the plugins and ISF files made from it. The shaders that come with GLim are public domain (CC0), so the plugins and ISF files you make from them are free to use and share.
-
-Plugins that GLim builds contain code from the FFGL SDK (and on Windows, GLEW). Their licences, in `THIRD_PARTY_NOTICES.txt`, ask that their notices go with any plugins you share.
 
 ## Privacy
 
