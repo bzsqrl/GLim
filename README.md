@@ -4,6 +4,8 @@ GLim turns GLSL shaders (ISF, Shadertoy, GLSL Sandbox) into **FFGL 2 plugins** f
 
 **Download:** the Windows and macOS (Apple Silicon) builds are on the [Releases](https://github.com/bzsqrl/GLim/releases) page. Each zip includes the user manual, 18 shaders to start with and the TouchOSC layouts. [USER_MANUAL.md](USER_MANUAL.md) covers installing and using GLim.
 
+**Made with AI.** GLim was built with AI coding tools, Claude Code (by Anthropic) and Google Antigravity. Most of its code, the shaders that come with it and its documentation were written by AI, directed by a person who decided what GLim should do and tested each version on Windows and macOS, in Resolume and MadMapper.
+
 The rest of this page is about running GLim from source.
 
 ## Running from source
