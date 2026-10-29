@@ -371,7 +371,7 @@ Email problems, questions and suggestions to **[bzsqrl@gmail.com](mailto:bzsqrl@
 When something goes wrong, please send:
 
 - **What you did, what happened, and what you expected.**
-- **GLim's version:** it's in the title bar and the log's first line (e.g. `GLim 0.9.0-beta.2`).
+- **GLim's version:** it's in the title bar and the log's first line (e.g. `GLim 0.9.0-beta.3`).
 - **Your computer:** Windows or macOS version, and the `GPU: …` line from the log.
 - **The log:** click in it, press **Ctrl+A** then **Ctrl+C** (⌘A, ⌘C on macOS), and paste it into your message.
 - **The shader**, if it's about one: the shader file and its `.glim.json`, if it has one.

@@ -8,7 +8,7 @@ from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, co
 
 MAC = sys.platform == 'darwin'
 
-# glim/__init__.py's version, e.g. 0.9.0-beta.2; its numeric part for the
+# glim/__init__.py's version, e.g. 0.9.0-beta.3; its numeric part for the
 # exe's version resource and the Mac bundle.
 with open(os.path.join('glim', '__init__.py'), encoding='utf-8') as f:
     VERSION = re.search(r'__version__ = "([^"]+)"', f.read()).group(1)
