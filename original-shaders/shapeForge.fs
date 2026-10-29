@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Building block: one geometric shape (polygon, star or circle) drawn as outline, fill and glow, repeated in concentric copies that spin, twist and pulse",
-  "CREDIT": "GLim original",
+  "CREDIT": "GLim - License: CC0",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Building Block"],
   "INPUTS": [

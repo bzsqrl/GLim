@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Ink dropped into moving water: wandering emitters release colour that is carried, stretched and marbled by a swirling flow field",
-  "CREDIT": "GLim original",
+  "CREDIT": "GLim - License: CC0",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

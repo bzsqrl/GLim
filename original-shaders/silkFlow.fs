@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Silky ribbons of colour: the plane is pushed through layered rotating sine currents, with a sheen that slides across the folds",
-  "CREDIT": "GLim original",
+  "CREDIT": "GLim - License: CC0",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

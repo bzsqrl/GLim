@@ -2,7 +2,7 @@
 
 Examples:
   python -m glim tests/corpus/vv_brokenLCD.fs --to ffgl
-  python -m glim sample-shaders --to both --out output/batch --test
+  python -m glim original-shaders --to both --out output/batch --test
 """
 import argparse
 import os

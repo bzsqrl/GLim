@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Building block: a grid of dots, squares, crosses, rings or diamonds whose size, spin and colour ride a travelling wave",
-  "CREDIT": "GLim original",
+  "CREDIT": "GLim - License: CC0",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Building Block"],
   "INPUTS": [

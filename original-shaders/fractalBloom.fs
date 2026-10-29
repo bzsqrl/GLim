@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "An inversion fractal whose constant wanders on a slow orbit, so filigree flowers grow, dissolve and regrow",
-  "CREDIT": "GLim original",
+  "CREDIT": "GLim - License: CC0",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [
