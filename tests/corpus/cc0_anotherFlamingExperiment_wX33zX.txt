@@ -1,3 +1,6 @@
+// https://www.shadertoy.com/view/wX33zX
+// Author: mrange
+
 // CC0: Another flaming experiment
 //  Doesn't look like real flames but I think it looks neat anyway
 

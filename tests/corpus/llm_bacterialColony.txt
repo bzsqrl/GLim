@@ -1,3 +1,5 @@
+// GLim test shader - License: CC0
+
 const float speed = 1.0;
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord ) {

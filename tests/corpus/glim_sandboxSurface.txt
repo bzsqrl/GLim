@@ -1,0 +1,24 @@
+// GLim test shader - License: CC0
+// GLSL Sandbox style with the pan/zoom surface: varying surfacePosition and
+// uniform surfaceSize, highp precision.
+#ifdef GL_ES
+precision highp float;
+#endif
+
+uniform float time;
+uniform vec2 resolution;
+uniform vec2 surfaceSize;
+varying vec2 surfacePosition;
+
+void main(void) {
+    vec2 p = surfacePosition * 3.0;
+    float edge = 1.5 / resolution.y * surfaceSize.y * 3.0;
+    vec2 cell = floor(p);
+    vec2 f = fract(p) - 0.5;
+    float phase = time * 0.8 + dot(cell, vec2(0.7, 1.3));
+    float rad = 0.25 + 0.15 * sin(phase);
+    float d = abs(length(f) - rad);
+    float ring = 1.0 - smoothstep(0.0, 0.03 + edge, d);
+    vec3 col = 0.5 + 0.5 * cos(vec3(0.0, 2.1, 4.2) + phase);
+    gl_FragColor = vec4(col * ring, 1.0);
+}

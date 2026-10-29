@@ -41,7 +41,7 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     files = sorted(f for f in glob.glob(os.path.join(args.dir, "*"))
                    if os.path.isfile(f) and args.filter in os.path.basename(f)
-                   and not f.endswith(".vs"))
+                   and not f.endswith((".vs", ".md")))
     print("GPU:", V.context().renderer)
     rows = []
     t0 = time.time()

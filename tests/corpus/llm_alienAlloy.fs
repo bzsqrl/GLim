@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Iridescent metallic surface",
-  "CREDIT": "Antigravity",
+  "CREDIT": "GLim - License: CC0",
   "ISFVSN": "2.0",
   "CATEGORIES": [
     "Generator",

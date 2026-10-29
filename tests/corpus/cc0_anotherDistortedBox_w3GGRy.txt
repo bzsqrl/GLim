@@ -1,3 +1,6 @@
+// https://www.shadertoy.com/view/w3GGRy
+// Author: mrange
+
 // CC0: Another distorted box
 //  A quick hack
 
