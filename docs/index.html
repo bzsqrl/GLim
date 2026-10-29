@@ -49,13 +49,18 @@
     border-bottom: 1px solid var(--line);
   }
   header.top .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
-  .brand { display: flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 700; font-size: 19px; }
+  .brand { flex-shrink: 0; display: flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 700; font-size: 19px; }
   .brand:hover { text-decoration: none; }
   .brand img { width: 30px; height: 30px; border-radius: 7px; }
-  nav { margin-left: auto; display: flex; gap: 22px; font-size: 15px; }
+  nav { margin-left: auto; display: flex; align-items: center; gap: 22px; font-size: 15px; }
   nav a { color: var(--dim); }
   nav a:hover { color: var(--fg); text-decoration: none; }
+  nav a.ai-badge { display: block; flex-shrink: 0; margin-left: 2px; transition: transform 0.2s ease; }
+  nav a.ai-badge:hover { transform: scale(1.08); }
+  nav a.ai-badge img { width: 39px; height: 44px; max-width: none; }
+  @media (max-width: 420px) { nav { gap: 16px; } nav a.ai-badge img { width: 32px; height: 36px; } }
   @media (max-width: 640px) { nav a.opt { display: none; } }
+  @media (max-width: 440px) { nav a.opt-sm { display: none; } }
 
   /* Hero */
   .hero { padding: 72px 0 56px; }
@@ -153,9 +158,10 @@
     <nav>
       <a class="opt" href="#features">Features</a>
       <a class="opt" href="#shaders">Shaders</a>
-      <a href="#download">Download</a>
+      <a class="opt-sm" href="#download">Download</a>
       <a href="USER_MANUAL.html">Manual</a>
       <a href="https://github.com/bzsqrl/GLim">GitHub</a>
+      <a class="ai-badge" href="https://aibadge.org/" target="_blank" rel="noopener" title="Made with AI (aibadge.org)"><img src="img/made-with-ai.png" alt="Made with AI" width="39" height="44"></a>
     </nav>
   </div>
 </header>
