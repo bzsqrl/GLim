@@ -1,3 +1,6 @@
+// https://www.shadertoy.com/view/tljyRG
+// Author: mrange
+
 // License CC0: Overlapping hextiles
 //  There are many examples on Shadertoy of overlapping rectangular tiling. 
 //  Thought ST could need (another?) an example of how to do overlapping hex tiles.

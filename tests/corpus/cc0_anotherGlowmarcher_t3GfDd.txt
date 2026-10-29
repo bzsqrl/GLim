@@ -1,3 +1,6 @@
+// https://www.shadertoy.com/view/t3GfDd
+// Author: mrange
+
 // CC0: Another day, another glowmarcher
 
 // Twigl link: https://twigl.app?ol=true&ss=-OmZSyy0GfTTuMjy66sJ

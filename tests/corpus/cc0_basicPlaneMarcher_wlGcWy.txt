@@ -1,0 +1,210 @@
+// https://www.shadertoy.com/view/wlGcWy
+// Author: mrange
+
+// Licence CC0: Simple plane marcher
+//  I had fun messing around with "plane marching"
+//  While not right to produce photo-realistic shaders you 
+//  create some pretty interesting effects with them
+//  Thought others might appreciate a basic "plane marcher"
+//  to play around with
+
+// -----------------------------------------------------------------------------
+// COMMON
+// -----------------------------------------------------------------------------
+
+#define PI              3.141592654
+#define TAU             (2.0*PI)
+#define TIME            iTime
+#define RESOLUTION      iResolution
+#define ROT(a)          mat2(cos(a), sin(a), -sin(a), cos(a))
+
+const vec3 std_gamma        = vec3(2.2, 2.2, 2.2);
+
+float hash(float co) {
+  return fract(sin(co*12.9898) * 13758.5453);
+}
+
+vec4 alphaBlend(vec4 back, vec4 front) {
+  float w = front.w + back.w*(1.0-front.w);
+  vec3 xyz = (front.xyz*front.w + back.xyz*back.w*(1.0-front.w))/w;
+  return w > 0.0 ? vec4(xyz, w) : vec4(0.0);
+}
+
+vec3 alphaBlend(vec3 back, vec4 front) {
+  return mix(back, front.xyz, front.w);
+}
+
+float tanh_approx(float x) {
+//  return tanh(x);
+  float x2 = x*x;
+  return clamp(x*(27.0 + x2)/(27.0+9.0*x2), -1.0, 1.0);
+}
+
+vec2 mod2_1(inout vec2 p) {
+  vec2 c = floor(p + 0.5);
+  p = fract(p + 0.5) - 0.5;
+  return c;
+}
+
+float hex(vec2 p, float r) {
+  const vec3 k = vec3(-sqrt(3.0)/2.0,1.0/2.0,sqrt(3.0)/3.0);
+  p = p.yx;
+  p = abs(p);
+  p -= 2.0*min(dot(k.xy,p),0.0)*k.xy;
+  p -= vec2(clamp(p.x, -k.z*r, k.z*r), r);
+  return length(p)*sign(p.y);
+}
+
+float circle(vec2 p, float r) {
+  return length(p) - r;
+}
+
+// -----------------------------------------------------------------------------
+// PATH
+// -----------------------------------------------------------------------------
+
+// The path function
+vec3 offset(float z) {
+  float a = z;
+  vec2 p = -0.075*(vec2(cos(a), sin(a*sqrt(2.0))) + vec2(cos(a*sqrt(0.75)), sin(a*sqrt(0.5))));
+  return vec3(p, z);
+}
+
+// The derivate of the path function
+//  Used to generate where we are looking
+vec3 doffset(float z) {
+  float eps = 0.1;
+  return 0.5*(offset(z + eps) - offset(z - eps))/eps;
+}
+
+// The second derivate of the path function
+//  Used to generate tilt
+vec3 ddoffset(float z) {
+  float eps = 0.1;
+  return 0.125*(doffset(z + eps) - doffset(z - eps))/eps;
+}
+
+// -----------------------------------------------------------------------------
+// PLANE MARCHER
+// -----------------------------------------------------------------------------
+
+// Plane generating function returns rgba
+//  pp is point on plane
+//  off is path at plane z
+//  aa is estimated pixel size at the plane
+//  n is plane number
+vec4 plane(vec3 ro, vec3 rd, vec3 pp, vec3 off, float aa, float n) {
+  float h = hash(n);
+  float s = mix(0.05, 0.25, h);
+
+  vec3 hn;
+  vec2 p = (pp-off*vec3(1.0, 1.0, 0.0)).xy;
+  p *= ROT(TAU*h);
+  const float lw = 0.005;
+  float d = hex(p/s, 0.5)*s;   
+  float dd = abs(d) - lw;
+
+  float a  = smoothstep(-aa, aa, -dd);
+  float ha = smoothstep(-aa, aa, d+lw);
+
+  vec4 col = vec4(mix(vec3(1.0-tanh_approx(15.0*length(p))), vec3(0.0), a), ha);
+
+  return col;
+}
+
+vec3 skyColor(vec3 ro, vec3 rd) {
+  float ld = max(dot(rd, vec3(0.0, 0.0, 1.0)), 0.0);
+  return vec3(tanh_approx(3.0*pow(ld, 100.0)));
+}
+
+vec3 color(vec3 ww, vec3 uu, vec3 vv, vec3 ro, vec2 p) {
+  float lp = length(p);
+  vec2 np = p + 1.0/RESOLUTION.xy;
+  float rdd = (2.0+0.5*tanh_approx(lp));  // Playing around with rdd can give interesting distortions
+  vec3 rd = normalize(p.x*uu + p.y*vv + rdd*ww);
+  vec3 nrd = normalize(np.x*uu + np.y*vv + rdd*ww);
+
+  const float planeDist = 1.0-0.75;
+  const int furthest = 11;
+  const int fadeFrom = max(furthest-6, 0);
+  const float fadeDist = planeDist*float(furthest - fadeFrom);
+  float nz = floor(ro.z / planeDist);
+
+  vec3 skyCol = skyColor(ro, rd);
+
+
+  vec4 acol = vec4(0.0);
+  const float cutOff = 0.95;
+  bool cutOut = false;
+
+  // Steps from nearest to furthest plane and accumulates the color 
+  for (int i = 1; i <= furthest; ++i) {
+    float pz = planeDist*nz + planeDist*float(i);
+
+    float pd = (pz - ro.z)/rd.z;
+
+    if (pd > 0.0 && acol.w < cutOff) {
+      vec3 pp = ro + rd*pd;
+      vec3 npp = ro + nrd*pd;
+
+      float aa = 3.0*length(pp - npp);
+
+      vec3 off = offset(pp.z);
+
+      vec4 pcol = plane(ro, rd, pp, off, aa, nz+float(i));
+
+      float nz = pp.z-ro.z;
+      float fadeIn = exp(-2.5*max((nz - planeDist*float(fadeFrom))/fadeDist, 0.0));
+      float fadeOut = smoothstep(0.0, planeDist*0.1, nz);
+      pcol.xyz = mix(skyCol, pcol.xyz, (fadeIn));
+      pcol.w *= fadeOut;
+      pcol = clamp(pcol, 0.0, 1.0);
+
+      acol = alphaBlend(pcol, acol);
+    } else {
+      cutOut = true;
+      break;
+    }
+
+  }
+
+  vec3 col = alphaBlend(skyCol, acol);
+// To debug cutouts due to transparency  
+//  col += cutOut ? vec3(1.0, -1.0, 0.0) : vec3(0.0);
+  return col;
+}
+
+// Classic post processing
+vec3 postProcess(vec3 col, vec2 q) {
+  col = clamp(col, 0.0, 1.0);
+  col = pow(col, 1.0/std_gamma);
+  col = col*0.6+0.4*col*col*(3.0-2.0*col);
+  col = mix(col, vec3(dot(col, vec3(0.33))), -0.4);
+  col *=0.5+0.5*pow(19.0*q.x*q.y*(1.0-q.x)*(1.0-q.y),0.7);
+  return col;
+}
+
+vec3 effect(vec2 p, vec2 q) {
+  float tm  = TIME*0.4;
+  vec3 ro   = offset(tm);
+  vec3 dro  = doffset(tm);
+  vec3 ddro = ddoffset(tm);
+
+  vec3 ww = normalize(dro);
+  vec3 uu = normalize(cross(normalize(vec3(0.0,1.0,0.0)+ddro), ww));
+  vec3 vv = normalize(cross(ww, uu));
+
+  vec3 col = color(ww, uu, vv, ro, p);
+  col = postProcess(col, q);
+  return col;
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 q = fragCoord/RESOLUTION.xy;
+  vec2 p = -1. + 2. * q;
+  p.x *= RESOLUTION.x/RESOLUTION.y;
+
+  vec3 col = effect(p, q);
+
+  fragColor = vec4(col, 1.0);
+}

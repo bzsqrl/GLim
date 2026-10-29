@@ -36,8 +36,8 @@ import time
 PORT = 8000                 # GLim listens here (TouchOSC: the connection's send port)
 FEEDBACK_PORT = 8001        # and replies here (TouchOSC: the connection's receive port)
 PREFIX = "/glim"
-SLOTS = 24                  # parameter slots in the TouchOSC layouts (enough for 78 of
-                            # the 79 sample shaders)
+SLOTS = 24                  # parameter slots in the TouchOSC layouts (enough for every
+                            # shader in original-shaders)
 TICK_MS = 30                # main thread: handle messages, send what changed
 CLIENT_TIMEOUT_S = 30.0
 ECHO_HOLD_S = 0.3           # don't send an address back to the client that's moving it

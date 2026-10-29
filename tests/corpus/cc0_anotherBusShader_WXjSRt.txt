@@ -1,3 +1,6 @@
+// https://www.shadertoy.com/view/WXjSRt
+// Author: mrange
+
 // CC0: Another bus shader
 //  Crafted while travelling on the bus
 //  Twigl:ed it: https://twigl.app?ol=true&ss=-OP_xRq3FyCOL-mNSi8o

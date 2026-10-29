@@ -1,3 +1,6 @@
+// https://www.shadertoy.com/view/Wc3SDX
+// Author: mrange
+
 // CC0: Another inversion
 //  This I found when looking through my weekend experiments. 
 //  Thought it looks neat in it's simplicity
