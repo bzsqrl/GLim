@@ -1,7 +1,7 @@
 """Command line: python -m glim <files or folders> [options]
 
 Examples:
-  python -m glim tests/corpus/vv_brokenLCD.fs --to ffgl
+  python -m glim tests/corpus/glim_colorMapper.fs --to ffgl
   python -m glim original-shaders --to both --out output/batch --test
 """
 import argparse
