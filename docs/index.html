@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GLim: live GLSL shaders and VJ plugins</title>
+<meta name="description" content="GLim plays GLSL shaders live and turns them into FFGL plugins for Resolume and ISF files for MadMapper. Free and open source, for Windows and macOS.">
+<meta property="og:title" content="GLim">
+<meta property="og:description" content="Play GLSL shaders live and turn them into plugins for your VJ software. Free and open source.">
+<meta property="og:image" content="https://glim.sqrl.biz/img/og.jpg">
+<meta property="og:url" content="https://glim.sqrl.biz/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="img/favicon-64.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #12161c;
+    --panel-2: #171b22;
+    --line: #262d38;
+    --fg: #e8eaf0;
+    --dim: #9aa3b2;
+    --accent: #7b7bf0;
+    --accent-strong: #5b5bd6;
+    --cyan: #3de0f0;
+    --magenta: #f03dd8;
+    --radius: 14px;
+    --max: 1120px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  img { display: block; max-width: 100%; }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 16px; }
+
+  /* Header */
+  header.top {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  header.top .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 700; font-size: 19px; }
+  .brand:hover { text-decoration: none; }
+  .brand img { width: 30px; height: 30px; border-radius: 7px; }
+  nav { margin-left: auto; display: flex; gap: 22px; font-size: 15px; }
+  nav a { color: var(--dim); }
+  nav a:hover { color: var(--fg); text-decoration: none; }
+  @media (max-width: 640px) { nav a.opt { display: none; } }
+
+  /* Hero */
+  .hero { padding: 72px 0 56px; }
+  .hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 48px; align-items: center; }
+  @media (max-width: 900px) { .hero .wrap { grid-template-columns: minmax(0, 1fr); } .hero { padding-top: 40px; } }
+  .hero h1 { font-size: clamp(38px, 6vw, 58px); line-height: 1.05; margin: 0 0 18px; letter-spacing: -0.02em; }
+  .hero h1 .glow {
+    background: linear-gradient(90deg, var(--cyan), #ffffff 45%, var(--magenta));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.lead { font-size: 20px; color: var(--dim); margin: 0 0 28px; max-width: 34em; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 16px;
+    border: 1px solid var(--line); color: var(--fg); background: var(--panel-2);
+  }
+  .btn:hover { text-decoration: none; border-color: #3a4453; }
+  .btn.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+  .btn.primary:hover { background: #6a6ae0; }
+  .btn svg { width: 18px; height: 18px; fill: currentColor; }
+  .small { font-size: 14px; color: var(--dim); margin-top: 16px; }
+
+  .showcase {
+    position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden;
+    border: 1px solid var(--line); background: var(--panel);
+    box-shadow: 0 30px 80px -30px rgba(61, 224, 240, 0.25), 0 30px 80px -40px rgba(240, 61, 216, 0.3);
+  }
+  .showcase img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; animation: cycle 30s infinite both; }
+  .showcase img:first-child { opacity: 1; animation: none; }   /* always underneath; the others fade over it in turn */
+  .showcase img:nth-child(2) { animation-delay: 5s; }
+  .showcase img:nth-child(3) { animation-delay: 10s; }
+  .showcase img:nth-child(4) { animation-delay: 15s; }
+  .showcase img:nth-child(5) { animation-delay: 20s; }
+  .showcase img:nth-child(6) { animation-delay: 25s; }
+  @keyframes cycle { 0% { opacity: 0; } 4% { opacity: 1; } 16.7% { opacity: 1; } 20.7% { opacity: 0; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .showcase img:not(:first-child) { display: none; } }
+
+  /* Sections */
+  section { padding: 64px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: clamp(28px, 4vw, 36px); margin: 0 0 12px; letter-spacing: -0.01em; }
+  .sub { color: var(--dim); margin: 0 0 36px; max-width: 46em; }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+  .card h3 { margin: 0 0 8px; font-size: 18px; }
+  .card p { margin: 0; color: var(--dim); font-size: 15.5px; }
+  .card .icon { width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; margin-bottom: 14px; background: #1e2430; }
+  .card .icon svg { width: 20px; height: 20px; fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .steps { counter-reset: step; display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+  .step { position: relative; padding: 22px 22px 22px 66px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .step::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 20px; top: 20px; width: 32px; height: 32px; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 700; font-size: 15px;
+    background: linear-gradient(135deg, var(--cyan), var(--magenta)); color: #0b0d12;
+  }
+  .step h3 { margin: 0 0 6px; font-size: 17px; }
+  .step p { margin: 0; color: var(--dim); font-size: 15.5px; }
+
+  .hosts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+  .tag { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--dim); font-size: 14px; background: var(--panel); }
+
+  /* Gallery */
+  .gallery { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .shader { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .shader img { aspect-ratio: 16 / 9; width: 100%; object-fit: cover; transition: transform 0.4s ease; }
+  .shader:hover img { transform: scale(1.04); }
+  .shader figcaption { padding: 10px 14px 12px; font-size: 14px; color: var(--dim); }
+  .shader figcaption b { display: block; color: var(--fg); font-size: 15px; font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-weight: 600; margin-bottom: 2px; }
+  .badge { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 6px; background: #1e2430; color: var(--accent); margin-left: 6px; font-family: inherit; vertical-align: 1px; font-weight: 600; }
+
+  /* Download */
+  .downloads { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+  .dl h3 { display: flex; align-items: center; gap: 10px; }
+  .dl h3 svg { width: 22px; height: 22px; fill: var(--fg); }
+  .dl ul { margin: 12px 0 20px; padding-left: 20px; color: var(--dim); font-size: 15.5px; }
+  .note { margin-top: 22px; color: var(--dim); font-size: 15px; }
+
+  footer { border-top: 1px solid var(--line); padding: 36px 0 48px; color: var(--dim); font-size: 14px; }
+  footer .wrap { display: grid; gap: 10px; }
+  footer p { margin: 0; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#"><img src="img/icon-256.png" alt="">GLim</a>
+    <nav>
+      <a class="opt" href="#features">Features</a>
+      <a class="opt" href="#shaders">Shaders</a>
+      <a href="#download">Download</a>
+      <a href="USER_MANUAL.html">Manual</a>
+      <a href="https://github.com/bzsqrl/GLim">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="wrap">
+    <div>
+      <h1>Shaders, <span class="glow">live</span>.<br>Plugins, made.</h1>
+      <p class="lead">GLim plays GLSL shaders live and turns them into plugins for your VJ software: FFGL for Resolume, ISF for MadMapper. Every parameter gets a slider. Free and open source.</p>
+      <div class="buttons">
+        <a class="btn primary" href="#download">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1zM5 19h14a1 1 0 1 1 0 2H5a1 1 0 1 1 0-2z"/></svg>
+          Download
+        </a>
+        <a class="btn" href="USER_MANUAL.html">Read the manual</a>
+      </div>
+      <p class="small">Version 0.9 beta · Windows 10 and 11 · macOS 14+ on Apple Silicon</p>
+    </div>
+    <div class="showcase" aria-label="Shaders that come with GLim">
+      <img src="img/shaders/kaleidoBloom.jpg" alt="kaleidoBloom: a kaleidoscope of glowing rings">
+      <img src="img/shaders/reactionBloom.jpg" alt="reactionBloom: reaction-diffusion coral patterns" loading="lazy">
+      <img src="img/shaders/voronoiGlass.jpg" alt="voronoiGlass: moving stained glass" loading="lazy">
+      <img src="img/shaders/gyroidDrift.jpg" alt="gyroidDrift: contour lines through a gyroid lattice" loading="lazy">
+      <img src="img/shaders/spiralDream.jpg" alt="spiralDream: a spiral tunnel" loading="lazy">
+      <img src="img/shaders/circleWeave.jpg" alt="circleWeave: overlapping circle grids" loading="lazy">
+    </div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Play it, tweak it, take it anywhere</h2>
+    <p class="sub">Drop in a folder of ISF, Shadertoy or GLSL Sandbox shaders. GLim previews them on your graphics card, gives every parameter a control, and sends the result where you need it.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg></div>
+        <h3>Playlists and slideshows</h3>
+        <p>Step through a queue of shaders with the arrow keys, or let Auto play them as a looping slideshow. A queue can drive a whole show.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><circle cx="9" cy="7" r="2.2"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="15" cy="17" r="2.2"/></svg></div>
+        <h3>Live parameters</h3>
+        <p>Every parameter gets a slider, switch or menu that changes the shader as it plays. In GLim and in the plugins, speed sliders change the pace without the motion jumping.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/></svg></div>
+        <h3>Fullscreen and Spout, Syphon, NDI®</h3>
+        <p>Fullscreen on any monitor or projector, or send to Resolume, MadMapper, OBS and TouchDesigner: Spout and Syphon on the same computer, NDI across the network.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></svg></div>
+        <h3>Remote control</h3>
+        <p>Run playback, the slideshow, the outputs and the shader's parameters from a phone or tablet over OSC. TouchOSC layouts for both are included.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg></div>
+        <h3>FFGL plugins for Resolume</h3>
+        <p>Build a shader into an FFGL 2 plugin for Resolume 7.21.3 and later: a .dll on Windows, a universal .bundle on macOS, with your parameters as Resolume controls.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/></svg></div>
+        <h3>ISF files for MadMapper</h3>
+        <p>Export any shader as an ISF 2 file for MadMapper, VDMX, Millumin and other ISF hosts, so a Shadertoy sketch becomes a reusable source or effect.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="sub">No coding needed to use it. If you do write shaders, GLim handles the plumbing between formats.</p>
+    <div class="steps">
+      <div class="step"><h3>Drop shaders on the queue</h3><p>Files or whole folders: ISF (.fs), Shadertoy and GLSL Sandbox code (.txt or .glsl). Multi-pass Shadertoy projects work too.</p></div>
+      <div class="step"><h3>Play and tweak in Studio</h3><p>Preview each shader live, move its sliders, check how hard it works your graphics card, and save your settings with the shader.</p></div>
+      <div class="step"><h3>Build or export</h3><p>Click Build FFGL for a Resolume plugin or Export ISF for MadMapper. GLim checks the result on your GPU first.</p></div>
+    </div>
+    <div class="hosts">
+      <span class="tag">Resolume Arena / Avenue</span>
+      <span class="tag">MadMapper</span>
+      <span class="tag">VDMX</span>
+      <span class="tag">Millumin</span>
+      <span class="tag">OBS</span>
+      <span class="tag">TouchDesigner</span>
+      <span class="tag">TouchOSC</span>
+    </div>
+  </div>
+</section>
+
+<section id="shaders">
+  <div class="wrap">
+    <h2>18 shaders to start with</h2>
+    <p class="sub">GLim comes with 18 shaders written for it: fourteen evolving patterns and four building blocks to layer into your own looks. They're public domain (CC0), so the plugins you build from them are yours to use and share.</p>
+    <div class="gallery">
+      <figure class="shader"><img src="img/shaders/circleWeave.jpg" alt="" loading="lazy"><figcaption><b>circleWeave</b>Three grids of circles weaving flower-of-life moiré.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/feedbackSwirl.jpg" alt="" loading="lazy"><figcaption><b>feedbackSwirl<span class="badge">feedback</span></b>Glowing seeds painting endless zooming trails.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/fractalBloom.jpg" alt="" loading="lazy"><figcaption><b>fractalBloom</b>Filigree fractal flowers that grow and dissolve.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/gyroidDrift.jpg" alt="" loading="lazy"><figcaption><b>gyroidDrift</b>Contour lines sliding through a 3D gyroid lattice.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/hexPulse.jpg" alt="" loading="lazy"><figcaption><b>hexPulse</b>A honeycomb of rings with waves of colour.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/inkMarble.jpg" alt="" loading="lazy"><figcaption><b>inkMarble<span class="badge">feedback</span></b>Ink carried and marbled by a swirling flow.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/kaleidoBloom.jpg" alt="" loading="lazy"><figcaption><b>kaleidoBloom</b>A kaleidoscope of rings opening like a flower.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/lavaOrbs.jpg" alt="" loading="lazy"><figcaption><b>lavaOrbs</b>Gooey orbs with soap-film skins, merging and parting.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/liquidPrism.jpg" alt="" loading="lazy"><figcaption><b>liquidPrism</b>Liquid colour folding into itself, never repeating.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/moireTides.jpg" alt="" loading="lazy"><figcaption><b>moireTides</b>Interfering ripples with a chromatic split.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/reactionBloom.jpg" alt="" loading="lazy"><figcaption><b>reactionBloom<span class="badge">feedback</span></b>Living reaction-diffusion: coral, mazes and cells.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/silkFlow.jpg" alt="" loading="lazy"><figcaption><b>silkFlow</b>Silky ribbons of colour with a sliding sheen.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/spiralDream.jpg" alt="" loading="lazy"><figcaption><b>spiralDream</b>An endless spiral tunnel that re-twists itself.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/voronoiGlass.jpg" alt="" loading="lazy"><figcaption><b>voronoiGlass</b>Stained glass that won't sit still.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/shapeForge.jpg" alt="" loading="lazy"><figcaption><b>shapeForge<span class="badge">building block</span></b>Polygons, stars and circles in concentric copies.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/gridMatrix.jpg" alt="" loading="lazy"><figcaption><b>gridMatrix<span class="badge">building block</span></b>A grid of shapes riding a travelling wave.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/radialBurst.jpg" alt="" loading="lazy"><figcaption><b>radialBurst<span class="badge">building block</span></b>A sunburst of rays that spin and spiral.</figcaption></figure>
+      <figure class="shader"><img src="img/shaders/noiseField.jpg" alt="" loading="lazy"><figcaption><b>noiseField<span class="badge">building block</span></b>Tunable noise, as a texture or a mask.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="wrap">
+    <h2>Download</h2>
+    <p class="sub">GLim is in beta. Each download is a zip with the app, the manual, the 18 shaders and the TouchOSC layouts. There's no installer: unzip it and run.</p>
+    <div class="downloads">
+      <div class="card dl">
+        <h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5l7.5-1v7H3zM11.5 4.4L21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.4z"/></svg>Windows</h3>
+        <ul>
+          <li>64-bit Windows 10 or 11</li>
+          <li>A graphics card with OpenGL 4.1</li>
+          <li>For building plugins: Microsoft's free Build Tools for Visual Studio</li>
+        </ul>
+        <a class="btn primary" href="https://github.com/bzsqrl/GLim/releases">Download for Windows</a>
+      </div>
+      <div class="card dl">
+        <h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.6c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-1.9-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.1 2.5-1.8 3.1-.5 7.6 1.3 10.1.8 1.2 1.8 2.6 3.1 2.5 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.5-1-2.5-4.2zM14 5.2c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg>macOS</h3>
+        <ul>
+          <li>Apple Silicon (M1 or later), macOS 14 Sonoma or later</li>
+          <li>Plugins it builds are universal (Intel too)</li>
+          <li>For building plugins: Xcode Command Line Tools and CMake</li>
+        </ul>
+        <a class="btn primary" href="https://github.com/bzsqrl/GLim/releases">Download for macOS</a>
+      </div>
+    </div>
+    <p class="note">The apps aren't code-signed yet, so Windows and macOS ask you to confirm the first time you open GLim. The <a href="USER_MANUAL.html">manual</a> walks you through it.</p>
+  </div>
+</section>
+
+<section id="open-source">
+  <div class="wrap">
+    <h2>Open source</h2>
+    <p class="sub">GLim is released under the MIT licence. The source, the test suite and the issue tracker are on <a href="https://github.com/bzsqrl/GLim">GitHub</a>. Bug reports, shaders that won't convert and ideas are all welcome.</p>
+    <div class="buttons">
+      <a class="btn" href="https://github.com/bzsqrl/GLim">View on GitHub</a>
+      <a class="btn" href="https://github.com/bzsqrl/GLim/issues">Report a problem</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>© 2026 Busy Squirrel · <a href="https://github.com/bzsqrl/GLim/blob/main/LICENSE.txt">MIT licence</a> · <a href="mailto:bzsqrl@gmail.com">bzsqrl@gmail.com</a></p>
+    <p>NDI® is a registered trademark of Vizrt NDI AB. Resolume, MadMapper, VDMX, Millumin, OBS, TouchDesigner, TouchOSC, Spout and Syphon belong to their respective owners; GLim isn't affiliated with or endorsed by them.</p>
+  </div>
+</footer>
+
+</body>
+</html>
