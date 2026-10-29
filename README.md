@@ -62,6 +62,7 @@ Each shader is converted, compiled and rendered on this computer's GPU (use `ven
 | `touchosc/` | TouchOSC layouts for remote control, made by `tools/build_touchosc.py` |
 | `tools/` | Generators for the TouchOSC layouts, `THIRD_PARTY_NOTICES.txt` (license texts in `tools/licenses/`) and `USER_MANUAL.html` |
 | `assets/icon/` | The app icon; regenerate it with `python assets/icon/make_icon.py` |
+| `assets/social-preview.png` | GitHub's social preview and the website's link preview (`docs/img/og.jpg`), made by `tools/make_social_preview.py` |
 | `tests/` | The test runner, test shaders (`corpus/`) and feature fixtures |
 | `docs/` | The website, [glim.sqrl.biz](https://glim.sqrl.biz), served by GitHub Pages. `python tools/build_manual.py docs` refreshes its copy of the manual, and `python tools/render_stills.py` its shader stills. |
 
