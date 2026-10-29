@@ -26,8 +26,7 @@ All of these keep running as you switch shaders, so a queue of shaders can drive
 | :-- | :-- |
 | `GLim.exe` (Windows) or `GLim.app` (macOS) | The app. There's no installer: it runs from wherever you put it. |
 | `touchosc` | TouchOSC layouts for remote control (see *Remote control* below) |
-| `sample-shaders` | Shaders to try GLim with. They're public domain (CC0), and each one starts with its author and a link to its Shadertoy page. |
-| `original-shaders` | 30 ISF shaders made for GLim, covered by GLim's licence (MIT). Twenty are psychedelic patterns that evolve over time, each with sliders to play with; six of them use feedback buffers and build up over a few seconds (`feedbackSwirl`, `reactionBloom`, `inkMarble`, `cyclicWaves`, `echoKaleido`, `meltEcho`), and `meltEcho` is an effect for your clips. The other ten are building blocks to layer into your own looks (see *Building blocks* below). |
+| `original-shaders` | 18 ISF shaders made for GLim, to try it with. They're public domain (CC0): use them however you like. Fourteen are psychedelic patterns that evolve over time, each with sliders to play with; three of them use feedback buffers and build up over a few seconds (`feedbackSwirl`, `reactionBloom`, `inkMarble`). The other four are building blocks to layer into your own looks (see *Building blocks* below). |
 | `USER_MANUAL.html` | This manual |
 | `LICENSE.txt` | GLim's licence (MIT) |
 | `THIRD_PARTY_NOTICES.txt` | The terms for the NDI software inside GLim, and the licences of the other software by others inside it |
@@ -50,7 +49,7 @@ All of these keep running as you switch shaders, so a queue of shaders can drive
 
 1. Right-click the zip, choose **Extract All…**, and extract it to a folder you can write to, such as Documents or the Desktop.
    - Don't start GLim.exe from inside the zip: Windows would run it from a temporary folder, and the plugins it builds would be lost.
-   - Don't put it in `Program Files`: GLim saves each shader's settings next to the shader, including the sample shaders that come with it.
+   - Don't put it in `Program Files`: GLim saves each shader's settings next to the shader, including the shaders that come with it.
 2. Double-click **GLim.exe**. It isn't code-signed yet, so Windows may say *Windows protected your PC*: click **More info**, then **Run anyway**. Windows asks only once. Some antivirus apps also scan it the first time, which can take a while.
 3. GLim takes a few seconds to start (it unpacks itself each time).
 4. Windows Firewall asks whether GLim may use the network. Allow it on **private networks**: remote control and NDI need it. Everything else works without it.
@@ -84,9 +83,9 @@ Without CMake, **Build FFGL** says what's missing.
 
 GLim opens with two tabs, **Queue** and **Studio**, and the **Log** at the bottom, which reports everything GLim does. Its first lines include GLim's version, the graphics card GLim uses (`GPU: …`) and the address for remote control (`OSC remote control: …`). If it says *GPU validation unavailable* instead, see *Troubleshooting*.
 
-A first tour, with the sample shaders:
+A first tour, with the shaders that come with GLim:
 
-1. Drag the `sample-shaders` folder onto the **Queue** tab (or click **📁** and choose it). Each shader becomes a row in the queue.
+1. Drag the `original-shaders` folder onto the **Queue** tab (or click **📁** and choose it). Each shader becomes a row in the queue.
 2. Press **Shift+Tab** (or click **Studio**). The first shader in the queue plays in the preview, with a slider, switch or menu for each of its parameters.
 3. Press **→** and **←** to step through the queue, or click **Auto** to play it as a slideshow. Move a slider to change the shader as it plays.
 4. Click **⧉** to open an output window. Drag it to a second monitor and double-click it to make it fullscreen; **Esc** brings it back.
@@ -284,29 +283,18 @@ Shadertoy and GLSL Sandbox ignore output alpha, so GLim makes those plugins opaq
 
 ## Building blocks
 
-Ten of the shaders in `original-shaders` are simple pieces to combine into your own looks, for example rays from `radialBurst`, coloured by `colorMapper`, mirrored by `kaleidoMirror` and smeared by `feedbackTrails`. Build them as plugins and stack them as layers and effects in Resolume.
+Four of the shaders in `original-shaders` are simple pieces to combine into your own looks, for example a `shapeForge` star over spiralling rays from `radialBurst`, masked by `noiseField`. Build them as plugins and stack them as layers in Resolume.
 
-**Sources** draw one element. Each has a **Transparent** switch: on, the background is see-through (alpha), so the layer sits over the ones below without a blend mode.
+Each draws one element and has a **Transparent** switch: on, the background is see-through (alpha), so the layer sits over the ones below without a blend mode.
 
 | Shader | What it draws | Main controls |
 | :-- | :-- | :-- |
 | `shapeForge` | A polygon, star or circle, as outline, fill and glow, in concentric copies | Sides, Star, Roundness, Copies, Spacing, Spin, Twist, Pulse, Position |
-| `lineScanner` | Scrolling lines, rings or a grid | Mode, Count, Width, Angle, Scroll, Bend, Width Jitter, Flicker |
 | `gridMatrix` | A grid of dots, squares, crosses, rings or diamonds, sized by a travelling wave | Shape, Wave, Columns, Wave Amount / Freq / Speed, Cell Spin, Grid Spin |
 | `radialBurst` | Rays from a point, straight or spiralling | Rays, Width, Spin, Twist, Breathe, Length Jitter, Inner Radius, Position |
 | `noiseField` | Smooth, ridged, turbulent or cellular noise; with **Threshold** it becomes a mask | Type, Scale, Detail, Warp, Drift, Evolve, Contrast, Threshold |
 
-**Effects** change the clip they're applied to and keep its alpha:
-
-| Shader | What it does | Main controls |
-| :-- | :-- | :-- |
-| `kaleidoMirror` | Mirrors the clip left/right, top/bottom, into four, or into a kaleidoscope | Mode, Segments, Spin, Zoom, Source Point, Source Orbit |
-| `tileShift` | Repeats the clip in tiles, or slices it into tiles, with flips, sliding rows, spinning tiles and glitches | Tiles X / Y, Whole Clip per Tile, Mirror Tiles, Row / Column Slide, Tile Spin, Gap, Glitch |
-| `colorMapper` | Recolours by brightness: gradient map, rainbow map, hue rotate or solarize | Mode, Shadows / Midtones / Highlights, Bands, Cycle, Posterize, Amount |
-| `displaceWarp` | Bends the clip with waves, noise, a swirl, ripples or shattered cells | Field, Amount, Scale, Speed, Center, RGB Split |
-| `feedbackTrails` | Video feedback: trails that zoom, turn and drift, blended by lighten, smear or luma key | Blend, Trail, Zoom, Rotate, Drift X / Y, Hue Shift, Clear |
-
-Every moving part has its own rate slider (Spin, Scroll, Pulse Rate …), and in the plugins moving a rate slider changes the speed without the motion jumping. The flicker, glitch and jitter controls change in steps on purpose, for strobing.
+Every moving part has its own rate slider (Spin, Scroll, Pulse Rate …), and in the plugins moving a rate slider changes the speed without the motion jumping. The jitter controls change in steps on purpose, for strobing.
 
 ## Remote control (OSC, TouchOSC)
 
@@ -416,7 +404,7 @@ Send the `selftest.log` from the `selftest` folder (the plugin it builds there c
 ### Running and packaging
 
 - **GUI:** `venv\Scripts\python src\main_gui.py` (macOS: `venv/bin/python src/main_gui.py`). It asks where to write plugins, ISF files and saved code, and remembers the folders in `prefs.json` (`glim/prefs.py`) in `%APPDATA%\GLim` (macOS: `~/Library/Application Support/GLim`). The command line below writes to the project's `output` folder unless you pass `--out`.
-- **Packaged app:** `venv\Scripts\python compile.py` builds `dist\GLim.exe`; on macOS, `venv/bin/python compile.py` builds `dist/GLim.app` (Apple Silicon, signed ad hoc, not notarized). It also copies the rest of the package into `dist`: the `sample-shaders` and `touchosc` folders, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles) and `USER_MANUAL.html` (`tools/build_manual.py`, from this file). The version is `__version__` in `glim/__init__.py`: it's shown in the title bar, the log and `selftest.log`, and stamped on GLim.exe (*Properties → Details*) and GLim.app. Headless check: `GLim.exe --selftest <shader> <dir>` (macOS: `GLim.app/Contents/MacOS/GLim --selftest <shader> <dir>`) writes `selftest.log` into `<dir>`.
+- **Packaged app:** `venv\Scripts\python compile.py` builds `dist\GLim.exe`; on macOS, `venv/bin/python compile.py` builds `dist/GLim.app` (Apple Silicon, signed ad hoc, not notarized). It also copies the rest of the package into `dist`: the `original-shaders` and `touchosc` folders, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles) and `USER_MANUAL.html` (`tools/build_manual.py`, from this file). The version is `__version__` in `glim/__init__.py`: it's shown in the title bar, the log and `selftest.log`, and stamped on GLim.exe (*Properties → Details*) and GLim.app. Headless check: `GLim.exe --selftest <shader> <dir>` (macOS: `GLim.app/Contents/MacOS/GLim --selftest <shader> <dir>`) writes `selftest.log` into `<dir>`.
 - **TouchOSC layouts:** edit `tools/build_touchosc.py` and run `venv\Scripts\python tools\build_touchosc.py`, or edit them in TouchOSC's editor.
 
 ### Command line
@@ -444,7 +432,7 @@ Shaders are the creative property of their authors.
 
 Keep credits, and respect non-commercial and share-alike terms.
 
-What you make with GLim is yours, but a shader's licence also applies to the plugins and ISF files made from it. The sample shaders say who wrote them and where they come from.
+What you make with GLim is yours, but a shader's licence also applies to the plugins and ISF files made from it. The shaders that come with GLim are public domain (CC0), so the plugins and ISF files you make from them are free to use and share.
 
 Plugins that GLim builds contain code from the FFGL SDK (and on Windows, GLEW). Their licences, in `THIRD_PARTY_NOTICES.txt`, ask that their notices go with any plugins you share.
 

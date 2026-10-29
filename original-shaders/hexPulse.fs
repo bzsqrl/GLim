@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "A honeycomb of hexagons with concentric rings inside each cell; waves of colour and pulsing roll across the grid",
-  "CREDIT": "GLim original",
+  "CREDIT": "GLim - License: CC0",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

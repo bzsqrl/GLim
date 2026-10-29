@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Liquid colour that folds into itself: three layers of domain-warped noise drift at different speeds, so the shapes never repeat",
-  "CREDIT": "GLim original",
+  "CREDIT": "GLim - License: CC0",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [

@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Building block: a sunburst of rays that can spin, bend into spirals, breathe and vary in length, from any point on screen",
-  "CREDIT": "GLim original",
+  "CREDIT": "GLim - License: CC0",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Building Block"],
   "INPUTS": [

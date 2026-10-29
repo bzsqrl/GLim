@@ -26,11 +26,11 @@ def seal_mac_app(app):
     subprocess.check_call(["codesign", "--verify", "--deep", "--strict", app])
 
 def package_files(root):
-    """What goes in the zip with the app, written into dist/: the sample shaders,
-    GLim's own shaders, the TouchOSC layouts, the licence, the third-party
-    notices (for what this platform's build bundles) and the user manual as HTML."""
+    """What goes in the zip with the app, written into dist/: GLim's own
+    shaders, the TouchOSC layouts, the licence, the third-party notices (for
+    what this platform's build bundles) and the user manual as HTML."""
     dist = os.path.join(root, "dist")
-    for folder in ("sample-shaders", "original-shaders", "touchosc"):
+    for folder in ("original-shaders", "touchosc"):
         dst = os.path.join(dist, folder)
         if os.path.isdir(dst):
             shutil.rmtree(dst)          # so files removed from the repo go too
@@ -66,7 +66,7 @@ def build():
             print("You can find GLim.app in the 'dist' folder.")
         else:
             print("You can find GLim.exe in the 'dist' folder.")
-        print("The rest of the package (sample and original shaders, TouchOSC layouts, licence, notices, manual) is there too.")
+        print("The rest of the package (original shaders, TouchOSC layouts, licence, notices, manual) is there too.")
     except subprocess.CalledProcessError as e:
         print(f"\nBuild failed with error: {e}")
         sys.exit(1)     # so scripts that run this see the failure

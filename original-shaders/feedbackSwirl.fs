@@ -1,6 +1,6 @@
 /*{
   "DESCRIPTION": "Video-feedback swirl: glowing seeds paint into a buffer that keeps zooming, spinning and shifting hue, leaving trails that never repeat",
-  "CREDIT": "GLim original",
+  "CREDIT": "GLim - License: CC0",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Psychedelic"],
   "INPUTS": [
