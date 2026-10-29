@@ -440,6 +440,12 @@ The command line runs from source only, not from GLim.exe or GLim.app.
 
 ---
 
+## About GLim
+
+GLim is made by [Busy Squirrel](https://sqrl.biz) and released under the MIT license.
+
+**Made with AI.** GLim was built with AI coding tools, Claude Code (by Anthropic) and Google Antigravity. Most of its code, the 18 shaders that come with it and this manual were written by AI, directed by a person who decided what GLim should do and tested each version on Windows and macOS, in Resolume and MadMapper. If something doesn't work as this manual says, please report it (see *Reporting problems*).
+
 ## NDI
 
 NDI® is a registered trademark of Vizrt NDI AB. GLim uses the NDI® SDK (through the cyndilib library) to send video; it isn't made or endorsed by Vizrt NDI AB. NDI runtime: Copyright © 2023–2026 Vizrt NDI AB, all rights reserved; its license notices ship with GLim (`cyndilib/wrapper/bin/*licenses*.txt`), and the terms NDI asks users to agree to are at the top of `THIRD_PARTY_NOTICES.txt`. More about NDI: [ndi.video](https://ndi.video/).
