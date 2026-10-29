@@ -2,7 +2,7 @@
 
 **GLim** plays GLSL shaders live and turns them into plugins for your VJ software. It reads fragment shaders written in the ISF, Shadertoy and GLSL Sandbox formats, and plain GLSL.
 
-GLim comes with 18 shaders you can use however you like. Shaders written by other people keep their authors' licences, including in the plugins and ISF files you make from them: see *Shaders from other people* before you use one.
+GLim comes with 18 shaders you can use however you like. Shaders written by other people keep their authors' licenses, including in the plugins and ISF files you make from them: see *Shaders from other people* before you use one.
 
 **Play shaders live**
 
@@ -30,8 +30,8 @@ All of these keep running as you switch shaders, so a queue of shaders can drive
 | `touchosc` | TouchOSC layouts for remote control (see *Remote control* below) |
 | `original-shaders` | 18 ISF shaders made for GLim, to try it with. They're public domain (CC0): use them however you like. Fourteen are psychedelic patterns that evolve over time, each with sliders to play with; three of them use feedback buffers and build up over a few seconds (`feedbackSwirl`, `reactionBloom`, `inkMarble`). The other four are building blocks to layer into your own looks (see *Building blocks* below). |
 | `USER_MANUAL.html` | This manual |
-| `LICENSE.txt` | GLim's licence (MIT) |
-| `THIRD_PARTY_NOTICES.txt` | The terms for the NDI software inside GLim, and the licences of the other software by others inside it |
+| `LICENSE.txt` | GLim's license (MIT) |
+| `THIRD_PARTY_NOTICES.txt` | The terms for the NDI software inside GLim, and the licenses of the other software by others inside it |
 
 ## System requirements
 
@@ -110,21 +110,21 @@ The Build Tools, Command Line Tools and CMake are uninstalled separately, if you
 
 ## Shaders from other people
 
-Shaders you find online belong to the people who wrote them. GLim converts the code but doesn't change who owns it: a shader's licence also covers the plugins and ISF files you make from it, and performing with them.
+Shaders you find online belong to the people who wrote them. GLim converts the code but doesn't change who owns it: a shader's license also covers the plugins and ISF files you make from it, and performing with them.
 
 Before you use someone else's shader in a show, or share what you build from it:
 
-- **Find its licence.** It's usually in a comment at the top of the code, or on the page you got the shader from.
+- **Find its license.** It's usually in a comment at the top of the code, or on the page you got the shader from.
   - Code on Shadertoy is under **CC BY-NC-SA 3.0** unless its author says otherwise.
   - ISF and GLSL Sandbox shaders vary.
-  - Code with no licence at all isn't free to reuse: ask its author.
+  - Code with no license at all isn't free to reuse: ask its author.
 - **Respect non-commercial terms.** Many shaders may not be used commercially, and commercial use can include paid gigs and commissioned visuals. If you're not sure, ask the author.
-- **Respect share-alike terms.** If you share something made from a share-alike shader, share it under the same licence.
+- **Respect share-alike terms.** If you share something made from a share-alike shader, share it under the same license.
 - **Keep the credit.** Leave the author's name and link in the code. GLim keeps the code's comments, so a credit at the top stays with your plugin and ISF file. An ISF shader's `CREDIT` (and the author and link from a Shadertoy JSON export) also becomes the plugin's About text and the exported ISF file's `CREDIT`. For other shaders, the exported ISF file says *Converted with GLim*: put the author's name there before you share it.
 
 What you make with GLim is yours, apart from what belongs to the shader's author. The shaders that come with GLim are public domain (CC0), so the plugins and ISF files you make from them are free to use and share.
 
-Plugins that GLim builds also contain code from the FFGL SDK (and on Windows, GLEW). Their licences, in `THIRD_PARTY_NOTICES.txt`, ask that their notices go with any plugins you share.
+Plugins that GLim builds also contain code from the FFGL SDK (and on Windows, GLEW). Their licenses, in `THIRD_PARTY_NOTICES.txt`, ask that their notices go with any plugins you share.
 
 ---
 
@@ -424,7 +424,7 @@ Attach the `selftest.log` from the `selftest` folder (the plugin it builds there
 ### Running and packaging
 
 - **GUI:** `venv\Scripts\python src\main_gui.py` (macOS: `venv/bin/python src/main_gui.py`). It asks where to write plugins, ISF files and saved code, and remembers the folders in `prefs.json` (`glim/prefs.py`) in `%APPDATA%\GLim` (macOS: `~/Library/Application Support/GLim`). The command line below writes to the project's `output` folder unless you pass `--out`.
-- **Packaged app:** `venv\Scripts\python compile.py` builds `dist\GLim.exe`; on macOS, `venv/bin/python compile.py` builds `dist/GLim.app` (Apple Silicon, signed ad hoc, not notarized). It also copies the rest of the package into `dist`: the `original-shaders` and `touchosc` folders, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licences of what this platform's build bundles) and `USER_MANUAL.html` (`tools/build_manual.py`, from this file). The version is `__version__` in `glim/__init__.py`: it's shown in the title bar, the log and `selftest.log`, and stamped on GLim.exe (*Properties → Details*) and GLim.app. Headless check: `GLim.exe --selftest <shader> <dir>` (macOS: `GLim.app/Contents/MacOS/GLim --selftest <shader> <dir>`) writes `selftest.log` into `<dir>`.
+- **Packaged app:** `venv\Scripts\python compile.py` builds `dist\GLim.exe`; on macOS, `venv/bin/python compile.py` builds `dist/GLim.app` (Apple Silicon, signed ad hoc, not notarized). It also copies the rest of the package into `dist`: the `original-shaders` and `touchosc` folders, `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt` (`tools/make_notices.py`: the licenses of what this platform's build bundles) and `USER_MANUAL.html` (`tools/build_manual.py`, from this file). The version is `__version__` in `glim/__init__.py`: it's shown in the title bar, the log and `selftest.log`, and stamped on GLim.exe (*Properties → Details*) and GLim.app. Headless check: `GLim.exe --selftest <shader> <dir>` (macOS: `GLim.app/Contents/MacOS/GLim --selftest <shader> <dir>`) writes `selftest.log` into `<dir>`.
 - **TouchOSC layouts:** edit `tools/build_touchosc.py` and run `venv\Scripts\python tools\build_touchosc.py`, or edit them in TouchOSC's editor.
 
 ### Command line
@@ -442,7 +442,7 @@ The command line runs from source only, not from GLim.exe or GLim.app.
 
 ## NDI
 
-NDI® is a registered trademark of Vizrt NDI AB. GLim uses the NDI® SDK (through the cyndilib library) to send video; it isn't made or endorsed by Vizrt NDI AB. NDI runtime: Copyright © 2023–2026 Vizrt NDI AB, all rights reserved; its licence notices ship with GLim (`cyndilib/wrapper/bin/*licenses*.txt`), and the terms NDI asks users to agree to are at the top of `THIRD_PARTY_NOTICES.txt`. More about NDI: [ndi.video](https://ndi.video/).
+NDI® is a registered trademark of Vizrt NDI AB. GLim uses the NDI® SDK (through the cyndilib library) to send video; it isn't made or endorsed by Vizrt NDI AB. NDI runtime: Copyright © 2023–2026 Vizrt NDI AB, all rights reserved; its license notices ship with GLim (`cyndilib/wrapper/bin/*licenses*.txt`), and the terms NDI asks users to agree to are at the top of `THIRD_PARTY_NOTICES.txt`. More about NDI: [ndi.video](https://ndi.video/).
 
 ## Privacy
 

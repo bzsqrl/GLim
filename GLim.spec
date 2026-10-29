@@ -15,7 +15,7 @@ with open(os.path.join('glim', '__init__.py'), encoding='utf-8') as f:
 NUMBERS = tuple(int(n) for n in VERSION.split('-')[0].split('.'))
 
 # NDI output (Windows and macOS): cyndilib bundles the NDI runtime. Only the main
-# library is needed (not its DirectShow / UWP variants), plus the NDI licence
+# library is needed (not its DirectShow / UWP variants), plus the NDI license
 # files, which must ship with it. Its compiled modules import each other, which
 # PyInstaller can't see, hence collect_submodules.
 ndi_binaries = [b for b in collect_dynamic_libs('cyndilib')
@@ -59,7 +59,7 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
-# PyOpenGL's wheel carries GLUT and GLE DLLs (and their licences); GLim
+# PyOpenGL's wheel carries GLUT and GLE DLLs (and their licenses); GLim
 # uses neither (its windows are GLFW's), so leave them out.
 a.binaries = [b for b in a.binaries
               if not os.path.normpath(b[0]).startswith(os.path.join('OpenGL', 'DLLS'))]

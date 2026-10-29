@@ -57,18 +57,18 @@ Each shader is converted, compiled and rendered on this computer's GPU (use `ven
 | `glim/` | Core library: conversion, GLSL and ISF emitters, GPU validation and preview, plugin builder, command line |
 | `src/` | The GUI (`main_gui.py`, `editor_panel.py`) and OSC remote control (`osc_remote.py`) |
 | `templates/ffgl/` | The C++ FFGL plugin runtime, driven by a generated `ShaderData.h` |
-| `boilerplates/ffgl/` | The Resolume FFGL SDK, vendored (BSD licence, see its `LICENSE.md`) |
+| `boilerplates/ffgl/` | The Resolume FFGL SDK, vendored (BSD license, see its `LICENSE.md`) |
 | `original-shaders/` | The shaders that ship with GLim (CC0) |
 | `touchosc/` | TouchOSC layouts for remote control, made by `tools/build_touchosc.py` |
-| `tools/` | Generators for the TouchOSC layouts, `THIRD_PARTY_NOTICES.txt` (licence texts in `tools/licenses/`) and `USER_MANUAL.html` |
+| `tools/` | Generators for the TouchOSC layouts, `THIRD_PARTY_NOTICES.txt` (license texts in `tools/licenses/`) and `USER_MANUAL.html` |
 | `assets/icon/` | The app icon; regenerate it with `python assets/icon/make_icon.py` |
 | `tests/` | The test runner, test shaders (`corpus/`) and feature fixtures |
 | `docs/` | The website, [glim.sqrl.biz](https://glim.sqrl.biz), served by GitHub Pages. `python tools/build_manual.py docs` refreshes its copy of the manual, and `python tools/render_stills.py` its shader stills. |
 
 Drag and drop in the GUI uses `tkdnd`, which comes with the `tkinterdnd2` package. Without it, use the **+** and **📁** buttons.
 
-## Licence
+## License
 
-GLim is released under the [MIT licence](LICENSE.txt). The shaders in `original-shaders/` and the test shaders written for GLim are public domain (CC0). GLim includes the NDI® SDK runtime: its terms are at the top of `THIRD_PARTY_NOTICES.txt`, which `compile.py` writes into `dist/`. NDI® is a registered trademark of Vizrt NDI AB.
+GLim is released under the [MIT license](LICENSE.txt). The shaders in `original-shaders/` and the test shaders written for GLim are public domain (CC0). GLim includes the NDI® SDK runtime: its terms are at the top of `THIRD_PARTY_NOTICES.txt`, which `compile.py` writes into `dist/`. NDI® is a registered trademark of Vizrt NDI AB.
 
 Questions, problems and suggestions: please [open an issue](https://github.com/bzsqrl/GLim/issues).

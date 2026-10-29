@@ -1,6 +1,6 @@
-"""Write THIRD_PARTY_NOTICES.txt: the terms NDI's licence asks users to agree
-to, and the licences of the third-party software that GLim's packaged app
-(GLim.exe or GLim.app) contains, as their licences require when the
+"""Write THIRD_PARTY_NOTICES.txt: the terms NDI's license asks users to agree
+to, and the licenses of the third-party software that GLim's packaged app
+(GLim.exe or GLim.app) contains, as their licenses require when the
 app is distributed.
 
 Usage: venv\\Scripts\\python tools\\make_notices.py [OUT_DIR]   (default: dist)
@@ -8,9 +8,9 @@ compile.py runs it after each build. It covers what this platform's build
 bundles: a package is listed when PyInstaller's record of the last build
 (build/GLim/PYZ-00.toc) contains it, so run it after compile.py.
 
-Licence texts come from the installed packages, from Python's own LICENSE.txt
+License texts come from the installed packages, from Python's own LICENSE.txt
 and Tcl's license.terms, from the repository (FFGL SDK, GLEW) and, for parts
-whose packages don't carry their licence, from tools/licenses (copied from
+whose packages don't carry their license, from tools/licenses (copied from
 each project's repository; the URLs are below)."""
 import fnmatch
 import glob
@@ -66,14 +66,14 @@ SOURCES = {
     "syphon.txt": "https://github.com/Syphon/Syphon-Framework/blob/master/License.txt",
 }
 
-# The terms the NDI SDK licence (paragraph 3d) requires users to agree to when
+# The terms the NDI SDK license (paragraph 3d) requires users to agree to when
 # a product that includes NDI is distributed.
 NDI_TERMS = """\
 NDI
 ---
 
 GLim includes the NDI® runtime, which belongs to Vizrt NDI AB. NDI's
-licence asks everyone who gets it to agree to the following. These terms
+license asks everyone who gets it to agree to the following. These terms
 apply to the NDI software inside GLim only:
 
   - Don't modify the NDI software.
@@ -86,14 +86,14 @@ apply to the NDI software inside GLim only:
   - Follow United States export law: don't export GLim, or any part of
     it, in a way that breaks it.
   - If you use GLim to make your own products that use NDI, follow the
-    NDI SDK licence: keep them fully NDI-compatible, and include these NDI
-    terms in your own licence.
+    NDI SDK license: keep them fully NDI-compatible, and include these NDI
+    terms in your own license.
 
 The NDI runtime is copyright (c) 2023-2026 Vizrt NDI AB. All rights reserved.
 NDI® is a registered trademark of Vizrt NDI AB. GLim isn't made or
 endorsed by Vizrt NDI AB. More about NDI: https://ndi.video/
 
-The NDI SDK licence: https://ndi.link/ndisdk_license""".split("\n")
+The NDI SDK license: https://ndi.link/ndisdk_license""".split("\n")
 
 
 def read(path):
@@ -137,13 +137,13 @@ def texts(files, dist):
             paths = [os.path.join(ROOT, name)]
         paths = [p for p in paths if os.path.isfile(p)]
         if not paths:
-            raise SystemExit(f"make_notices: no licence file for {spec} ({dist or ''})")
+            raise SystemExit(f"make_notices: no license file for {spec} ({dist or ''})")
         out += [t for t in map(read, paths) if t not in out]      # e.g. one file in two places
     return out
 
 
 def python_and_tcl():
-    """Python's licence (on Windows it also covers the OpenSSL, libffi, bzip2,
+    """Python's license (on Windows it also covers the OpenSSL, libffi, bzip2,
     xz, zlib and Tcl/Tk builds that come with it) and Tcl/Tk's."""
     out = []
     for p in (os.path.join(sys.base_prefix, "LICENSE.txt"),
@@ -195,8 +195,8 @@ def main(out_dir):
         f"GLim {__version__}: third-party notices",
         "",
         "GLim's own code is under the MIT License (LICENSE.txt). GLim also",
-        "contains the software by others listed below, each used under the licence",
-        "that follows its name. These notices are included as those licences require.",
+        "contains the software by others listed below, each used under the license",
+        "that follows its name. These notices are included as those licenses require.",
         "",
     ] + NDI_TERMS + [
         "",
