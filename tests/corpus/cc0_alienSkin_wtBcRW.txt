@@ -1,3 +1,6 @@
+// https://www.shadertoy.com/view/wtBcRW
+// Author: mrange
+
 // License CC0: Alien skin
 //  More playing around with warped FBMs
 //  https://iquilezles.org/articles/warp

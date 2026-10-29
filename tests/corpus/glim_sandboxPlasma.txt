@@ -1,0 +1,45 @@
+// GLim test shader - License: CC0
+// GLSL Sandbox style: time / mouse / resolution uniforms, a GL_ES precision block,
+// a struct and a const array.
+#ifdef GL_ES
+precision mediump float;
+#endif
+
+uniform float time;
+uniform vec2 mouse;
+uniform vec2 resolution;
+
+struct Wave {
+    vec2 dir;
+    float freq;
+    float speed;
+};
+
+const vec3 PALETTE[4] = vec3[4](
+    vec3(0.95, 0.30, 0.45),
+    vec3(0.20, 0.75, 0.90),
+    vec3(0.98, 0.85, 0.30),
+    vec3(0.45, 0.25, 0.85)
+);
+
+float wave(Wave w, vec2 p) {
+    return sin(dot(p, w.dir) * w.freq + time * w.speed);
+}
+
+vec3 palette(float t) {
+    t = fract(t) * 4.0;
+    int i = int(floor(t));
+    return mix(PALETTE[i], PALETTE[(i + 1) % 4], smoothstep(0.0, 1.0, fract(t)));
+}
+
+void main(void) {
+    vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+    vec2 m = (mouse - 0.5) * 2.0;
+    Wave w1 = Wave(normalize(vec2(1.0, 0.3)), 3.0, 1.1);
+    Wave w2 = Wave(normalize(vec2(-0.4, 1.0)), 4.5, -0.7);
+    float r = length(p - m);
+    float v = wave(w1, p) + wave(w2, p) + sin(r * 6.0 - time * 1.5);
+    vec3 col = palette(v * 0.25 + time * 0.05);
+    col *= 0.75 + 0.25 * sin(v * 3.0);
+    gl_FragColor = vec4(col, 1.0);
+}
