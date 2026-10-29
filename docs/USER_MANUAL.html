@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GLim User Manual</title>
+<style>
+:root {
+  --bg: #ffffff; --panel: #f4f5f8; --fg: #1d2129; --dim: #5d6675; --line: #dde1e8;
+  --accent: #4b4bc4; --code-bg: #eef0f4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1217; --panel: #171b22; --fg: #e6e9ef; --dim: #8b95a5; --line: #2a313c;
+    --accent: #8f8ff0; --code-bg: #1c2129;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1217; --panel: #171b22; --fg: #e6e9ef; --dim: #8b95a5; --line: #2a313c;
+  --accent: #8f8ff0; --code-bg: #1c2129;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.6 "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont,
+        "Helvetica Neue", Arial, sans-serif;
+}
+.page { display: flex; max-width: 1180px; margin: 0 auto; }
+nav {
+  position: sticky; top: 0; align-self: flex-start; width: 250px; flex: none;
+  max-height: 100vh; overflow-y: auto; padding: 32px 16px 32px 24px; font-size: 14px;
+}
+nav .title { font-weight: 650; font-size: 15px; margin-bottom: 2px; }
+nav .version { color: var(--dim); font-size: 13px; margin-bottom: 16px; }
+nav ul { list-style: none; margin: 0; padding: 0; }
+nav li { margin: 0; }
+nav a { display: block; padding: 3px 8px; border-radius: 6px; color: var(--dim); text-decoration: none; }
+nav a:hover { background: var(--panel); color: var(--fg); }
+main { flex: 1; min-width: 0; padding: 32px 32px 80px; }
+h1 { font-size: 30px; line-height: 1.25; margin: 0 0 4px; }
+.subtitle { color: var(--dim); margin: 0 0 24px; }
+h2 { font-size: 22px; margin: 44px 0 10px; padding-top: 16px; border-top: 1px solid var(--line); }
+h3 { font-size: 18px; margin: 28px 0 8px; }
+h4 { font-size: 16px; margin: 22px 0 6px; }
+h2, h3, h4 { scroll-margin-top: 16px; }
+hr { display: none; }                       /* the sections' own rules separate them */
+a { color: var(--accent); }
+ul, ol { padding-left: 24px; }
+li { margin: 3px 0; }
+li > ul, li > ol { margin: 4px 0; }
+code {
+  font: 0.88em/1.4 "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere;
+}
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+pre code { background: none; padding: 0; overflow-wrap: normal; }
+.table-wrap { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; vertical-align: top; padding: 7px 12px; border-bottom: 1px solid var(--line); }
+th { color: var(--dim); font-weight: 600; }
+thead tr:only-child th:empty { display: none; }
+@media (max-width: 860px) {
+  .page { display: block; }
+  nav { position: static; width: auto; max-height: none; padding: 20px 16px 0; }
+  nav ul { columns: 2; column-gap: 16px; }
+  main { padding: 16px 16px 60px; }
+}
+@media print {
+  nav { display: none; }
+  main { padding: 0; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  a { color: inherit; }
+  h2 { break-after: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+<nav aria-label="Contents">
+<div class="title">GLim</div>
+<div class="version">Version 0.9.0-beta.2</div>
+<ul><li><a href="#whats-in-the-package">What's in the package</a></li><li><a href="#system-requirements">System requirements</a></li><li><a href="#installing-on-windows">Installing on Windows</a></li><li><a href="#installing-on-macos">Installing on macOS</a></li><li><a href="#first-launch">First launch</a></li><li><a href="#updating-and-uninstalling">Updating and uninstalling</a></li><li><a href="#using-glim">Using GLim</a></li><li><a href="#supported-inputs">Supported inputs</a></li><li><a href="#parameters">Parameters</a></li><li><a href="#building-blocks">Building blocks</a></li><li><a href="#remote-control-osc-touchosc">Remote control (OSC, TouchOSC)</a></li><li><a href="#troubleshooting">Troubleshooting</a></li><li><a href="#reporting-problems">Reporting problems</a></li><li><a href="#running-from-source-developers">Running from source (developers)</a></li><li><a href="#ndi">NDI</a></li><li><a href="#shader-licensing">Shader licensing</a></li><li><a href="#privacy">Privacy</a></li></ul>
+</nav>
+<main>
+<h1>GLim User Manual</h1>
+<p class="subtitle">For GLim 0.9.0-beta.2</p>
+<p><strong>GLim</strong> plays GLSL shaders live and turns them into plugins for your VJ software. It takes ISF, Shadertoy, GLSL Sandbox and plain GLSL fragment shaders.</p>
+<p><strong>Play shaders live</strong></p>
+<ul>
+<li><strong>Playlists:</strong> drop a folder of shaders on the <strong>Queue</strong> tab, then step through them with <strong>←</strong> / <strong>→</strong>, or click <strong>Auto</strong> to play them as a slideshow that changes every few seconds and loops.</li>
+<li><strong>Fullscreen and output window:</strong> show the shader fullscreen, or in its own window on a second monitor or a projector, while GLim stays free to use.</li>
+<li><strong>Spout / Syphon:</strong> send it to Resolume, MadMapper, OBS, TouchDesigner and other apps on the same computer, at 1920×1080 and about 60 fps, GPU to GPU (Spout on Windows, Syphon on macOS).</li>
+<li><strong>NDI®:</strong> send it over the network to other computers, at 1080p or 720p and 30 fps.</li>
+<li><strong>TouchOSC remote control:</strong> run playback, the playlist, the slideshow, the outputs and the shader's parameters from a phone or tablet. Layouts for both are included.</li>
+<li><strong>Live parameters:</strong> every parameter gets a slider, switch or menu that changes the shader as it plays; your settings are saved with the shader.</li>
+</ul>
+<p>All of these keep running as you switch shaders, so a queue of shaders can drive a whole show.</p>
+<p><strong>Convert shaders</strong></p>
+<ul>
+<li><strong>FFGL 2 plugins</strong> for Resolume 7.21.3+ and other FFGL hosts (<code>.dll</code> on Windows, universal <code>.bundle</code> on macOS)</li>
+<li><strong>ISF 2 files</strong> (<code>.fs</code>) for MadMapper, VDMX, Millumin and other ISF hosts</li>
+</ul>
+<hr />
+<h2 id="whats-in-the-package">What's in the package</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align: left;">File</th>
+<th style="text-align: left;">What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>GLim.exe</code> (Windows) or <code>GLim.app</code> (macOS)</td>
+<td style="text-align: left;">The app. There's no installer: it runs from wherever you put it.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>touchosc</code></td>
+<td style="text-align: left;">TouchOSC layouts for remote control (see <em>Remote control</em> below)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>original-shaders</code></td>
+<td style="text-align: left;">18 ISF shaders made for GLim, to try it with. They're public domain (CC0): use them however you like. Fourteen are psychedelic patterns that evolve over time, each with sliders to play with; three of them use feedback buffers and build up over a few seconds (<code>feedbackSwirl</code>, <code>reactionBloom</code>, <code>inkMarble</code>). The other four are building blocks to layer into your own looks (see <em>Building blocks</em> below).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>USER_MANUAL.html</code></td>
+<td style="text-align: left;">This manual</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>LICENSE.txt</code></td>
+<td style="text-align: left;">GLim's licence (MIT)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>THIRD_PARTY_NOTICES.txt</code></td>
+<td style="text-align: left;">The terms for the NDI software inside GLim, and the licences of the other software by others inside it</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="system-requirements">System requirements</h2>
+<p><strong>Windows</strong></p>
+<ul>
+<li>64-bit Windows 10 or 11.</li>
+<li>A graphics card with <strong>OpenGL 4.1</strong> or later and its manufacturer's driver (practically any NVIDIA, AMD or Intel graphics from 2012 on). GLim renders every shader on your graphics card, so it doesn't work in a virtual machine or over Remote Desktop.</li>
+<li><em>Only for building FFGL plugins:</em> Microsoft's free Build Tools for Visual Studio (see <em>Installing on Windows</em>). Everything else works without them.</li>
+</ul>
+<p><strong>macOS</strong></p>
+<ul>
+<li>A Mac with <strong>Apple Silicon</strong> (M1 or later). GLim.app doesn't run on Intel Macs.</li>
+<li><strong>macOS 14 Sonoma</strong> or later.</li>
+<li><em>Only for building FFGL plugins:</em> Apple's free Xcode Command Line Tools and CMake (see <em>Installing on macOS</em>).</li>
+</ul>
+<p><strong>For the plugins you make:</strong> Resolume 7.21.3 or later, or another FFGL 2 host. Mac plugins are universal: they also run on Intel Macs (macOS 10.15+).</p>
+<h2 id="installing-on-windows">Installing on Windows</h2>
+<ol>
+<li>Right-click the zip, choose <strong>Extract All…</strong>, and extract it to a folder you can write to, such as Documents or the Desktop.<ul>
+<li>Don't start GLim.exe from inside the zip: Windows would run it from a temporary folder, and the plugins it builds would be lost.</li>
+<li>Don't put it in <code>Program Files</code>: GLim saves each shader's settings next to the shader, including the shaders that come with it.</li>
+</ul>
+</li>
+<li>Double-click <strong>GLim.exe</strong>. It isn't code-signed yet, so Windows may say <em>Windows protected your PC</em>: click <strong>More info</strong>, then <strong>Run anyway</strong>. Windows asks only once. Some antivirus apps also scan it the first time, which can take a while.</li>
+<li>GLim takes a few seconds to start (it unpacks itself each time).</li>
+<li>Windows Firewall asks whether GLim may use the network. Allow it on <strong>private networks</strong>: remote control and NDI need it. Everything else works without it.</li>
+</ol>
+<p><strong>To build FFGL plugins</strong> (optional: the preview, Export ISF, Spout, NDI and remote control work without it):</p>
+<ol>
+<li>Download the free <strong>Build Tools for Visual Studio</strong> from <a href="https://visualstudio.microsoft.com/visual-cpp-build-tools/" target="_blank" rel="noopener">visualstudio.microsoft.com/visual-cpp-build-tools</a> and run it. If you already have Visual Studio 2022 or later, open the Visual Studio Installer and modify your installation instead.</li>
+<li>Tick the <strong>Desktop development with C++</strong> workload and click <strong>Install</strong>. Its default parts are all GLim needs (they include CMake). The download is several GB.</li>
+<li>If GLim was running, restart it.</li>
+</ol>
+<p>Without them, <strong>Build FFGL</strong> says what's missing and where to get it.</p>
+<h2 id="installing-on-macos">Installing on macOS</h2>
+<ol>
+<li>Double-click the zip to unpack it, and drag <strong>GLim.app</strong> to your <strong>Applications</strong> folder (or wherever you like).</li>
+<li>The app isn't notarized by Apple yet, so macOS blocks it the first time. Double-click it, and click <strong>Done</strong> (or <strong>OK</strong>) when macOS says it can't verify it. Then open <strong>System Settings → Privacy &amp; Security</strong>, scroll down to the message about GLim, click <strong>Open Anyway</strong>, and confirm with your password. macOS asks only once.<ul>
+<li>On macOS 14 you can instead right-click the app and choose <strong>Open</strong>.</li>
+<li>Or, in Terminal: <code>xattr -dr com.apple.quarantine /Applications/GLim.app</code></li>
+</ul>
+</li>
+<li>When GLim first uses the network (remote control or NDI), macOS asks whether it may find devices on your local network: click <strong>Allow</strong>.</li>
+<li>When you first build a plugin, macOS may ask once for access to your Documents folder (GLim looks there for Resolume's <em>Extra Effects</em> folder): click <strong>Allow</strong>.</li>
+</ol>
+<p><strong>To build FFGL plugins</strong> (optional: the preview, Export ISF, Syphon, NDI and remote control work without it):</p>
+<ol>
+<li>Install the <strong>Xcode Command Line Tools</strong>: open Terminal, type <code>xcode-select --install</code>, press Return, and click <strong>Install</strong>. The full Xcode app isn't needed (if you have it, this step is already done).</li>
+<li>Install <strong>CMake</strong>: download the macOS <code>.dmg</code> from <a href="https://cmake.org/download/" target="_blank" rel="noopener">cmake.org/download</a> and drag <strong>CMake.app</strong> to Applications. If you use Homebrew, <code>brew install cmake</code> works too.</li>
+<li>If GLim was running, restart it.</li>
+</ol>
+<p>Without CMake, <strong>Build FFGL</strong> says what's missing.</p>
+<h2 id="first-launch">First launch</h2>
+<p>GLim opens with two tabs, <strong>Queue</strong> and <strong>Studio</strong>, and the <strong>Log</strong> at the bottom, which reports everything GLim does. Its first lines include GLim's version, the graphics card GLim uses (<code>GPU: …</code>) and the address for remote control (<code>OSC remote control: …</code>). If it says <em>GPU validation unavailable</em> instead, see <em>Troubleshooting</em>.</p>
+<p>A first tour, with the shaders that come with GLim:</p>
+<ol>
+<li>Drag the <code>original-shaders</code> folder onto the <strong>Queue</strong> tab (or click <strong>📁</strong> and choose it). Each shader becomes a row in the queue.</li>
+<li>Press <strong>Shift+Tab</strong> (or click <strong>Studio</strong>). The first shader in the queue plays in the preview, with a slider, switch or menu for each of its parameters.</li>
+<li>Press <strong>→</strong> and <strong>←</strong> to step through the queue, or click <strong>Auto</strong> to play it as a slideshow. Move a slider to change the shader as it plays.</li>
+<li>Click <strong>⧉</strong> to open an output window. Drag it to a second monitor and double-click it to make it fullscreen; <strong>Esc</strong> brings it back.</li>
+<li>Click <strong>Build FFGL</strong> to make a plugin of the shader that's showing (this needs the build tools above). GLim asks where to put the plugin (<code>.dll</code> on Windows, <code>.bundle</code> on macOS): choose <strong>Documents\Resolume Arena\Extra Effects</strong> (macOS: <code>~/Documents/Resolume Arena/Extra Effects</code>), which Resolume scans by default (more folders can be added in Resolume's <em>Preferences → Video</em>). The first time, the dialog opens there if that folder exists. The first build takes about a minute, because it sets up a build workspace and compiles the FFGL SDK; after that, a plugin takes a couple of seconds.</li>
+<li>Restart Resolume. A shader that makes its own picture appears under <strong>Sources</strong>, one that changes a clip under <strong>Effects</strong>.</li>
+<li><strong>Export ISF</strong> saves the shader as an <code>.fs</code> file for MadMapper, VDMX, Millumin and other ISF hosts.</li>
+</ol>
+<p>GLim saves each shader's settings (slider values, ranges, names) in a <code>&lt;shader&gt;.glim.json</code> file next to the shader, so keep your shaders in a folder you can write to.</p>
+<h2 id="updating-and-uninstalling">Updating and uninstalling</h2>
+<p><strong>To update</strong>, replace GLim.exe (or GLim.app) with the new one. Your shaders' settings stay, since they're next to the shaders. If the TouchOSC layouts changed, copy them to your phone or tablet again: TouchOSC keeps its own copy.</p>
+<p><strong>To uninstall</strong>, delete GLim.exe (or GLim.app). GLim installs nothing else, but it leaves:</p>
+<ul>
+<li>its build workspace: <code>%LOCALAPPDATA%\GLim</code> (macOS: <code>~/Library/Caches/GLim</code>);</li>
+<li>its preferences (the folders you last chose to save into): <code>%APPDATA%\GLim</code> (macOS: <code>~/Library/Application Support/GLim</code>);</li>
+<li>the <code>.glim.json</code> settings files next to your shaders.</li>
+</ul>
+<p>The Build Tools, Command Line Tools and CMake are uninstalled separately, if you installed them for GLim.</p>
+<hr />
+<h2 id="using-glim">Using GLim</h2>
+<p>Whenever GLim writes files (<strong>Build FFGL</strong>, <strong>Export ISF</strong>, or saving shader code), it asks where. Each dialog opens in the folder you chose last time for that kind of file (plugins, ISF files or shader code), also after you restart GLim, and the Queue and Studio tabs share these folders.</p>
+<h3 id="queue-tab">Queue tab</h3>
+<p>The queue is the list of shaders to build, export or play.</p>
+<ol>
+<li>Drop shader files or folders onto the <strong>Queue</strong> (or use <strong>+</strong> to add files and <strong>📁</strong> to add a folder).</li>
+<li>Click <strong>Build FFGL</strong> to make FFGL plugins, or <strong>Export ISF</strong> to make <code>.fs</code> files. Each asks for a folder.</li>
+<li>If you built plugins into a folder Resolume scans (see <em>First launch</em>), restart Resolume. Otherwise, copy them to one first.</li>
+</ol>
+<p>In the queue, select rows with a click (Shift/Ctrl-click for several), or press <strong>Ctrl+A</strong> (⌘A on macOS) to select them all. Ctrl+A works anywhere on the Queue tab; in text fields it keeps its usual meaning.</p>
+<ul>
+<li><strong>With rows selected</strong>, <strong>Reset</strong>, <strong>Analyze</strong>, <strong>Build FFGL</strong> and <strong>Export ISF</strong> act on just those rows, and show how many in brackets, e.g. <strong>Build FFGL (3)</strong>. Selected rows are rebuilt even if they're already done. Click empty space in the list or press <strong>Esc</strong> to deselect; the buttons then work on the whole queue again (Build skips rows that are already done).</li>
+<li><strong>Reset</strong> sets built and failed rows back to Pending, so <strong>Build FFGL</strong> converts them again (for example after changing settings) without reloading the files. <strong>Clear Completed</strong> removes the built rows; <strong>Clear All</strong> empties the queue.</li>
+<li><strong>Delete</strong> removes the selected rows. Right-click for the same actions plus <strong>Open in Studio</strong>; double-clicking a row also opens it in the editor. On macOS, Control-click also opens the menu.</li>
+<li><strong>Switching to the Studio tab</strong> (its button, or <strong>Shift+Tab</strong>) loads a shader from the queue and sets what ← / → and the slideshow step through: with <strong>one row selected</strong>, that row, stepping through the whole queue; with <strong>several selected</strong>, the first of them, stepping through only those; with <strong>none selected</strong>, the first row, stepping through the whole queue. An empty queue loads nothing. If you come back without changing the queue or its selection, Studio stays on the shader it was showing, so you can glance at the queue mid-playlist. Double-click or <strong>Open in Studio</strong> always loads the row.</li>
+<li><strong>Shift+Tab</strong> switches between the Queue and Studio tabs from anywhere in the window.</li>
+<li>Drag the column header edges to resize columns. The <strong>Size</strong> column shows each shader file's size. Click the <strong>Filename</strong>, <strong>Type</strong>, <strong>Size</strong> or <strong>GPU</strong> heading to sort the queue by it (click again to reverse; Size and GPU start with the largest). The sorted order becomes the queue's order, for builds and for ← / → and the slideshow.</li>
+<li><strong>Analyze</strong> fills the <strong>GPU @1080p</strong> column with each shader's GPU load (see <em>GPU load</em> below), for the selected rows or the whole queue. Press it again to stop (it reads <strong>Stop Analysis</strong> meanwhile; <strong>Build FFGL</strong> likewise reads <strong>Cancel Build</strong>). Sorting by GPU puts the heaviest first; ⚠ marks shaders that can't hold 60 fps at 1080p on this computer. The log names the heaviest one.</li>
+</ul>
+<h3 id="studio-tab">Studio tab</h3>
+<p>Open a shader with <strong>+</strong> (or paste one) and click <strong>Analyze</strong> (or press Ctrl+Enter; ⌘+Enter on macOS): it processes the code, loads it into the preview and measures its GPU load. After editing the code, Analyze processes it again; with the code unchanged it only measures. <strong>Build FFGL (.dll)</strong> (<code>.bundle</code> on macOS) then makes the plugin and <strong>Export ISF (.fs)</strong> the ISF file, as on the Queue tab. The disk button next to <strong>+</strong> saves the code as a <code>.txt</code> or <code>.fs</code> file. You get:</p>
+<ul>
+<li><strong>Live preview.</strong> Rendered on your GPU the same way the plugin renders it.<ul>
+<li><strong>Fullscreen:</strong> click <strong>⛶</strong>, double-click the preview, or press <strong>Ctrl+F</strong> (⌘F on macOS) to fill the monitor GLim is on; press <strong>Esc</strong>, <strong>Ctrl+F</strong> / ⌘F again, or double-click to return.</li>
+<li><strong>Output window (multi-monitor):</strong> click <strong>⧉</strong> (left of ⛶) to show the live render in its own window, opened on another monitor if you have one. Move and resize it like any window; GLim stays usable, and slider changes show up live. Double-click it or press <strong>Ctrl+F</strong> / ⌘F (in it, or in GLim) to make it fullscreen on the monitor it's on; <strong>Esc</strong> goes back to the window. The <strong>⧉</strong> button is a toggle (highlighted while the window is open): press it again, or use the window's close button, to close it. While the output is fullscreen the button does nothing; press Esc first.</li>
+<li><strong>Sending to other apps (Send row, under the preview):</strong> each button is off when GLim starts; click it to turn it on (highlighted) or off. They work together, and on their own: they keep sending when you switch shaders (← / →, the slideshow) or go to the Queue tab, with or without the output window. While one is on, the output window shows the same frames, scaled to fit. Turned on before a shader is loaded, sending starts with the first one.<ul>
+<li><strong>Spout</strong> (Windows) or <strong>Syphon</strong> (macOS) sends the shader loaded in the Studio tab to other apps on the same computer (Resolume, MadMapper, OBS, TouchDesigner, …) as a source named <strong>GLim</strong>, at 1920×1080, about 60 fps, GPU to GPU.</li>
+<li><strong>Remote control:</strong> the controls here and the shader's parameters can also be worked from TouchOSC on a phone, tablet or computer (see <em>Remote control</em> below).</li>
+<li><strong>NDI®</strong> sends it over the network, to apps on this computer or others on the same network, as the source <strong>COMPUTERNAME (GLim)</strong>, at 30 fps. The menu beside it picks <strong>1080p</strong> (1920×1080) or <strong>720p</strong> (1280×720); changing it while sending switches straight away. NDI uses some CPU to compress the frames, more at 1080p. The first time, Windows Firewall asks whether GLim may use the network (allow it, or other computers won't see the source), and macOS asks for Local Network access. Receive it in Resolume (Sources → NDI), OBS (with the DistroAV plugin), or NDI Studio Monitor (part of the free NDI Tools).</li>
+</ul>
+</li>
+<li>Both render at the window's resolution (up to 1920 wide, scaled up beyond that). The output draws on its own thread, so it keeps playing smoothly while GLim is busy (e.g. rebuilding the parameter list after a shader switch). While it's open, the small preview keeps running at a lower frame rate (about 10 fps) and follows shader switches; on Windows, GLim's own window pauses while you drag the output window.</li>
+<li><strong>Queue playlist:</strong> the <strong>←</strong> / <strong>→</strong> buttons under the preview (and the ← / → keys: anywhere in the Studio tab, unless you're typing in the code box or a text field or have clicked a slider (click anywhere else to release it); and in fullscreen or the output window) load the previous / next shader in the <strong>Queue</strong> (or in the selected rows, if several were selected when you switched to Studio) into the Studio tab. Each starts from the beginning with its saved settings, shaders that don't compile are skipped, and the list wraps around. The label next to them shows the position in the queue (e.g. "3 / 12"), or "not in queue" when the loaded shader isn't in it.</li>
+<li><strong>Slideshow:</strong> <strong>Auto</strong> (next to the ← / → buttons) steps to the next queue shader every few seconds; type the time in the box beside it (seconds, minimum 1, Enter to apply; default 10). After the last shader it loops back to the first. The button is highlighted while on, and the label counts down ("next in 4s"). Pausing the preview (⏸) holds the countdown; ← / → restart it. It keeps running in fullscreen and with the output window open, so it works as an unattended playlist on a second monitor. Press <strong>Auto</strong> again to stop.</li>
+<li>Fullscreen and the output window always show the shader loaded in the Studio tab, so loading another shader (from the queue, <strong>+</strong>, or a drop) switches them too, and recompiling after a settings change updates them live. If the loaded shader doesn't compile, they keep showing the last one that did.</li>
+<li>Play/pause with ⏸; restart time and feedback buffers with ⟲.</li>
+<li>For effects, preview over the test pattern, or choose <strong>Load image…</strong> to use your own picture.</li>
+</ul>
+</li>
+<li><strong>Channels.</strong> For Shadertoy shaders, pick what each <code>iChannel</code> reads: the clip (<code>input</code>), <code>noise</code>, <code>audio</code>, <code>none</code>, or an image file. The <strong>filter</strong> and <strong>wrap</strong> menus next to it set how the channel is sampled (see <em>Sampler settings</em> below).</li>
+<li><strong>Parameters.</strong> For each control you can:<ul>
+<li><strong>Untick</strong> it to hide it. Hidden controls are compiled in as constants at their current value.</li>
+<li><strong>Rename</strong> it. That's the name Resolume and MadMapper show.</li>
+<li>Set the <strong>min/max</strong> range.</li>
+<li>Set the <strong>starting value</strong> with the slider, switch, dropdown or color picker.</li>
+<li>Type a value: click the number to the right of a slider, type, and press Enter (Esc cancels). If the value is outside the min/max range, the range widens to fit.</li>
+<li>Reset a slider to the shader's own default: right-click it (on macOS also Control-click).</li>
+<li>Nudge a slider with the keyboard: click it (its handle turns amber), then press <strong>←</strong> / <strong>→</strong> to step it by 1/100 of its range (1 for whole numbers). Click anywhere else to release it: ← / → then step through the queue again.</li>
+</ul>
+</li>
+<li><strong>GPU load.</strong> Under the preview, a bar and readout show how hard the shader works your graphics card, e.g. <strong>29% of 60 fps</strong> and <em>4.81 ms/frame · ~208 fps max · 1920×1080</em>.<ul>
+<li>It's the GPU time one frame takes, timed by the graphics card itself (so vsync, the screen and GLim's own work don't count), measured at 1920×1080 over about a second.</li>
+<li><strong>Live</strong> (highlighted while on) measures continuously: a new reading about every half second, so it follows slider moves and shader switches as you make them. It measures at 1920×1080 in the background (the preview itself stays small) and pauses while the preview isn't showing, e.g. on the Queue tab. It keeps the graphics card busy, so it's <strong>off</strong> by default: switching shaders (e.g. in a slideshow) then costs as little as possible, nothing is measured unless you press <strong>Analyze</strong>, and results already known (from <strong>Analyze</strong>, <strong>Live</strong>, or the queue's <strong>Analyze</strong>) still show. Turn it on for diagnostics or when comparing shaders. While Live is on, <strong>Analyze</strong> only processes changed code (Live does the measuring).</li>
+<li><strong>% of 60 fps</strong> is that time as a share of a 60 fps frame (16.7 ms): under 50% (green) leaves plenty of room; 50–100% (amber) is heavy; over 100% (red) means it can't run at 60 fps at 1080p on this computer, even on its own. In Resolume, layers and effects add up: two shaders at 40% each use about 80%.</li>
+<li><strong>ms/frame</strong> is the raw time; <strong>fps max</strong> is the highest frame rate the GPU could draw it at (1000 ÷ ms). The cost scales roughly with the number of pixels: 4K (3840×2160) costs about 4× as much as 1080p.</li>
+<li>It's measured with the current slider values; some sliders (iterations, loops, detail) change the cost a lot. Press <strong>Analyze</strong> to re-measure after moving them (or use <strong>Live</strong>).</li>
+<li>Why not just time the preview as it plays? With so little to do, the graphics card lowers its clock speed, and a light shader then times up to 2× slower than it really needs. Measurements run frames back to back so the card works at full speed, as it does under a real show's load.</li>
+<li>While the output window (or fullscreen) is open, measuring times the output itself, at its actual resolution, instead of running a separate 1080p measurement alongside it: continuously with <strong>Live</strong> on ("live in the output"), or for one second when you press <strong>Analyze</strong> ("measured in the output"). These are the output's real frame times, so a light shader can read higher here than measured at 1080p: at 60 fps with little to do, the card lowers its clocks.</li>
+<li>CPU load isn't shown: shaders run entirely on the GPU, and the plugin's CPU work per frame is tiny.</li>
+<li>Results depend on the graphics card (and, on laptops, whether it's plugged in). Measurements from the queue and from this tab are shared for the session.</li>
+</ul>
+</li>
+<li><strong>Save settings.</strong> Writes <code>&lt;shader&gt;.glim.json</code> next to the shader. <strong>Build FFGL</strong> saves it automatically. Queue builds, ISF exports and the command line all use it, so set up a shader once and batch-build it later.</li>
+</ul>
+<hr />
+<h2 id="supported-inputs">Supported inputs</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align: left;">Format</th>
+<th style="text-align: left;">Detected by</th>
+<th style="text-align: left;">Becomes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>ISF</strong> (<code>.fs</code>)</td>
+<td style="text-align: left;"><code>/*{ JSON }*/</code> header</td>
+<td style="text-align: left;">Source, Effect (1 image input), or Mixer (Transition category with 2 images)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Shadertoy</strong></td>
+<td style="text-align: left;"><code>mainImage()</code></td>
+<td style="text-align: left;">Source; or Effect if it reads <code>iChannel0</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>GLSL Sandbox / plain GLSL</strong></td>
+<td style="text-align: left;"><code>main()</code></td>
+<td style="text-align: left;">Source (or Effect if it declares a <code>sampler2D</code> uniform)</td>
+</tr>
+</tbody>
+</table></div>
+<p>Supported features:</p>
+<ul>
+<li><strong>ISF:</strong> all input types. Multi-pass and persistent buffers (<code>PASSES</code>, <code>PERSISTENT</code>, <code>FLOAT</code>, <code>WIDTH</code>/<code>HEIGHT</code> expressions) are supported, as are all <code>IMG_*</code> macros, <code>DATE</code>, <code>FRAMEINDEX</code> and <code>TIMEDELTA</code>.<ul>
+<li><code>IMPORTED</code> images are embedded in the plugin.</li>
+<li><code>audio</code>/<code>audioFFT</code> inputs receive the host's audio spectrum.</li>
+<li>Companion <code>.vs</code> vertex shaders (same file name, next to the <code>.fs</code>) are supported.</li>
+</ul>
+</li>
+<li><strong>Shadertoy:</strong> <code>iTime</code>, <code>iResolution</code>, <code>iMouse</code>, <code>iDate</code>, <code>iFrame</code>, <code>iTimeDelta</code>, <code>iChannel0-3</code> and <code>iChannelResolution</code>.</li>
+<li><strong>GLSL Sandbox:</strong> <code>time</code>, <code>resolution</code>, <code>mouse</code> and <code>surfacePosition</code>. Unknown <code>uniform</code>s become sliders.</li>
+<li><strong>Tempo (any dialect):</strong> <code>iBPM</code>, <code>iBeat</code> and <code>iBarPhase</code>. See <em>Tempo</em> below.</li>
+<li><strong>Older GLSL:</strong> <code>texture2D</code>, <code>gl_FragColor</code> and similar legacy names are translated automatically.</li>
+<li><strong>Uninitialised variables</strong> are set to zero, as browsers do. Shadertoy code often relies on this.</li>
+</ul>
+<h3 id="shadertoy-channels">Shadertoy channels</h3>
+<p>By default every <code>iChannel</code> reads the clip, which makes the plugin an effect. Choose a different source with a comment line anywhere in the shader:</p>
+<pre><code class="language-glsl">// glim: iChannel1 = textures/rock.jpg   (image file, relative to the shader; embedded in the plugin)
+// glim: iChannel2 = noise                (generated RGBA noise texture)
+// glim: iChannel3 = audio                (live audio spectrum from the host)
+// glim: iChannel0 = input                (the clip; the default)
+</code></pre>
+<p>If an image file is missing, a noise texture is used and GLim warns you.</p>
+<h4 id="sampler-settings">Sampler settings</h4>
+<p>Like Shadertoy's per-channel settings, add <code>filter</code>, <code>wrap</code> and <code>vflip</code> after the source:</p>
+<pre><code class="language-glsl">// glim: iChannel1 = textures/pixels.png filter=nearest wrap=clamp
+// glim: iChannel2 = textures/rock.jpg vflip=false
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align: left;">Setting</th>
+<th style="text-align: left;">Values</th>
+<th style="text-align: left;">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>filter</code></td>
+<td style="text-align: left;"><code>nearest</code> (sharp pixels), <code>linear</code>, <code>mipmap</code> (smooth when shrunk)</td>
+<td style="text-align: left;">images: <code>mipmap</code>; buffers and the clip: <code>linear</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>wrap</code></td>
+<td style="text-align: left;"><code>clamp</code>, <code>repeat</code> (tiles)</td>
+<td style="text-align: left;">images: <code>repeat</code>; buffers and the clip: <code>clamp</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>vflip</code></td>
+<td style="text-align: left;"><code>true</code>, <code>false</code> (image upside down, as on Shadertoy)</td>
+<td style="text-align: left;"><code>true</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Shadertoy JSON exports carry these settings already. In multi-buffer shaders each pass can read the same buffer with different settings. The clip can't be mipmapped, so <code>mipmap</code> acts like <code>linear</code> there.</p>
+<p>In ISF exports, <code>nearest</code> and <code>repeat</code> are emulated in the shader, because ISF hosts always sample images smoothly and clamped. Two small differences remain: <code>mipmap</code> acts like <code>linear</code>, and with <code>linear</code> + <code>repeat</code>, the half texel at each tile edge clamps instead of blending with the opposite edge (only visible on very low-resolution images).</p>
+<h3 id="multi-buffer-shadertoy-shaders-buffer-ad">Multi-buffer Shadertoy shaders (Buffer A–D)</h3>
+<p>Either:</p>
+<ul>
+<li><strong>Shadertoy JSON:</strong> drop the <code>.json</code> export of the shader. Passes, channel wiring and texture slots come from the file. Texture images are used if a file with the same name sits next to the JSON; otherwise noise is used.</li>
+<li><strong>Sectioned text:</strong> paste each tab into one <code>.txt</code> under header lines, with channel directives inside each section:</li>
+</ul>
+<pre><code class="language-glsl">// ==== Common ====
+...
+// ==== Buffer A ====
+// glim: iChannel0 = Buffer A     (feedback: reads its own previous frame)
+void mainImage(...) { ... }
+// ==== Image ====
+// glim: iChannel0 = Buffer A
+void mainImage(...) { ... }
+</code></pre>
+<p>Buffers become float feedback buffers in the FFGL plugin and <code>PASSES</code> in ISF exports. Errors are reported as <code>[Buffer A] line N</code>.</p>
+<h3 id="not-yet-supported">Not yet supported</h3>
+<ul>
+<li>Shadertoy cubemap and sound-output passes.</li>
+<li>Keyboard input (reads black).</li>
+<li>Real waveform data. FFGL hosts only provide the spectrum, so waveform inputs get the spectrum instead.</li>
+</ul>
+<hr />
+<h2 id="parameters">Parameters</h2>
+<h3 id="isf-inputs">ISF inputs</h3>
+<p>These become native FFGL parameters:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align: left;">ISF input</th>
+<th style="text-align: left;">FFGL parameter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>float</code></td>
+<td style="text-align: left;">Slider with the real MIN/MAX range</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>long</code></td>
+<td style="text-align: left;">Dropdown with the ISF labels</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>bool</code></td>
+<td style="text-align: left;">Toggle</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>event</code></td>
+<td style="text-align: left;">Trigger button</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>color</code></td>
+<td style="text-align: left;">Color picker</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>point2D</code></td>
+<td style="text-align: left;">X and Y sliders</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="shadertoy-glsl-constants">Shadertoy / GLSL constants</h3>
+<p>Top-level <code>const float/bool/vec3</code> values and <code>#define NAME 1.5</code> lines become sliders, toggles or color pickers. To leave one out, untick it in the Studio tab: it's compiled in as a constant at its current value. (The command line's <code>--no-params</code> still turns this off for a whole run.)</p>
+<ul>
+<li>Math constants (PI, TAU, epsilons…) are skipped.</li>
+<li>Constants that must stay constant (array sizes, <code>case</code> labels) are skipped.</li>
+<li>If turning a constant into a slider would break compilation, GLim puts it back as a constant and tells you.</li>
+</ul>
+<h3 id="built-in-controls">Built-in controls</h3>
+<ul>
+<li><strong>Speed</strong> is added to every animated shader and scales time smoothly; changing it never makes the animation jump. If the shader already has its own "speed" control, GLim's is called <strong>Time Scale</strong> instead.</li>
+<li><strong>Sliders that multiply time</strong> (<code>iTime * speed</code>, <code>TIME * rate</code>, <code>vec3(rx, ry, rz) * iTime</code>, also inside <code>#define</code>s) don't jump the animation either: the plugin keeps a running total of time × slider, so moving the slider changes how fast things move from that moment on. This also covers the shader's own speed controls. It applies to FFGL plugins and the preview; ISF hosts can't keep a running total, so in ISF exports these sliders (and Speed) still jump. Time that reaches the slider through a variable first (<code>float t = iTime; … t * speed</code>) isn't detected.</li>
+<li><strong>Mouse X/Y</strong> and <strong>Mouse Click</strong> are added when a shader uses the mouse.</li>
+</ul>
+<h3 id="tempo">Tempo</h3>
+<p>Shaders in any dialect can use the host's tempo by reading these names (no declaration needed):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align: left;">Name</th>
+<th style="text-align: left;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>iBPM</code></td>
+<td style="text-align: left;">Tempo in beats per minute</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>iBeat</code></td>
+<td style="text-align: left;">Beats elapsed, in step with the host's bars (<code>fract(iBeat)</code> pulses every beat)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>iBarPhase</code></td>
+<td style="text-align: left;">0 to 1 through the current bar</td>
+</tr>
+</tbody>
+</table></div>
+<p>Resolume sends its tempo to FFGL plugins. Until a host sends any, and in the preview, the plugin runs at 120 BPM. ISF hosts have no tempo input, so ISF exports get a <strong>BPM</strong> slider (default 120) and count beats from <code>TIME</code>.</p>
+<h3 id="alpha">Alpha</h3>
+<p>Shadertoy and GLSL Sandbox ignore output alpha, so GLim makes those plugins opaque. ISF shaders keep their alpha.</p>
+<h2 id="building-blocks">Building blocks</h2>
+<p>Four of the shaders in <code>original-shaders</code> are simple pieces to combine into your own looks, for example a <code>shapeForge</code> star over spiralling rays from <code>radialBurst</code>, masked by <code>noiseField</code>. Build them as plugins and stack them as layers in Resolume.</p>
+<p>Each draws one element and has a <strong>Transparent</strong> switch: on, the background is see-through (alpha), so the layer sits over the ones below without a blend mode.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align: left;">Shader</th>
+<th style="text-align: left;">What it draws</th>
+<th style="text-align: left;">Main controls</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>shapeForge</code></td>
+<td style="text-align: left;">A polygon, star or circle, as outline, fill and glow, in concentric copies</td>
+<td style="text-align: left;">Sides, Star, Roundness, Copies, Spacing, Spin, Twist, Pulse, Position</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>gridMatrix</code></td>
+<td style="text-align: left;">A grid of dots, squares, crosses, rings or diamonds, sized by a travelling wave</td>
+<td style="text-align: left;">Shape, Wave, Columns, Wave Amount / Freq / Speed, Cell Spin, Grid Spin</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>radialBurst</code></td>
+<td style="text-align: left;">Rays from a point, straight or spiralling</td>
+<td style="text-align: left;">Rays, Width, Spin, Twist, Breathe, Length Jitter, Inner Radius, Position</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>noiseField</code></td>
+<td style="text-align: left;">Smooth, ridged, turbulent or cellular noise; with <strong>Threshold</strong> it becomes a mask</td>
+<td style="text-align: left;">Type, Scale, Detail, Warp, Drift, Evolve, Contrast, Threshold</td>
+</tr>
+</tbody>
+</table></div>
+<p>Every moving part has its own rate slider (Spin, Scroll, Pulse Rate …), and in the plugins moving a rate slider changes the speed without the motion jumping. The jitter controls change in steps on purpose, for strobing.</p>
+<h2 id="remote-control-osc-touchosc">Remote control (OSC, TouchOSC)</h2>
+<p>GLim's Studio tab can be controlled from a phone, a tablet or another computer over the network, with OSC. It's always on: GLim listens on UDP port <strong>8000</strong> and sends what it's doing back on port <strong>8001</strong>. The log says so when GLim starts, with this computer's address: <code>OSC remote control: 192.168.1.20, port 8000 (feedback to port 8001)</code>. The first time, Windows Firewall asks whether GLim may use the network: allow it on private networks, or other devices can't reach it. macOS asks for Local Network access.</p>
+<p>It controls what's under the preview: play / pause, restart, ← / →, the slideshow (<strong>Auto</strong> and its time), the output window and fullscreen, Spout (Syphon on macOS), NDI and its size, and the loaded shader's parameters. Not the queue, <strong>Build FFGL</strong>, <strong>Export ISF</strong> or <strong>Analyze</strong>.</p>
+<p>You need <a href="https://hexler.net/touchosc" target="_blank" rel="noopener">TouchOSC</a> (by hexler, for Windows, macOS, iOS and Android). <strong>TouchOSC layouts</strong> are in the <code>touchosc</code> folder:</p>
+<ul>
+<li><code>GLim_desktop.tosc</code>: one landscape page, for TouchOSC on a computer or a tablet.</li>
+<li><code>GLim_phone.tosc</code>: for phones held upright (made for the Pixel 7a; fits other 20:9 phones). A <strong>CONTROL</strong> page, then the parameters, 8 to a page.</li>
+</ul>
+<p>To use one:</p>
+<ol>
+<li>In TouchOSC, open <strong>Connections → OSC</strong> and set up any connection (the layouts send and receive on all of them; other enabled connections get GLim's messages too, which other apps ignore): <strong>UDP</strong>, <strong>Host</strong> = the GLim computer's address (from the log; <code>127.0.0.1</code> when TouchOSC runs on the same computer), <strong>Send Port</strong> <code>8000</code>, <strong>Receive Port</strong> <code>8001</code>.</li>
+<li>Open the layout in TouchOSC and start the control surface (▶). To get it onto a phone or tablet, copy the <code>.tosc</code> file there (by cloud drive, email or USB) and open it from TouchOSC. TouchOSC keeps its own copy of a layout on each device: after a new version of GLim's layouts, copy the file to the phone or tablet again.</li>
+<li>The status line (under the shader name on the desktop layout, at the bottom on the phone) changes to <strong>connected: GLim on COMPUTERNAME</strong> within a couple of seconds. If it stays at <em>not connected</em>, check the address and ports, that both are on the same network, and the firewall.</li>
+</ol>
+<p>On a Mac with tap to click turned on, TouchOSC on that Mac misses some taps on the trackpad (GLim never receives them; other macOS apps have the same problem). Press the trackpad down instead, or use a mouse.</p>
+<p>The layout follows GLim: the switches light up as things are turned on (from the layout, in GLim or by the slideshow), and loading another shader fills in its parameter names, values and faders.</p>
+<p><strong>Parameters</strong> take up to 24 slots, in the order of the Studio tab's list (without those kept as constants). Each value has a slot: a colour takes one per channel (R, G, B and, if it has one, A) and a point one per axis (X, Y). Unused slots are hidden. A fader covers the parameter's range (as set in the Studio tab); for a menu it steps through the options; a switch is on past the middle, and a trigger fires at the right-hand end. Moving a fader changes the value as the Studio tab's slider does, so it's saved with the shader's settings too. A shader with more than 24 values (rare) shows the first 24; the layout says e.g. <em>28 parameters: the first 24 are here</em>.</p>
+<p><strong>From other OSC apps</strong> (Open Stage Control, Max, Lemur, …): send to UDP port 8000 at the GLim computer's address. Switches take <code>1</code> or <code>0</code> (no argument toggles); buttons act on a message with no argument or <code>1</code> (not on the <code>0</code> a button sends when it's released).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align: left;">Address</th>
+<th style="text-align: left;">Argument</th>
+<th style="text-align: left;">What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>/glim/play</code></td>
+<td style="text-align: left;">1 / 0</td>
+<td style="text-align: left;">Play / pause</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/restart</code></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">Restart the shader</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/prev</code>, <code>/glim/next</code></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">Previous / next shader in the queue (as ← / →)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/auto</code></td>
+<td style="text-align: left;">1 / 0</td>
+<td style="text-align: left;">Slideshow on / off</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/auto/seconds</code></td>
+<td style="text-align: left;">seconds</td>
+<td style="text-align: left;">Slideshow time (minimum 1)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/auto/seconds/up</code>, <code>/down</code></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">Slideshow time one step longer / shorter (… 8, 10, 12, 15, 20 …)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/output</code></td>
+<td style="text-align: left;">1 / 0</td>
+<td style="text-align: left;">Output window open / closed (closing works even when it's fullscreen)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/fullscreen</code></td>
+<td style="text-align: left;">1 / 0</td>
+<td style="text-align: left;">Fullscreen, as ⛶ (the output window's, if it's open)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/spout</code></td>
+<td style="text-align: left;">1 / 0</td>
+<td style="text-align: left;">Spout (Syphon on macOS) on / off</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/ndi</code></td>
+<td style="text-align: left;">1 / 0</td>
+<td style="text-align: left;">NDI on / off</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/ndi/720p</code></td>
+<td style="text-align: left;">1 / 0</td>
+<td style="text-align: left;">NDI at 1280×720 / 1920×1080</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/param/1</code> … <code>/24</code></td>
+<td style="text-align: left;">0 … 1</td>
+<td style="text-align: left;">Parameter slot (as above)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/ping</code></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">Answered with <code>/glim/pong</code> and the computer's name</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>/glim/sync</code></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">Send the whole state again</td>
+</tr>
+</tbody>
+</table></div>
+<p>GLim sends its state to every address that has sent it a message in the last 30 seconds (send <code>/glim/ping</code> now and then to keep it coming; the TouchOSC layouts do, every second), on port 8001 and on the port the message came from. The switches come back on their own addresses as <code>1</code> / <code>0</code>, each parameter slot as its <code>0 … 1</code> value, and these as text: <code>/glim/shader</code> (the shader's name), <code>/glim/queue</code> (e.g. <code>3 / 12 · next in 4s</code>), <code>/glim/time</code>, <code>/glim/auto/label</code> (e.g. <code>10 s</code>), <code>/glim/spout/name</code> (<code>Spout</code> or <code>Syphon</code>), <code>/glim/params</code> (how many parameters), <code>/glim/param/&lt;n&gt;/name</code> and <code>/glim/param/&lt;n&gt;/value</code> (both empty for an unused slot). Only what changes is sent again.</p>
+<hr />
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p><strong>Starting GLim</strong></p>
+<ul>
+<li><strong>Windows protected your PC</strong>, or an antivirus app removes GLim.exe: GLim isn't code-signed yet. Click <strong>More info → Run anyway</strong>; in the antivirus app, restore the file and allow it.</li>
+<li><strong>macOS: "GLim can't be opened"</strong> or <strong>"is damaged and can't be opened"</strong>: macOS blocks apps from outside the App Store that aren't notarized. Use <strong>Open Anyway</strong> (see <em>Installing on macOS</em>), or run <code>xattr -dr com.apple.quarantine /Applications/GLim.app</code> in Terminal.</li>
+<li><strong>No preview, or the log says <em>GPU validation unavailable</em>:</strong> GLim can't use your graphics card's OpenGL 4.1. Install the latest driver from NVIDIA, AMD or Intel (not just the one Windows Update installed). It doesn't work in a virtual machine or over Remote Desktop. On a laptop with two graphics chips, set GLim.exe to <em>High performance</em> in Windows <em>Settings → System → Display → Graphics</em>.</li>
+</ul>
+<p><strong>Shaders and plugins</strong></p>
+<ul>
+<li><strong>"Shader does not compile"</strong>: the log lists the errors with line numbers from <em>your</em> file.</li>
+<li><strong>Build FFGL says "No C++ compiler found" or "CMake not found":</strong> install the build tools (see <em>Installing on Windows</em> or <em>Installing on macOS</em>) and restart GLim.</li>
+<li><strong>Build failed</strong>: the log shows the compiler's error lines.</li>
+<li><strong>Plugin missing in Resolume</strong>: check that the <code>.dll</code> (Windows) or <code>.bundle</code> (macOS) is in a folder Resolume scans, then restart Resolume. FFGL shows only the first 16 characters of a plugin name. GLim keeps those 16 characters unique within one batch.</li>
+<li><strong>Settings aren't kept:</strong> GLim saves them next to the shader, so the shader's folder must be writable (not inside a zip, a read-only drive or <code>Program Files</code>).</li>
+</ul>
+<p><strong>Network (NDI and remote control)</strong></p>
+<ul>
+<li><strong>Other computers don't see the NDI source, or TouchOSC stays <em>not connected</em>:</strong><ul>
+<li>Both devices must be on the same network. Guest and public Wi-Fi often keep devices apart.</li>
+<li>Windows: allow GLim through the firewall on private networks (<em>Windows Security → Firewall &amp; network protection → Allow an app through firewall</em>), and check that your network is set to <em>Private</em> (<em>Settings → Network &amp; internet</em>), not <em>Public</em>.</li>
+<li>macOS: turn GLim on in <em>System Settings → Privacy &amp; Security → Local Network</em>.</li>
+</ul>
+</li>
+<li><strong>The log says <em>OSC remote control unavailable: UDP port 8000 is in use</em>:</strong> another app (or a second copy of GLim) is using port 8000. Close it and restart GLim.</li>
+</ul>
+<h2 id="reporting-problems">Reporting problems</h2>
+<p>Email problems, questions and suggestions to <strong><a href="mailto:bzsqrl@gmail.com">bzsqrl@gmail.com</a></strong>.</p>
+<p>When something goes wrong, please send:</p>
+<ul>
+<li><strong>What you did, what happened, and what you expected.</strong></li>
+<li><strong>GLim's version:</strong> it's in the title bar and the log's first line (e.g. <code>GLim 0.9.0-beta.2</code>).</li>
+<li><strong>Your computer:</strong> Windows or macOS version, and the <code>GPU: …</code> line from the log.</li>
+<li><strong>The log:</strong> click in it, press <strong>Ctrl+A</strong> then <strong>Ctrl+C</strong> (⌘A, ⌘C on macOS), and paste it into your message.</li>
+<li><strong>The shader</strong>, if it's about one: the shader file and its <code>.glim.json</code>, if it has one.</li>
+<li>A screenshot, if it's about how something looks.</li>
+</ul>
+<p>If GLim won't start at all, its self-test can show why. It converts and builds one shader and checks Spout or Syphon, NDI and remote control, without opening the window, and writes <code>selftest.log</code>:</p>
+<ul>
+<li><strong>Windows:</strong> in the folder with GLim.exe, type <code>powershell</code> in File Explorer's address bar and press Enter, then type <code>.\GLim.exe --selftest</code> and a space, drag any shader file into the window (that types its path), type a space and <code>selftest</code>, and press Enter.</li>
+<li><strong>macOS:</strong> in Terminal, type <code>/Applications/GLim.app/Contents/MacOS/GLim --selftest</code> and a space, drag any shader file into the window, type a space and <code>~/Desktop/selftest</code>, and press Return.</li>
+</ul>
+<p>Send the <code>selftest.log</code> from the <code>selftest</code> folder (the plugin it builds there can be deleted).</p>
+<hr />
+<h2 id="running-from-source-developers">Running from source (developers)</h2>
+<h3 id="prerequisites-windows">Prerequisites (Windows)</h3>
+<ul>
+<li><strong>Python 3.10+</strong> with the packages in <code>requirements.txt</code>: <code>venv\Scripts\pip install -r requirements.txt</code></li>
+<li><strong>CMake</strong>: on your PATH, in its default folder (<code>C:\Program Files\CMake</code>), or the one that comes with Visual Studio</li>
+<li><strong>Visual Studio 2022+ or the Build Tools</strong>, with the "Desktop development with C++" workload</li>
+<li>An OpenGL 4.1 GPU.</li>
+</ul>
+<h3 id="prerequisites-macos">Prerequisites (macOS)</h3>
+<ul>
+<li><strong>Python 3.12</strong> (Homebrew <code>python@3.12</code> and <code>python-tk@3.12</code>) with the packages in <code>requirements.txt</code>: <code>venv/bin/pip install -r requirements.txt</code></li>
+<li><strong>CMake</strong> (<code>brew install cmake</code>)</li>
+<li><strong>Xcode Command Line Tools</strong> (<code>xcode-select --install</code>). The full Xcode app isn't needed.</li>
+</ul>
+<h3 id="running-and-packaging">Running and packaging</h3>
+<ul>
+<li><strong>GUI:</strong> <code>venv\Scripts\python src\main_gui.py</code> (macOS: <code>venv/bin/python src/main_gui.py</code>). It asks where to write plugins, ISF files and saved code, and remembers the folders in <code>prefs.json</code> (<code>glim/prefs.py</code>) in <code>%APPDATA%\GLim</code> (macOS: <code>~/Library/Application Support/GLim</code>). The command line below writes to the project's <code>output</code> folder unless you pass <code>--out</code>.</li>
+<li><strong>Packaged app:</strong> <code>venv\Scripts\python compile.py</code> builds <code>dist\GLim.exe</code>; on macOS, <code>venv/bin/python compile.py</code> builds <code>dist/GLim.app</code> (Apple Silicon, signed ad hoc, not notarized). It also copies the rest of the package into <code>dist</code>: the <code>original-shaders</code> and <code>touchosc</code> folders, <code>LICENSE.txt</code>, <code>THIRD_PARTY_NOTICES.txt</code> (<code>tools/make_notices.py</code>: the licences of what this platform's build bundles) and <code>USER_MANUAL.html</code> (<code>tools/build_manual.py</code>, from this file). The version is <code>__version__</code> in <code>glim/__init__.py</code>: it's shown in the title bar, the log and <code>selftest.log</code>, and stamped on GLim.exe (<em>Properties → Details</em>) and GLim.app. Headless check: <code>GLim.exe --selftest &lt;shader&gt; &lt;dir&gt;</code> (macOS: <code>GLim.app/Contents/MacOS/GLim --selftest &lt;shader&gt; &lt;dir&gt;</code>) writes <code>selftest.log</code> into <code>&lt;dir&gt;</code>.</li>
+<li><strong>TouchOSC layouts:</strong> edit <code>tools/build_touchosc.py</code> and run <code>venv\Scripts\python tools\build_touchosc.py</code>, or edit them in TouchOSC's editor.</li>
+</ul>
+<h3 id="command-line">Command line</h3>
+<pre><code>venv\Scripts\python -m glim &lt;files or folders&gt; --to ffgl|isf|both|check [--out DIR] [--no-params] [--test]
+</code></pre>
+<ul>
+<li><code>--to check</code> validates shaders without building anything.</li>
+<li><code>--test</code> loads each finished plugin in GLim's built-in test host and renders a few frames.</li>
+</ul>
+<p>The command line runs from source only, not from GLim.exe or GLim.app.</p>
+<hr />
+<h2 id="ndi">NDI</h2>
+<p>NDI® is a registered trademark of Vizrt NDI AB. GLim uses the NDI® SDK (through the cyndilib library) to send video; it isn't made or endorsed by Vizrt NDI AB. NDI runtime: Copyright © 2023–2026 Vizrt NDI AB, all rights reserved; its licence notices ship with GLim (<code>cyndilib/wrapper/bin/*licenses*.txt</code>), and the terms NDI asks users to agree to are at the top of <code>THIRD_PARTY_NOTICES.txt</code>. More about NDI: <a href="https://ndi.video/" target="_blank" rel="noopener">ndi.video</a>.</p>
+<h2 id="shader-licensing">Shader licensing</h2>
+<p>Shaders are the creative property of their authors.</p>
+<ul>
+<li>Shadertoy code defaults to <strong>CC BY-NC-SA 3.0</strong> unless the code says otherwise.</li>
+<li>ISF and GLSL Sandbox shaders vary.</li>
+</ul>
+<p>Keep credits, and respect non-commercial and share-alike terms.</p>
+<p>What you make with GLim is yours, but a shader's licence also applies to the plugins and ISF files made from it. The shaders that come with GLim are public domain (CC0), so the plugins and ISF files you make from them are free to use and share.</p>
+<p>Plugins that GLim builds contain code from the FFGL SDK (and on Windows, GLEW). Their licences, in <code>THIRD_PARTY_NOTICES.txt</code>, ask that their notices go with any plugins you share.</p>
+<h2 id="privacy">Privacy</h2>
+<p>GLim doesn't collect any data and doesn't connect to the internet. It uses your local network only for NDI output and for remote control (OSC on UDP port 8000).</p>
+</main>
+</div>
+</body>
+</html>

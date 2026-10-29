@@ -63,6 +63,7 @@ Each shader is converted, compiled and rendered on this computer's GPU (use `ven
 | `tools/` | Generators for the TouchOSC layouts, `THIRD_PARTY_NOTICES.txt` (licence texts in `tools/licenses/`) and `USER_MANUAL.html` |
 | `assets/icon/` | The app icon; regenerate it with `python assets/icon/make_icon.py` |
 | `tests/` | The test runner, test shaders (`corpus/`) and feature fixtures |
+| `docs/` | The website, [glim.sqrl.biz](https://glim.sqrl.biz), served by GitHub Pages. `python tools/build_manual.py docs` refreshes its copy of the manual, and `python tools/render_stills.py` its shader stills. |
 
 Drag and drop in the GUI uses `tkdnd`, which comes with the `tkinterdnd2` package. Without it, use the **+** and **📁** buttons.
 
