@@ -71,4 +71,4 @@ Drag and drop in the GUI uses `tkdnd`, which comes with the `tkinterdnd2` packag
 
 GLim is released under the [MIT licence](LICENSE.txt). The shaders in `original-shaders/` and the test shaders written for GLim are public domain (CC0). GLim includes the NDI® SDK runtime: its terms are at the top of `THIRD_PARTY_NOTICES.txt`, which `compile.py` writes into `dist/`. NDI® is a registered trademark of Vizrt NDI AB.
 
-Questions, problems and suggestions: [bzsqrl@gmail.com](mailto:bzsqrl@gmail.com), or open an issue.
+Questions, problems and suggestions: please [open an issue](https://github.com/bzsqrl/GLim/issues).

@@ -619,14 +619,14 @@ void mainImage(...) { ... }
 <li><strong>The log says <em>OSC remote control unavailable: UDP port 8000 is in use</em>:</strong> another app (or a second copy of GLim) is using port 8000. Close it and restart GLim.</li>
 </ul>
 <h2 id="reporting-problems">Reporting problems</h2>
-<p>Email problems, questions and suggestions to <strong><a href="mailto:bzsqrl@gmail.com">bzsqrl@gmail.com</a></strong>.</p>
-<p>When something goes wrong, please send:</p>
+<p>Report problems, ask questions and suggest ideas on GitHub: <strong><a href="https://github.com/bzsqrl/GLim/issues" target="_blank" rel="noopener">github.com/bzsqrl/GLim/issues</a></strong> (a free GitHub account is needed). Please check first whether someone has already reported the same thing.</p>
+<p>When something goes wrong, please include:</p>
 <ul>
 <li><strong>What you did, what happened, and what you expected.</strong></li>
 <li><strong>GLim's version:</strong> it's in the title bar and the log's first line (e.g. <code>GLim 0.9.0-beta.3</code>).</li>
 <li><strong>Your computer:</strong> Windows or macOS version, and the <code>GPU: …</code> line from the log.</li>
-<li><strong>The log:</strong> click in it, press <strong>Ctrl+A</strong> then <strong>Ctrl+C</strong> (⌘A, ⌘C on macOS), and paste it into your message.</li>
-<li><strong>The shader</strong>, if it's about one: the shader file and its <code>.glim.json</code>, if it has one.</li>
+<li><strong>The log:</strong> click in it, press <strong>Ctrl+A</strong> then <strong>Ctrl+C</strong> (⌘A, ⌘C on macOS), and paste it into the issue.</li>
+<li><strong>The shader</strong>, if it's about one: paste its code, or attach the shader file and its <code>.glim.json</code> (if it has one) in a zip.</li>
 <li>A screenshot, if it's about how something looks.</li>
 </ul>
 <p>If GLim won't start at all, its self-test can show why. It converts and builds one shader and checks Spout or Syphon, NDI and remote control, without opening the window, and writes <code>selftest.log</code>:</p>
@@ -634,7 +634,7 @@ void mainImage(...) { ... }
 <li><strong>Windows:</strong> in the folder with GLim.exe, type <code>powershell</code> in File Explorer's address bar and press Enter, then type <code>.\GLim.exe --selftest</code> and a space, drag any shader file into the window (that types its path), type a space and <code>selftest</code>, and press Enter.</li>
 <li><strong>macOS:</strong> in Terminal, type <code>/Applications/GLim.app/Contents/MacOS/GLim --selftest</code> and a space, drag any shader file into the window, type a space and <code>~/Desktop/selftest</code>, and press Return.</li>
 </ul>
-<p>Send the <code>selftest.log</code> from the <code>selftest</code> folder (the plugin it builds there can be deleted).</p>
+<p>Attach the <code>selftest.log</code> from the <code>selftest</code> folder (the plugin it builds there can be deleted).</p>
 <hr />
 <h2 id="running-from-source-developers">Running from source (developers)</h2>
 <h3 id="prerequisites-windows">Prerequisites (Windows)</h3>

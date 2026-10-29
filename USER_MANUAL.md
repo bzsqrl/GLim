@@ -366,15 +366,15 @@ GLim sends its state to every address that has sent it a message in the last 30 
 
 ## Reporting problems
 
-Email problems, questions and suggestions to **[bzsqrl@gmail.com](mailto:bzsqrl@gmail.com)**.
+Report problems, ask questions and suggest ideas on GitHub: **[github.com/bzsqrl/GLim/issues](https://github.com/bzsqrl/GLim/issues)** (a free GitHub account is needed). Please check first whether someone has already reported the same thing.
 
-When something goes wrong, please send:
+When something goes wrong, please include:
 
 - **What you did, what happened, and what you expected.**
 - **GLim's version:** it's in the title bar and the log's first line (e.g. `GLim 0.9.0-beta.3`).
 - **Your computer:** Windows or macOS version, and the `GPU: …` line from the log.
-- **The log:** click in it, press **Ctrl+A** then **Ctrl+C** (⌘A, ⌘C on macOS), and paste it into your message.
-- **The shader**, if it's about one: the shader file and its `.glim.json`, if it has one.
+- **The log:** click in it, press **Ctrl+A** then **Ctrl+C** (⌘A, ⌘C on macOS), and paste it into the issue.
+- **The shader**, if it's about one: paste its code, or attach the shader file and its `.glim.json` (if it has one) in a zip.
 - A screenshot, if it's about how something looks.
 
 If GLim won't start at all, its self-test can show why. It converts and builds one shader and checks Spout or Syphon, NDI and remote control, without opening the window, and writes `selftest.log`:
@@ -382,7 +382,7 @@ If GLim won't start at all, its self-test can show why. It converts and builds o
 - **Windows:** in the folder with GLim.exe, type `powershell` in File Explorer's address bar and press Enter, then type `.\GLim.exe --selftest ` and a space, drag any shader file into the window (that types its path), type a space and `selftest`, and press Enter.
 - **macOS:** in Terminal, type `/Applications/GLim.app/Contents/MacOS/GLim --selftest ` and a space, drag any shader file into the window, type a space and `~/Desktop/selftest`, and press Return.
 
-Send the `selftest.log` from the `selftest` folder (the plugin it builds there can be deleted).
+Attach the `selftest.log` from the `selftest` folder (the plugin it builds there can be deleted).
 
 ---
 
